@@ -76,7 +76,7 @@ function updateCountdown() {
         minute: '2-digit',
         hour12: true,
     };
-    const formattedDate = targetDate.toLocaleString('en-US', options);
+    const formattedDate = targetDate.toLocaleString('en-GB', options);
 
     eventLabel.innerHTML = `${event.label}: <span>${formattedDate}</span>`;
 
@@ -149,7 +149,7 @@ function updateLocalTime() {
         hour12: true,
     };
     document.getElementById('localTime').textContent =
-        'Local time: ' + now.toLocaleString('en-US', options);
+        'Local time: ' + now.toLocaleString('en-GB', options);
 }
 
 // ===== Audio Playlist =====
