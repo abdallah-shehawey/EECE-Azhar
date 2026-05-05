@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Graduation Countdown</title>
+    <meta name="description" content="Graduation Countdown - Communication and Electronics Dep. 2026, Faculty of Engineering, Al-Azhar University" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <!-- Background -->
+    <div class="bg-overlay"></div>
+
+    <!-- Floating Particles -->
+    <div id="particles"></div>
+
+    <!-- Main Content -->
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <button id="audioBtn" class="audio-btn" onclick="toggleAudio()">
+                <svg id="audioIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                </svg>
+                <span id="audioBtnText">Play Audio</span>
+            </button>
+            <div class="logos-wrapper">
+                <div class="logo-container">
+                    <img src="logo-faculty.jpg" alt="Faculty of Engineering Logo" class="university-logo" />
+                </div>
+                <div class="logo-container">
+                    <img src="logo-university.png" alt="Al-Azhar University Logo" class="university-logo" />
+                </div>
+            </div>
+        </header>
+
+        <!-- Tab Navigation -->
+        <nav class="tabs" id="tabs">
+            <button class="tab active" data-tab="exam" onclick="switchTab('exam')">
+                Final Exam (10:00 AM - 1:00 PM)
+            </button>
+            <button class="tab" data-tab="discussion" onclick="switchTab('discussion')">
+                Project Discussion
+            </button>
+            <button class="tab" data-tab="custom" onclick="switchTab('custom')">
+                Custom Date
+            </button>
+        </nav>
+
+        <!-- Title Section -->
+        <div class="title-section">
+            <h1 class="main-title">
+                <span class="grad-icon">🎓</span>
+                Graduation Countdown
+            </h1>
+            <p class="subtitle">
+                Communication and Electronics Dep. 2026, Faculty of Engineering, Al-Azhar University.
+            </p>
+        </div>
+
+        <!-- Custom Date Picker (hidden by default) -->
+        <div class="date-picker-container" id="datePickerContainer" style="display: none;">
+            <label class="date-label">Set your own target date and time</label>
+            <input type="datetime-local" id="customDateInput" class="date-input" onchange="setCustomDate()" />
+        </div>
+
+        <!-- Countdown Card -->
+        <div class="countdown-card">
+            <div class="card-glow"></div>
+            <div class="card-content">
+                <p class="event-label" id="eventLabel">Final Exam (10:00 AM - 1:00 PM): <span id="targetDateDisplay"></span></p>
+                <div class="countdown-grid" id="countdownGrid">
+                    <div class="countdown-item">
+                        <span class="countdown-number" id="days">00</span>
+                        <span class="countdown-label">DAYS</span>
+                    </div>
+                    <div class="countdown-item">
+                        <span class="countdown-number" id="hours">00</span>
+                        <span class="countdown-label">HOURS</span>
+                    </div>
+                    <div class="countdown-item">
+                        <span class="countdown-number" id="minutes">00</span>
+                        <span class="countdown-label">MINUTES</span>
+                    </div>
+                    <div class="countdown-item">
+                        <span class="countdown-number seconds" id="seconds">00</span>
+                        <span class="countdown-label">SECONDS</span>
+                    </div>
+                </div>
+                <p class="local-time" id="localTime"></p>
+            </div>
+        </div>
+
+        <!-- Celebration Message (hidden) -->
+        <div class="celebration" id="celebration" style="display: none;">
+            <h2 class="celebration-title">🎉 Time's Up! 🎉</h2>
+            <p class="celebration-text">The moment has arrived!</p>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>Made by Abdallah Shehawey</p>
+    </footer>
+
+    <!-- Audio (Graduation Song) -->
+    <audio id="bgAudio" loop>
+        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg" />
+    </audio>
+
+    <script src="script.js"></script>
+</body>
+</html>
