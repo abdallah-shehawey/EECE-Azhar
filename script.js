@@ -8,6 +8,10 @@ const EVENTS = {
         label: 'Project Discussion',
         date: new Date('2026-07-01T10:00:00'),
     },
+    party: {
+        label: 'Graduation Party',
+        date: new Date('2026-07-22T10:00:00'),
+    },
 };
 
 let currentTab = 'exam';
