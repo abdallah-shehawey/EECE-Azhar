@@ -22,6 +22,10 @@
         <!-- Header -->
         <header class="header">
             <div class="header-controls">
+                <div class="dept-badge">
+                    <span class="dept-name">Comm &amp; Electronics</span>
+                    <span class="dept-year">Class of 2026</span>
+                </div>
                 <div class="audio-wrapper">
                     <button id="audioBtn" class="audio-btn" onclick="toggleAudio()">
                         <span id="audioBtnText">🔇 Tap to Play</span>
@@ -42,62 +46,113 @@
             </div>
         </header>
 
-        <!-- Tab Navigation -->
-        <nav class="tabs" id="tabs">
-            <button class="tab active" data-tab="exam" onclick="switchTab('exam')">
-                Final Exam
+        <!-- ===== Top-Level Mode Navigation ===== -->
+        <nav class="mode-nav" id="modeNav">
+            <button class="mode-btn active" id="modeCountdownBtn" data-mode="countdown" onclick="switchMode('countdown')">
+                <span class="mode-icon">⏱</span>
+                <span class="mode-label">Countdown</span>
             </button>
-            <button class="tab" data-tab="discussion" onclick="switchTab('discussion')">
-                Project Discussion
-            </button>
-            <button class="tab" data-tab="party" onclick="switchTab('party')">
-                Graduation Party
+            <button class="mode-btn" id="modeYearbookBtn" data-mode="yearbook" onclick="switchMode('yearbook')">
+                <span class="mode-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                        <circle cx="12" cy="13" r="4"/>
+                    </svg>
+                </span>
+                <span class="mode-label">Class Yearbook</span>
             </button>
         </nav>
 
-        <!-- Title Section -->
-        <div class="title-section">
-            <h1 class="main-title">
-                <span class="grad-icon">🎓</span>
-                Graduation Countdown
-            </h1>
-            <p class="subtitle">
-                Communication and Electronics Dep. 2026, Faculty of Engineering, Al-Azhar University.
-            </p>
-        </div>
+        <!-- ===== MODE: COUNTDOWN ===== -->
+        <div id="mode-countdown">
+            <!-- Tab Navigation -->
+            <nav class="tabs" id="tabs">
+                <button class="tab active" data-tab="exam" onclick="switchTab('exam')">
+                    Final Exam
+                </button>
+                <button class="tab" data-tab="discussion" onclick="switchTab('discussion')">
+                    Project Discussion
+                </button>
+                <button class="tab" data-tab="party" onclick="switchTab('party')">
+                    Graduation Party
+                </button>
+            </nav>
 
-        <!-- Countdown Card -->
-        <div class="countdown-card">
-            <div class="card-glow"></div>
-            <div class="card-content">
-                <p class="event-label" id="eventLabel">Final Exam (10:00 AM - 1:00 PM): <span id="targetDateDisplay"></span></p>
-                <div class="countdown-grid" id="countdownGrid">
-                    <div class="countdown-item">
-                        <span class="countdown-number" id="days">00</span>
-                        <span class="countdown-label">DAYS</span>
+            <!-- Title Section -->
+            <div class="title-section">
+                <h1 class="main-title">
+                    <span class="grad-icon">🎓</span>
+                    Graduation Countdown
+                </h1>
+                <p class="subtitle">
+                    Communication and Electronics Dep. 2026, Faculty of Engineering, Al-Azhar University.
+                </p>
+            </div>
+
+            <!-- Countdown Card -->
+            <div class="countdown-card">
+                <div class="card-glow"></div>
+                <div class="card-content">
+                    <p class="event-label" id="eventLabel">Final Exam (10:00 AM - 1:00 PM): <span id="targetDateDisplay"></span></p>
+                    <div class="countdown-grid" id="countdownGrid">
+                        <div class="countdown-item">
+                            <span class="countdown-number" id="days">00</span>
+                            <span class="countdown-label">DAYS</span>
+                        </div>
+                        <div class="countdown-item">
+                            <span class="countdown-number" id="hours">00</span>
+                            <span class="countdown-label">HOURS</span>
+                        </div>
+                        <div class="countdown-item">
+                            <span class="countdown-number" id="minutes">00</span>
+                            <span class="countdown-label">MINUTES</span>
+                        </div>
+                        <div class="countdown-item">
+                            <span class="countdown-number seconds" id="seconds">00</span>
+                            <span class="countdown-label">SECONDS</span>
+                        </div>
                     </div>
-                    <div class="countdown-item">
-                        <span class="countdown-number" id="hours">00</span>
-                        <span class="countdown-label">HOURS</span>
-                    </div>
-                    <div class="countdown-item">
-                        <span class="countdown-number" id="minutes">00</span>
-                        <span class="countdown-label">MINUTES</span>
-                    </div>
-                    <div class="countdown-item">
-                        <span class="countdown-number seconds" id="seconds">00</span>
-                        <span class="countdown-label">SECONDS</span>
-                    </div>
+                    <p class="local-time" id="localTime"></p>
                 </div>
-                <p class="local-time" id="localTime"></p>
+            </div>
+
+            <!-- Celebration Message (hidden) -->
+            <div class="celebration" id="celebration" style="display: none;">
+                <h2 class="celebration-title">🎉 Time's Up! 🎉</h2>
+                <p class="celebration-text">The moment has arrived!</p>
             </div>
         </div>
 
-        <!-- Celebration Message (hidden) -->
-        <div class="celebration" id="celebration" style="display: none;">
-            <h2 class="celebration-title">🎉 Time's Up! 🎉</h2>
-            <p class="celebration-text">The moment has arrived!</p>
+        <!-- ===== MODE: YEARBOOK ===== -->
+        <div id="mode-yearbook" class="yearbook-section" style="display: none;">
+            <div class="yearbook-header">
+                <h2 class="yearbook-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="title-camera-icon">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                        <circle cx="12" cy="13" r="4"/>
+                    </svg>
+                    Class of 2026
+                </h2>
+                <p class="yearbook-subtitle">Communication &amp; Electronics · Faculty of Engineering · Al-Azhar University</p>
+                <div class="yearbook-search-wrapper">
+                    <span class="search-icon">🔍</span>
+                    <input
+                        type="text"
+                        id="yearbookSearch"
+                        class="yearbook-search"
+                        placeholder="Search by name or track..."
+                        oninput="filterStudents(this.value)"
+                    />
+                </div>
+            </div>
+
+            <div class="students-grid" id="studentsGrid">
+                <!-- Rendered by JS -->
+            </div>
+
+            <p class="no-results" id="noResults" style="display:none;">No students found.</p>
         </div>
+
     </div>
 
     <!-- Footer -->
