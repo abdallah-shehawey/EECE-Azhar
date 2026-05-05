@@ -180,7 +180,7 @@ const STUDENTS = [
     },
     {
         name: 'Mohamed Anwar',
-        photo: 'Pic/anwar.heif',
+        photo: 'Pic/anwar.jpg',
         track: ['Digital Design'],
         color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
         social: {
@@ -409,6 +409,8 @@ function renderYearbook(list = STUDENTS) {
             img.className = 'student-photo';
             img.src = student.photo;
             img.alt = student.name;
+            img.loading = 'lazy';
+            img.decoding = 'async';
             img.addEventListener('error', () => {
                 // Swap image with avatar on load failure
                 student.photo = null; // Update student object for modal fallback
