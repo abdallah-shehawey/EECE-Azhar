@@ -249,7 +249,7 @@ function createParticles() {
     const container = document.getElementById('particles');
     // Reduce particles on mobile for better scrolling performance
     const isMobile = window.innerWidth <= 768;
-    const count = isMobile ? 12 : 30;
+    const count = isMobile ? 50 : 120;
 
     for (let i = 0; i < count; i++) {
         const particle = document.createElement('div');
@@ -258,7 +258,8 @@ function createParticles() {
         const size = Math.random() * 4 + 2;
         const left = Math.random() * 100;
         const duration = Math.random() * 15 + (isMobile ? 15 : 10); // Slower on mobile
-        const delay = Math.random() * 15;
+        // Use negative delay so the animation starts immediately but at a random point in its timeline
+        const delay = -(Math.random() * 30);
 
         particle.style.width = size + 'px';
         particle.style.height = size + 'px';
