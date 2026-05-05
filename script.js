@@ -191,17 +191,17 @@ const STUDENTS = [
     },
     },
     {
-        name: 'Mohamed Beheiry',
-        photo: 'Pic/behery.jpg',
-        track: ['Network'],
-        color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
-        social: {
-            linkedin:  '',
-            github:    '',
-            whatsapp:  '',
-            facebook:  '',
-        },
+    name: 'Mohamed Behiry',
+    photo: 'Pic/behery.jpg', 
+    track: ['Network Engineering', 'Network Security'],
+    color: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+    social: {
+        linkedin:  'https://www.linkedin.com/in/mohamed-behiry-462055240',
+        github:    'https://github.com/Mohammed-Abdelfatth',
+        whatsapp:  '+201023198792',
+        facebook:  'https://www.facebook.com/share/18KvrPxGj2/',
     },
+},
     {
         name: 'Ahmed Elsayed',
         photo: 'Pic/elsyed.jpg',
