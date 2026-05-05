@@ -640,11 +640,19 @@ body::before {
     .tabs {
         border-radius: 16px;
         padding: 4px;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+
+    .tabs::-webkit-scrollbar {
+        display: none;
     }
 
     .tab {
-        font-size: 14px;
-        padding: 10px 18px;
+        font-size: 13px;
+        padding: 8px 14px;
     }
 
     .countdown-number {
@@ -721,8 +729,8 @@ body::before {
     }
 
     .tab {
-        font-size: 13px;
-        padding: 9px 16px;
+        font-size: 12px;
+        padding: 8px 10px;
     }
 
     .event-label {

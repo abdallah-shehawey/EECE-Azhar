@@ -1,7 +1,7 @@
 // ===== Target Dates =====
 const EVENTS = {
     exam: {
-        label: 'Final Exam (10:00 AM - 1:00 PM)',
+        label: 'Final Exam',
         date: new Date('2026-06-03T10:00:00'),
     },
     discussion: {
