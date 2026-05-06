@@ -41,7 +41,7 @@ const STUDENTS = [
         },
     },
     {
-        name: 'Abdalrahman Taha',
+        name: 'Abdelrahman Taha',
         photo: 'Pic/bido.jpeg',
         track: ['Digital Design and Verification'],
         color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
@@ -283,7 +283,7 @@ const STUDENTS = [
         },
     },
     {
-        name: 'Abdalrahman Eid',
+        name: 'Abdelrahman Eid',
         photo: 'Pic/eid.jpg',
         track: ['Network'],
         color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
