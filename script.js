@@ -132,7 +132,7 @@ const STUDENTS = [
     },
     {
         name: 'Abdallah Mohamed Salah',
-        photo: 'Pic/salah.jpeg',
+        photo: 'Pic/salah.jpg',
         track: ['Digital Design & Verification'],
         color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
         social: {
