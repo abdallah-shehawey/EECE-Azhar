@@ -143,6 +143,18 @@ const STUDENTS = [
         },
     },
     {
+        name: 'Mohamed Emadeldin',
+        photo: 'Pic/mohemad.jpg',
+        track: ['Digital IC Design','Digital IC Verification'],
+        color: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+        social: {
+            linkedin:  'https://www.linkedin.com/in/mohamed-emadeldin-202954239/',
+            github:    'https://github.com/Moh-Emadeldin',
+            whatsapp:  '',
+            facebook:  'https://www.facebook.com/mohamed58emad',
+        },
+    },
+    {
         name: 'Abdelrahman Adwe',
         photo: 'Pic/adwe.jpg',
         track: ['Digital IC Design & Verification','Embedded Systems'],
