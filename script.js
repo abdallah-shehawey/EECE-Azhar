@@ -133,7 +133,7 @@ const STUDENTS = [
     {
         name: 'Abdallah Mohamed Salah',
         photo: 'Pic/salah.jpeg',
-        track: ['Digital Design and Verification'],
+        track: ['Digital Design & Verification'],
         color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
         social: {
             linkedin:  'www.linkedin.com/in/abdallah-mohamed-salah',
@@ -143,15 +143,15 @@ const STUDENTS = [
         },
     },
     {
-        name: 'Abdalrahman Adwe',
+        name: 'Abdelrahman Adwe',
         photo: 'Pic/adwe.jpg',
-        track: ['Digital Design', 'Embedded Systems'],
-        color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
+        track: ['Digital IC Design & Verification','Embedded Systems'],
+        color: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
         social: {
-            linkedin:  '',
-            github:    '',
-            whatsapp:  '',
-            facebook:  '',
+            linkedin:  'https://www.linkedin.com/in/abdelrhman-adwe/',
+            github:    'https://github.com/abdelrahmanadwe',
+            whatsapp:  '+201093980406',
+            facebook:  'https://www.facebook.com/share/1BLCftWCZ3/',
         },
     },
     {
@@ -163,6 +163,18 @@ const STUDENTS = [
             linkedin:  'https://www.linkedin.com/in/abdelrahman-shaban-470834243',
             whatsapp:  '+201115737513',
             facebook:  'https://www.facebook.com/share/1F175p8e6d/',
+        },
+    },
+    {
+        name: 'Mohamed Elsayed Eldokhmisy',
+        photo: 'Pic/dokhmis.jpeg',
+        track: ['Digital Design & Verification'],
+        color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
+        social: {
+            linkedin:  'https://www.linkedin.com/in/mohamed-elsayed-eldokhmisy',
+            github:    'https://github.com/mohamedesayd',
+            whatsapp:  '+201024105435',
+            facebook:  'https://www.facebook.com/share/1BAUNC4B27/',
         },
     },
     {
@@ -180,7 +192,7 @@ const STUDENTS = [
     {
     name: 'Mohamed Anwar',
     photo: 'Pic/anwar.jpg',
-    track: ['Digital IC Design and Verification'],
+    track: ['Digital IC Design & Verification'],
     color: 'linear-gradient(135deg, #0ea5e9, #1e3a8a)',
     social: {
         linkedin:  'https://www.linkedin.com/in/mohammed-anwar-170727279',
@@ -207,10 +219,9 @@ const STUDENTS = [
         track: ['AI', 'Network'],
         color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
         social: {
-            linkedin:  '',
-            github:    '',
-            whatsapp:  '',
-            facebook:  '',
+            linkedin:  'https://www.linkedin.com/in/ahmad-elsayed-bab65b291',
+            whatsapp:  '+201067628053',
+            facebook:  'https://www.facebook.com/share/1BGSgEkoaD/',
         },
     },
     {
