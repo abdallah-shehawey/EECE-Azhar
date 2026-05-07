@@ -7,6 +7,15 @@
     box-sizing: border-box;
 }
 
+/* ===== Custom Font ===== */
+@font-face {
+    font-family: 'PoetsenOne';
+    src: url('font/PoetsenOne-Regular.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
 :root {
     --bg-dark: rgba(10, 10, 30, 0.75);
     --card-bg: rgba(18, 18, 40, 0.85);
@@ -21,8 +30,8 @@
     --glass-border: rgba(255, 255, 255, 0.1);
     --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     --gradient-2: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
-    --font-primary: 'Outfit', sans-serif;
-    --font-secondary: 'DM Sans', sans-serif;
+    --font-primary: 'PoetsenOne', 'Outfit', sans-serif;
+    --font-secondary: 'PoetsenOne', 'DM Sans', sans-serif;
 }
 
 html {
@@ -1349,22 +1358,20 @@ body::before {
 
 /* PNG image icon in tab */
 .ptab-img-icon {
-    width: 30px;
-    height: 30px;
+    width: 26px;
+    height: 26px;
     object-fit: contain;
     flex-shrink: 0;
-    /* invert black→white, high contrast makes thin lines appear thicker */
-    filter: invert(1) contrast(5) brightness(1.1);
+    filter: invert(1) contrast(2.5) brightness(1.1);
     transition: filter 0.3s ease;
 }
 
 .project-tab.active .ptab-img-icon {
-    /* green tint when active */
-    filter: invert(1) contrast(5) sepia(1) saturate(4) hue-rotate(90deg) brightness(1.1);
+    filter: invert(1) contrast(2.5) sepia(1) saturate(4) hue-rotate(90deg) brightness(1.1);
 }
 
 .project-tab:not(.active):hover .ptab-img-icon {
-    filter: invert(1) contrast(5) brightness(1.3);
+    filter: invert(1) contrast(2.5) brightness(1.3);
 }
 
 /* PNG image icon in project card */
@@ -1373,8 +1380,7 @@ body::before {
     height: 36px;
     object-fit: contain;
     display: block;
-    /* green tint + thick lines */
-    filter: invert(1) contrast(5) sepia(1) saturate(4) hue-rotate(90deg) brightness(1.05);
+    filter: invert(1) contrast(2.5) sepia(1) saturate(4) hue-rotate(90deg) brightness(1.05);
 }
 
 /* Active tab SVG inherits white color */
@@ -1497,14 +1503,28 @@ body::before {
 .project-cat-badge {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
     font-family: var(--font-secondary);
-    font-size: 11.5px;
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.5px;
     text-transform: uppercase;
-    padding: 4px 12px;
+    padding: 4px 10px;
     border-radius: 20px;
+    white-space: nowrap;
+}
+
+/* Icon sizing inside badge */
+.project-cat-badge svg {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+}
+
+.project-cat-badge .proj-card-img-icon {
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
 }
 
 .project-cat-badge.cat-network {

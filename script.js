@@ -41,18 +41,6 @@ const STUDENTS = [
         },
     },
     {
-        name: 'Abdelrahman Taha',
-        photo: 'Pic/bido.jpeg',
-        track: ['Digital Design and Verification'],
-        color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
-        social: {
-            linkedin:  'https://www.linkedin.com/in/abdalrahman-taha-493a3b237',
-            github:  'https://github.com/bidotaha',
-            whatsapp:  '+201117947328',
-            facebook:  'https://www.facebook.com/bido.taha',
-        },
-    },
-    {
         name: 'Abdelrahman Adwe',
         photo: 'Pic/adwe.jpg',
         track: ['Digital IC Design & Verification', 'Embedded Systems'],
@@ -62,6 +50,18 @@ const STUDENTS = [
             github:  'https://github.com/abdelrahmanadwe',
             whatsapp:  '+201093980406',
             facebook:  'https://www.facebook.com/share/1BLCftWCZ3/',
+        },
+    },
+    {
+        name: 'Abdelrahman Taha',
+        photo: 'Pic/bido.jpeg',
+        track: ['Digital Design and Verification'],
+        color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
+        social: {
+            linkedin:  'https://www.linkedin.com/in/abdalrahman-taha-493a3b237',
+            github:  'https://github.com/bidotaha',
+            whatsapp:  '+201117947328',
+            facebook:  'https://www.facebook.com/bido.taha',
         },
     },
     {
@@ -746,8 +746,8 @@ const GRADUATION_PROJECTS = [
         icon: '⚡',
         team: [
             { name: 'Abdallah Mohamed Salah',     leader: true  },
-            { name: 'Abdelrahman Adwe',           leader: false },
-            { name: 'Mohamed Adel',               leader: false },
+            { name: 'Mohamed Adel',           leader: false },
+            { name: 'Abdelrahman Adwe',               leader: false },
             { name: 'Yousef Mohamed Abdelfattah', leader: false },
             { name: 'Mohamed Elsayed Eldokhmisy', leader: false },
             { name: 'Momen Elzaghawy',            leader: false },
@@ -761,10 +761,10 @@ const GRADUATION_PROJECTS = [
         team: [
             { name: 'Omar Ahmed',        leader: true  },
             { name: 'Youssef Elswase',   leader: false },
-            { name: 'Ahmed Abdulhameed', leader: false },
+            { name: 'Ramadan Khaled', leader: false },
             { name: 'Mohamed Emadeldin', leader: false },
             { name: 'Abdelrahman Taha',  leader: false },
-            { name: 'Youssef Elswase',   leader: false },
+            { name: 'Ahmed Abdulhameed',   leader: false },
             
         ],
     },
@@ -777,6 +777,13 @@ const PROJ_ICONS = {
     Digital:  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/></svg>`,
     Embedded: `<img src="icons/embedded_icon.png" alt="Embedded" class="proj-card-img-icon" />`,
     Network:  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`,
+};
+
+// Display labels for category badges
+const CAT_LABELS = {
+    Digital:  'Digital Design',
+    Embedded: 'Embedded Systems',
+    Network:  'Network',
 };
 
 function switchProjectCat(cat) {
@@ -813,8 +820,9 @@ function renderProjects() {
         const cardTop = document.createElement('div');
         cardTop.className = 'project-card-top';
         const iconSvg = PROJ_ICONS[project.category] || '';
+        const catLabel = CAT_LABELS[project.category] || project.category;
         cardTop.innerHTML = `
-            <span class="project-cat-badge cat-${catKey}">${iconSvg} ${project.category}</span>
+            <span class="project-cat-badge cat-${catKey}">${iconSvg} ${catLabel}</span>
             <div class="project-card-icon cat-${catKey}">${iconSvg}</div>
         `;
 
