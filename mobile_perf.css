@@ -3,42 +3,18 @@
    Appended to style.css via @import or link
    ============================================= */
 
-/* GPU promotion for animated elements */
-.countdown-number,
-.particle,
-.project-card,
-.student-card,
-.mode-btn,
-.project-member-pill {
-    transform: translateZ(0);
-    backface-visibility: hidden;
-}
-
-/* ── Mobile: disable expensive backdrop-filter blur ── */
 @media (max-width: 768px) {
-
-    /* Disable all backdrop-filter on mobile — biggest perf gain */
-    *,
-    *::before,
-    *::after {
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
-    }
-
-    /* Compensate glass look with solid dark background */
+    /* 
+       Limit backdrop-filter removal to ONLY the heaviest elements.
+       We do NOT apply a global background-color so we don't break active gradients.
+    */
     .countdown-card,
-    .mode-nav,
-    .mode-btn,
-    .event-tabs,
-    .event-tab,
-    .photo-modal,
     .student-card,
     .project-card,
-    .yearbook-filters,
-    .cat-filter-btn,
-    .audio-wrapper,
-    .header {
-        background-color: rgba(15, 12, 35, 0.92) !important;
+    .photo-modal-content {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background: rgba(20, 20, 45, 0.95) !important; /* Solid fallback */
     }
 
     /* Reduce particle animation complexity on mobile */
@@ -55,11 +31,11 @@
         transform: none !important;
     }
 
-    /* Simplify box-shadows on mobile */
+    /* Simplify box-shadows on heavy cards */
     .countdown-card,
     .student-card,
     .project-card {
-        box-shadow: 0 4px 16px rgba(0,0,0,0.4) !important;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.5) !important;
     }
 
     /* Disable the card-glow pseudo element (expensive paint) */
