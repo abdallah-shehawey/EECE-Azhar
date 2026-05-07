@@ -1183,32 +1183,35 @@ function toggleAudio() {
 // ===== Particles =====
 function createParticles() {
     const container = document.getElementById('particles');
-    // Reduce particles on mobile for better scrolling performance
     const isMobile = window.innerWidth <= 768;
-    const count = isMobile ? 50 : 120;
+    const count = isMobile ? 25 : 120;
+
+    const fragment = document.createDocumentFragment();
 
     for (let i = 0; i < count; i++) {
         const particle = document.createElement('div');
         particle.classList.add('particle');
 
-        const size = Math.random() * 4 + 2;
+        const size = Math.random() * 3 + 1.5;
         const left = Math.random() * 100;
-        const duration = Math.random() * 15 + (isMobile ? 15 : 10); // Slower on mobile
-        // Use negative delay so the animation starts immediately but at a random point in its timeline
+        const duration = Math.random() * 15 + (isMobile ? 20 : 10);
         const delay = -(Math.random() * 50);
 
-        particle.style.width = size + 'px';
-        particle.style.height = size + 'px';
-        particle.style.left = left + '%';
-        particle.style.animationDuration = duration + 's';
-        particle.style.animationDelay = delay + 's';
+        particle.style.cssText = `
+            width:${size}px;
+            height:${size}px;
+            left:${left}%;
+            animation-duration:${duration}s;
+            animation-delay:${delay}s;
+            background:${isMobile
+                ? `hsla(${Math.random()*60+250},70%,65%,0.5)`
+                : `radial-gradient(circle,hsla(${Math.random()*60+250},80%,65%,0.6),transparent)`
+            };
+        `;
 
-        // Random colors between purple and pink
-        const hue = Math.random() * 60 + 250; // 250-310 range
-        particle.style.background = `radial-gradient(circle, hsla(${hue}, 80%, 65%, 0.6), transparent)`;
-
-        container.appendChild(particle);
+        fragment.appendChild(particle);
     }
+    container.appendChild(fragment);
 }
 
 // ===== Confetti =====
@@ -1231,5 +1234,3 @@ function launchConfetti() {
         }, i * 30);
     }
 }
-
-

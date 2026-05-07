@@ -1,0 +1,86 @@
+/* =============================================
+   Mobile Performance Optimizations
+   Appended to style.css via @import or link
+   ============================================= */
+
+/* GPU promotion for animated elements */
+.countdown-number,
+.particle,
+.project-card,
+.student-card,
+.mode-btn,
+.project-member-pill {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+}
+
+/* ── Mobile: disable expensive backdrop-filter blur ── */
+@media (max-width: 768px) {
+
+    /* Disable all backdrop-filter on mobile — biggest perf gain */
+    *,
+    *::before,
+    *::after {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+
+    /* Compensate glass look with solid dark background */
+    .countdown-card,
+    .mode-nav,
+    .mode-btn,
+    .event-tabs,
+    .event-tab,
+    .photo-modal,
+    .student-card,
+    .project-card,
+    .yearbook-filters,
+    .cat-filter-btn,
+    .audio-wrapper,
+    .header {
+        background-color: rgba(15, 12, 35, 0.92) !important;
+    }
+
+    /* Reduce particle animation complexity on mobile */
+    .particle {
+        animation-timing-function: linear !important;
+        will-change: transform;
+    }
+
+    /* Disable hover transform animations on mobile (they cause repaints) */
+    .student-card:hover,
+    .project-card:hover,
+    .project-member-pill:hover,
+    .mode-btn:hover {
+        transform: none !important;
+    }
+
+    /* Simplify box-shadows on mobile */
+    .countdown-card,
+    .student-card,
+    .project-card {
+        box-shadow: 0 4px 16px rgba(0,0,0,0.4) !important;
+    }
+
+    /* Disable the card-glow pseudo element (expensive paint) */
+    .card-glow {
+        display: none !important;
+    }
+
+    /* Reduce CSS animation frame rate hints */
+    .project-coming-soon .cs-pulse-ring {
+        animation: none !important;
+        opacity: 0.15;
+    }
+
+    /* Smooth scrolling via compositor only */
+    html {
+        scroll-behavior: auto;
+    }
+
+    /* Use contain to limit repaint scope */
+    .yearbook-grid,
+    .projects-grid {
+        contain: layout style;
+    }
+}
