@@ -1,58 +1,29 @@
 /* =============================================
    Mobile Performance Optimizations
+   Appended to style.css via @import or link
    ============================================= */
 
 @media (max-width: 768px) {
-
-    /* ─────────────────────────────────────────────
-    BG FLICKER FIX (most important!)
-    
-    Problem: position:fixed on body::before causes
-    a full repaint every time the browser URL bar
-    shows/hides (viewport height changes).
-    
-    Fix: Remove the fixed pseudo-element and put
-    the background directly on body with scroll
-    attachment. No more repaint = smooth scroll.
-    ───────────────────────────────────────────── */
-    body::before {
-        display: none !important;
-    }
-
-    body {
-        background: url('bg.jpg') center top / cover no-repeat;
-        background-attachment: scroll; /* default — never recalcs on URL bar */
-    }
-
-    /* The overlay was also position:fixed — change to absolute */
-    .bg-overlay {
-        position: absolute !important;
-        min-height: 200%; /* Tall enough to cover all scroll content */
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
-    }
-
-    /* Particles container — keep fixed but it's cheap with only 25 particles */
-    #particles {
-        position: absolute !important;
-        min-height: 200%;
-    }
-
-    /* ─────────────────────────────────────────────
-       Other optimizations
-    ───────────────────────────────────────────── */
-
-    /* Remove expensive backdrop-filter only on heavy elements */
+    /* 
+       Limit backdrop-filter removal to ONLY the heaviest elements.
+       We do NOT apply a global background-color so we don't break active gradients.
+    */
     .countdown-card,
     .student-card,
     .project-card,
     .photo-modal-content {
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
-        background: rgba(20, 20, 45, 0.95) !important;
+        background: rgba(20, 20, 45, 0.95) !important; /* Solid fallback */
     }
 
-    /* Disable hover transforms on mobile (cause repaints) */
+    /* Reduce particle animation complexity on mobile */
+    .particle {
+        animation-timing-function: linear !important;
+        will-change: transform;
+    }
+
+    /* Disable hover transform animations on mobile (they cause repaints) */
     .student-card:hover,
     .project-card:hover,
     .project-member-pill:hover,
@@ -60,29 +31,30 @@
         transform: none !important;
     }
 
-    /* Simplify box-shadows */
+    /* Simplify box-shadows on heavy cards */
     .countdown-card,
     .student-card,
     .project-card {
         box-shadow: 0 4px 16px rgba(0,0,0,0.5) !important;
     }
 
-    /* Disable expensive paint elements */
+    /* Disable the card-glow pseudo element (expensive paint) */
     .card-glow {
         display: none !important;
     }
 
+    /* Reduce CSS animation frame rate hints */
     .project-coming-soon .cs-pulse-ring {
         animation: none !important;
         opacity: 0.15;
     }
 
-    /* Instant scroll — no JS-driven smooth scroll on mobile */
+    /* Smooth scrolling via compositor only */
     html {
         scroll-behavior: auto;
     }
 
-    /* Limit repaint scope on grids */
+    /* Use contain to limit repaint scope */
     .yearbook-grid,
     .projects-grid {
         contain: layout style;
