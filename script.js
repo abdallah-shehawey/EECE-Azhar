@@ -120,6 +120,16 @@ const STUDENTS = [
             facebook:  'https://www.facebook.com/Ahmed.Taahaaa',
         },
     },
+        {
+        name: 'Ali Ibrahim',
+        photo: 'Pic/ali.jpeg',
+        track: 'Network',
+        color: 'linear-gradient(135deg, #f59e0b, #b45309)',
+        social: {
+            whatsapp:  '+201023150203',
+            facebook:  'https://www.facebook.com/share/18doCrAE9q/',
+        },
+    },
     {
         name: 'Anas Ghazy',
         photo: 'Pic/anas.jpeg',
