@@ -67,7 +67,7 @@ const STUDENTS = [
     {
         name: 'Abdelrahman Eid',
         photo: 'Pic/eid.jpg',
-        track: ['Network'],
+        track: ['Network Engineer'],
         color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
         social: {
             linkedin:  'https://www.linkedin.com/in/abdelrhman-ali-b554063a2',
