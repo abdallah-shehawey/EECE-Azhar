@@ -42,8 +42,8 @@ Click **Fork** at the top right of the repo page on GitHub.
 ### 2. Clone Your Fork
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/Graduation-Website.git
-cd Graduation-Website
+git clone git@github.com:abdallah-shehawey/EECE-Azhar.git
+cd EECE-Azhar
 ```
 
 ### 3. Create a Branch
