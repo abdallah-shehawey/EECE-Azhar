@@ -100,7 +100,7 @@ const STUDENTS = [
     {
         name: 'Ahmed Elsayed',
         photo: 'Pic/elsyed.jpg',
-        track: ['AI', 'Network'],
+        track: ['AI', 'Network Engineer'],
         color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
         social: {
             linkedin:  'https://www.linkedin.com/in/ahmad-elsayed-bab65b291',
@@ -111,7 +111,7 @@ const STUDENTS = [
     {
         name: 'Ahmed Gamal',
         photo: 'Pic/gmal.jpg',
-        track: ['Embedded System', 'Network'],
+        track: ['Embedded System', 'Network Engineer'],
         color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
         social: {
             linkedin:  'https://www.linkedin.com/in/ahmadgamalmansour',
@@ -131,10 +131,10 @@ const STUDENTS = [
             facebook:  'https://www.facebook.com/Ahmed.Taahaaa',
         },
     },
-        {
+    {
         name: 'Ali Ibrahim',
         photo: 'Pic/ali.jpeg',
-        track: 'Network',
+        track: 'Network Engineer',
         color: 'linear-gradient(135deg, #f59e0b, #b45309)',
         social: {
             whatsapp:  '+201023150203',
@@ -177,7 +177,7 @@ const STUDENTS = [
     {
         name: 'Mohamed Behiry',
         photo: 'Pic/behery.jpg',
-        track: ['Network Engineering', 'Network Security'],
+        track: ['Network Engineer', 'Network Security'],
         color: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
         social: {
             linkedin:  'https://www.linkedin.com/in/mohamed-behiry-462055240',
@@ -213,7 +213,7 @@ const STUDENTS = [
     {
         name: 'Mohammed Taha Khalifa',
         photo: 'Pic/khalifa.jpg',
-        track: ['Network'],
+        track: ['Network Engineer'],
         color: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
         social: {
             linkedin:  'https://www.linkedin.com/in/mohammed-taha-khalifa-8264a5349',
@@ -248,7 +248,7 @@ const STUDENTS = [
     {
         name: 'Omar Elstawy',
         photo: 'Pic/setawey.jpg',
-        track: ['Network', 'Embedded Systems', 'Digital Design'],
+        track: ['Network Engineer', 'Embedded Systems', 'Digital Design'],
         color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
         social: {
             linkedin:  '',
