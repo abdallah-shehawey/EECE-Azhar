@@ -15,296 +15,7 @@ const EVENTS = {
 };
 
 // ===== Students Data =====
-const STUDENTS = [
-    {
-        name: 'Abdallah Shehawey',
-        photo: 'Pic/abdallahshehawey.jpg',
-        track: ['Embedded Systems', 'Embedded Linux', 'DevOps'],
-        color: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
-        social: {
-            linkedin:  'https://www.linkedin.com/in/abdallah-shehawey',
-            github:  'https://github.com/abdallah-shehawey',
-            whatsapp:  '+201501899476',
-            facebook:  'https://www.facebook.com/share/1BHxWsiLCE/',
-        },
-    },
-    {
-        name: 'Abdallah Mohamed Salah',
-        photo: 'Pic/salah.jpg',
-        track: ['Digital Design & Verification'],
-        color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
-        social: {
-            linkedin:  'www.linkedin.com/in/abdallah-mohamed-salah',
-            github:  'https://github.com/AbdallahMoSalah',
-            whatsapp:  '+201006076903',
-            facebook:  'https://www.facebook.com/bdallhmhmdslah.295625/',
-        },
-    },
-    {
-        name: 'Abdelrahman Adwe',
-        photo: 'Pic/adwe.jpg',
-        track: ['Digital IC Design & Verification', 'Embedded Systems'],
-        color: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
-        social: {
-            linkedin:  'https://www.linkedin.com/in/abdelrhman-adwe/',
-            github:  'https://github.com/abdelrahmanadwe',
-            whatsapp:  '+201093980406',
-            facebook:  'https://www.facebook.com/share/1BLCftWCZ3/',
-        },
-    },
-    {
-        name: 'Abdelrahman Taha',
-        photo: 'Pic/bido.jpeg',
-        track: ['Digital Design and Verification'],
-        color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
-        social: {
-            linkedin:  'https://www.linkedin.com/in/abdalrahman-taha-493a3b237',
-            github:  'https://github.com/bidotaha',
-            whatsapp:  '+201117947328',
-            facebook:  'https://www.facebook.com/bido.taha',
-        },
-    },
-    {
-        name: 'Abdelrahman Eid',
-        photo: 'Pic/eid.jpg',
-        track: ['Network Engineer'],
-        color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
-        social: {
-            linkedin:  'https://www.linkedin.com/in/abdelrhman-ali-b554063a2',
-            whatsapp:  '+201002959491',
-            facebook:  'https://web.facebook.com/profile.php?id=61557349534819',
-        },
-    },
-    {
-        name: 'Abdelrahman Shaban',
-        photo: 'Pic/shaban.jpg',
-        track: ['Network Engineer'],
-        color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
-        social: {
-            linkedin:  'https://www.linkedin.com/in/abdelrahman-shaban-470834243',
-            whatsapp:  '+201115737513',
-            facebook:  'https://www.facebook.com/share/1F175p8e6d/',
-        },
-    },
-    {
-        name: 'Ahmed Abdulhameed',
-        photo: 'Pic/7ameedo.jpeg',
-        track: ['AI', 'Digital Design'],
-        color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
-        social: {
-            linkedin:  'https://www.linkedin.com/in/ahmed-abdulhameed-067871239/',
-            github:  'https://github.com/AhmedAbdulhameed1',
-            whatsapp:  '+201095468560',
-        },
-    },
-    {
-        name: 'Ahmed Elsayed',
-        photo: 'Pic/elsyed.jpg',
-        track: ['AI', 'Network Engineer'],
-        color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
-        social: {
-            linkedin:  'https://www.linkedin.com/in/ahmad-elsayed-bab65b291',
-            whatsapp:  '+201067628053',
-            facebook:  'https://www.facebook.com/share/1BGSgEkoaD/',
-        },
-    },
-    {
-        name: 'Ahmed Gamal',
-        photo: 'Pic/gmal.jpg',
-        track: ['Embedded System', 'Network Engineer'],
-        color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
-        social: {
-            linkedin:  'https://www.linkedin.com/in/ahmadgamalmansour',
-            github:  'https://github.com/ahmedgamal2003',
-            whatsapp:  '01006872317',
-            facebook:  'https://www.facebook.com/profile.php?id=100019660395067',
-        },
-    },
-    {
-        name: 'Ahmed Taha',
-        photo: 'Pic/AhmedTaha.jpeg',
-        track: 'Network security',
-        color: 'linear-gradient(135deg, #ec4899, #be185d)',
-        social: {
-            linkedin:  'https://www.linkedin.com/in/ahmed-taahaa',
-            whatsapp:  '+201066036829',
-            facebook:  'https://www.facebook.com/Ahmed.Taahaaa',
-        },
-    },
-    {
-        name: 'Ali Ibrahim',
-        photo: 'Pic/ali.jpeg',
-        track: 'Network Engineer',
-        color: 'linear-gradient(135deg, #f59e0b, #b45309)',
-        social: {
-            whatsapp:  '+201023150203',
-            facebook:  'https://www.facebook.com/share/18doCrAE9q/',
-        },
-    },
-    {
-        name: 'Anas Ghazy',
-        photo: 'Pic/anas.jpeg',
-        track: ['Network Engineer'],
-        color: 'linear-gradient(135deg, #ec4899, #be185d)',
-        social: {
-            linkedin:  'https://www.linkedin.com/in/anas-ghazy-aaa896323',
-            whatsapp:  '+201025145996',
-            facebook:  'https://www.facebook.com/share/173eunCXL5/?mibextid=wwXIfr',
-        },
-    },
-    {
-        name: 'Mohamed Adel',
-        photo: 'Pic/adel.jpeg',
-        track: ['Digital Design'],
-        color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
-        social: {
-            linkedin:  'https://www.linkedin.com/in/mohamed-adel-9a34b42a7',
-            whatsapp:  '+201065593315',
-        },
-    },
-    {
-        name: 'Mohamed Anwar',
-        photo: 'Pic/anwar.jpg',
-        track: ['Digital IC Design & Verification'],
-        color: 'linear-gradient(135deg, #0ea5e9, #1e3a8a)',
-        social: {
-            linkedin:  'https://www.linkedin.com/in/mohammed-anwar-170727279',
-            github:  'https://github.com/MohammedAnwar2244',
-            whatsapp:  '+201104910528',
-            facebook:  'https://www.facebook.com/share/1BPhMMCQjX/',
-        },
-    },
-    {
-        name: 'Mohamed Behiry',
-        photo: 'Pic/behery.jpg',
-        track: ['Network Engineer', 'Network Security'],
-        color: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
-        social: {
-            linkedin:  'https://www.linkedin.com/in/mohamed-behiry-462055240',
-            github:  'https://github.com/Mohammed-Abdelfatth',
-            whatsapp:  '+201023198792',
-            facebook:  'https://www.facebook.com/share/18KvrPxGj2/',
-        },
-    },
-    {
-        name: 'Mohamed Elsayed Eldokhmisy',
-        photo: 'Pic/dokhmis.jpeg',
-        track: ['Digital Design & Verification'],
-        color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
-        social: {
-            linkedin:  'https://www.linkedin.com/in/mohamed-elsayed-eldokhmisy/',
-            github:  'https://github.com/mohamedesayd',
-            whatsapp:  '+201024105435',
-            facebook:  'https://www.facebook.com/share/1BAUNC4B27/',
-        },
-    },
-    {
-        name: 'Mohamed Emadeldin',
-        photo: 'Pic/mohemad.jpg',
-        track: ['Digital IC Design', 'Digital IC Verification'],
-        color: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
-        social: {
-            linkedin:  'https://www.linkedin.com/in/mohamed-emadeldin-202954239/',
-            github:  'https://github.com/Moh-Emadeldin',
-            whatsapp:  '',
-            facebook:  'https://www.facebook.com/mohamed58emad',
-        },
-    },
-    {
-        name: 'Mohammed Taha Khalifa',
-        photo: 'Pic/khalifa.jpg',
-        track: ['Network Engineer'],
-        color: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
-        social: {
-            linkedin:  'https://www.linkedin.com/in/mohammed-taha-khalifa-8264a5349',
-            whatsapp:  '+201127326706',
-            facebook:  'https://www.facebook.com/share/1BY2TNDX8y/',
-        },
-    },
-    {
-        name: 'Momen Elzaghawy',
-        photo: 'Pic/momen.jpg',
-        track: ['Digital Design', 'Digital Verification', 'Asic Verification'],
-        color: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
-        social: {
-            linkedin:  'linkedin.com/in/momenelzaghawy',
-            github:  'https://github.com/momenelzaghawy',
-            whatsapp:  '+201002115038',
-            facebook:  'https://www.facebook.com/share/1BHxWsiLCE/',
-        },
-    },
-    {
-        name: 'Omar Ahmed',
-        photo: 'Pic/omar.jpg',
-        track: ['Digital Design'],
-        color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
-        social: {
-            linkedin:  '',
-            github:  '',
-            whatsapp:  '',
-            facebook:  '',
-        },
-    },
-    {
-        name: 'Omar Elstawy',
-        photo: 'Pic/setawey.jpg',
-        track: ['Network Engineer', 'Embedded Systems', 'Digital Design'],
-        color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
-        social: {
-            linkedin:  '',
-            github:  '',
-            whatsapp:  '',
-            facebook:  '',
-        },
-    },
-    {
-        name: 'Ramadan Khaled',
-        photo: 'Pic/ramadan.jpeg',
-        track: 'Digital Design',
-        color: 'linear-gradient(135deg, #10b981, #047857)',
-        social: {
-            linkedin:  'https://www.linkedin.com/in/ramadan-khaled-80a8b3275?utm_source=share_via&utm_content=profile&utm_medium=member_ios',
-            whatsapp:  '+201010634152',
-            facebook:  '',
-        },
-    },
-    {
-        name: 'Yousef Mohamed Abdelfattah',
-        photo: 'Pic/Yousef.jpeg',
-        track: 'Digital Design',
-        color: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-        social: {
-            linkedin:  'https://www.linkedin.com/in/yousef-mohamed-abd-el-fattah-3b1a0328b',
-            github:  'https://github.com/Yousef-fma',
-            whatsapp:  '+201270809908',
-            facebook:  'https://www.facebook.com/share/1AdT8F6sbq/',
-        },
-    },
-    {
-        name: 'Youssef Elswase',
-        photo: 'Pic/elswase.jpeg',
-        track: ['Embedded System', 'Digital Design'],
-        color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
-        social: {
-            linkedin:  'https://www.linkedin.com/in/youssef-mohamed-7a21b8275',
-            github:  'https://github.com/youssef-elswase',
-            whatsapp:  '+201092223738',
-            facebook:  'https://www.facebook.com/share/1U4nx8hwUt/',
-        },
-    },
-    {
-        name: 'Abdallah Saleh',
-        photo: 'Pic/saleh.jpg',
-        track: ['Embedded System', 'Software Testing'],
-        color: 'linear-gradient(135deg, #ef4444, #b91c1c)',
-        social: {
-            linkedin:  '',
-            github:  '',
-            whatsapp:  '',
-            facebook:  '',
-        },
-    },
-];
+// Loaded from data/students.js
 
 // ===== Yearbook =====
 function getInitials(name) {
@@ -459,17 +170,14 @@ function renderYearbook(list = STUDENTS) {
         const card = document.createElement('div');
         card.className = 'student-card';
         card.style.animation      = 'fadeInUp 0.5s ease-out both';
-        card.style.animationDelay = `${i * 0.06}s`;
+        card.style.animationDelay = `${(i % 10) * 0.06}s`; // cycle delay so it doesn't get too long
 
-        // ── Photo wrap (using DOM API to avoid inline onerror HTML issues) ──
         const photoWrap = document.createElement('div');
         photoWrap.className = 'student-photo-wrap';
 
-        // Make the entire card clickable
         card.style.cursor = 'pointer';
         card.title = 'Click to view details';
         card.addEventListener('click', (e) => {
-            // Prevent opening modal if they clicked a social button on the small card
             if (!e.target.closest('.social-btn')) {
                 openPhotoModal(student);
             }
@@ -483,8 +191,7 @@ function renderYearbook(list = STUDENTS) {
             img.loading = 'lazy';
             img.decoding = 'async';
             img.addEventListener('error', () => {
-                // Swap image with avatar on load failure
-                student.photo = null; // Update student object for modal fallback
+                student.photo = null;
                 const av = document.createElement('div');
                 av.className = 'student-avatar';
                 av.style.background = student.color;
@@ -500,12 +207,18 @@ function renderYearbook(list = STUDENTS) {
             photoWrap.appendChild(av);
         }
 
-        // ── Name ──
+        // ── Gender Badge ──
+        const genderBadge = document.createElement('div');
+        genderBadge.className = 'student-gender-badge';
+        const isFemale = student.gender === 'female';
+        genderBadge.textContent = isFemale ? '👩‍🎓' : '👨‍🎓';
+        genderBadge.title = isFemale ? 'Female' : 'Male';
+        photoWrap.appendChild(genderBadge);
+
         const nameEl = document.createElement('p');
         nameEl.className = 'student-name';
         nameEl.textContent = student.name;
 
-        // ── Track badge(s) ──
         const trackContainer = document.createElement('div');
         trackContainer.className = 'student-track-container';
         
@@ -520,7 +233,6 @@ function renderYearbook(list = STUDENTS) {
             });
         }
 
-        // ── Social buttons ──
         const socialRow = document.createElement('div');
         socialRow.className = 'social-links';
 
@@ -558,6 +270,19 @@ function renderYearbook(list = STUDENTS) {
 
 let selectedCategories = new Set();
 let currentSearchQuery = '';
+let selectedGender = 'male';
+
+function switchGender(gender) {
+    selectedGender = gender;
+    document.querySelectorAll('.gender-tabs .tab').forEach(btn => {
+        if (btn.getAttribute('data-gender') === gender) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+    applyFilters();
+}
 
 function getStudentCategories(student) {
     let tracks = student.track;
@@ -693,8 +418,15 @@ function applyFilters() {
             const sCats = getStudentCategories(s);
             matchesCategory = Array.from(selectedCategories).some(c => sCats.has(c));
         }
+
+        // Gender filter
+        let matchesGender = true;
+        if (selectedGender !== 'all') {
+            const sGender = s.gender === 'female' ? 'female' : 'male'; // undefined defaults to male
+            matchesGender = sGender === selectedGender;
+        }
         
-        return matchesText && matchesCategory;
+        return matchesText && matchesCategory && matchesGender;
     });
     
     renderYearbook(filtered);
@@ -703,71 +435,7 @@ function applyFilters() {
 
 
 // ===== Graduation Projects Data =====
-const GRADUATION_PROJECTS = [
-    // ── Network ──
-    {
-        category: 'Network',
-        icon: '🌐',
-        team: [
-            { name: 'Ahmed Taha',          leader: true  },
-            { name: 'Abdelrahman Shaban',  leader: false },
-            { name: 'Abdelrahman Eid',     leader: false },
-            { name: 'Omar Elstawy',        leader: false },
-            { name: 'Ali Ibrahim',         leader: false },
-            { name: 'Mahmoud Nassar',      leader: false },
-        ],
-    },
-    {
-        category: 'Network',
-        icon: '📡',
-        team: [
-            { name: 'Mohamed Saeed',         leader: true  },
-            { name: 'Mohammed Taha Khalifa', leader: false },
-            { name: 'Mohamed Behiry',        leader: false },
-            { name: 'Ahmed Elsayed',         leader: false },
-            { name: 'Anas Ghazy',            leader: false },
-            { name: 'Eslam Ahmed',           leader: false },
-        ],
-    },
-    // ── Embedded ──
-    {
-        category: 'Embedded',
-        icon: '🔌',
-        team: [
-            { name: 'Abdallah Shehawey', leader: true  },
-            { name: 'Ahmed Gamal',       leader: false },
-            { name: 'Abdallah Saleh',    leader: false },
-        ],
-    },
-    // ── Digital ──
-    {
-        category: 'Digital',
-        icon: '⚡',
-        team: [
-            { name: 'Abdallah Mohamed Salah',     leader: true  },
-            { name: 'Mohamed Adel',           leader: false },
-            { name: 'Abdelrahman Adwe',               leader: false },
-            { name: 'Yousef Mohamed Abdelfattah', leader: false },
-            { name: 'Mohamed Elsayed Eldokhmisy', leader: false },
-            { name: 'Momen Elzaghawy',            leader: false },
-            { name: 'Mohamed Anwar',              leader: false },
-            
-        ],
-    },
-    {
-        category: 'Digital',
-        icon: '🧠',
-        team: [
-            { name: 'Omar Ahmed',        leader: true  },
-            { name: 'Youssef Elswase',   leader: false },
-            { name: 'Ramadan Khaled', leader: false },
-            { name: 'Mohamed Emadeldin', leader: false },
-            { name: 'Abdelrahman Taha',  leader: false },
-            { name: 'Ahmed Abdulhameed',   leader: false },
-            
-        ],
-    },
-];
+// Loaded from data/projects.js
 
 let currentProjectCat = 'Digital';
 
@@ -971,12 +639,11 @@ let previousValues = { days: '', hours: '', minutes: '', seconds: '' };
 
 // ===== Initialize =====
 document.addEventListener('DOMContentLoaded', () => {
-    createParticles();
     startCountdown();
     startProjectDiscussionCountdown();
     updateLocalTime();
     initAudio();
-    renderYearbook();
+    applyFilters();
 });
 
 // ===== Mode Switching (Top-Level) =====
@@ -1004,6 +671,10 @@ function switchMode(mode) {
         document.getElementById('yearbookSearch').value = '';
         currentSearchQuery = '';
         selectedCategories.clear();
+        selectedGender = 'male';
+        document.querySelectorAll('.gender-tabs .tab').forEach(btn => {
+            btn.classList.toggle('active', btn.getAttribute('data-gender') === 'male');
+        });
         applyFilters();
         renderStats();
     } else if (mode === 'projects') {
@@ -1234,39 +905,7 @@ function toggleAudio() {
     }
 }
 
-// ===== Particles =====
-function createParticles() {
-    const container = document.getElementById('particles');
-    const isMobile = window.innerWidth <= 768;
-    const count = isMobile ? 25 : 120;
-
-    const fragment = document.createDocumentFragment();
-
-    for (let i = 0; i < count; i++) {
-        const particle = document.createElement('div');
-        particle.classList.add('particle');
-
-        const size = Math.random() * 3 + 1.5;
-        const left = Math.random() * 100;
-        const duration = Math.random() * 15 + (isMobile ? 20 : 10);
-        const delay = -(Math.random() * 50);
-
-        particle.style.cssText = `
-            width:${size}px;
-            height:${size}px;
-            left:${left}%;
-            animation-duration:${duration}s;
-            animation-delay:${delay}s;
-            background:${isMobile
-                ? `hsla(${Math.random()*60+250},70%,65%,0.5)`
-                : `radial-gradient(circle,hsla(${Math.random()*60+250},80%,65%,0.6),transparent)`
-            };
-        `;
-
-        fragment.appendChild(particle);
-    }
-    container.appendChild(fragment);
-}
+// Particles logic removed (replaced by static CSS orbs)
 
 // ===== Confetti =====
 function launchConfetti() {

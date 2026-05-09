@@ -16,11 +16,12 @@
     <meta name="theme-color" content="#0a0a1e" />
 </head>
 <body>
-    <!-- Background -->
-    <div class="bg-overlay"></div>
-
-    <!-- Floating Particles -->
-    <div id="particles"></div>
+    <!-- Background Orbs -->
+    <div class="bg-orbs">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
 
     <!-- Main Content -->
     <div class="container">
@@ -152,6 +153,12 @@
                     <!-- Rendered by JS -->
                 </div>
 
+                <!-- Gender Tabs -->
+                <div class="tabs gender-tabs" id="genderTabs">
+                    <button class="tab active" data-gender="male" onclick="switchGender('male')">👨‍🎓 Men</button>
+                    <button class="tab" data-gender="female" onclick="switchGender('female')">👩‍🎓 Women</button>
+                </div>
+
                 <div class="yearbook-search-wrapper">
                     <span class="search-icon">🔍</span>
                     <input
@@ -226,6 +233,8 @@
     <!-- Audio Player -->
     <audio id="bgAudio"></audio>
 
+    <script src="data/students.js"></script>
+    <script src="data/projects.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
