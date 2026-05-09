@@ -8,7 +8,7 @@ const GRADUATION_PROJECTS = [
       { name: "Ahmed Taha", leader: true },
       { name: "Abdelrahman Shaban", leader: false },
       { name: "Abdelrahman Eid", leader: false },
-      { name: "Omar Elstawy", leader: false },
+      { name: "Omar Elsettawi", leader: false },
       { name: "Ali Ibrahim", leader: false },
       { name: "Mahmoud Nassar", leader: false },
     ],
