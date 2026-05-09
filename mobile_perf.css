@@ -8,7 +8,6 @@
        Limit backdrop-filter removal to ONLY the heaviest elements.
        We do NOT apply a global background-color so we don't break active gradients.
     */
-    .countdown-card,
     .student-card,
     .project-card,
     .photo-modal-content {
@@ -17,11 +16,11 @@
         background: rgba(8, 10, 18, 0.95) !important; /* Solid fallback matching new dark theme */
     }
 
-    /* ── Remove fixed orbs on mobile entirely ──
+    /* ── Remove fixed orbs on mobile entirely (except for countdown) ──
        Fixed elements repaint every time the address bar shows/hides,
        causing a lag flash at the bottom of the screen.
        Replace with a static gradient on html/body instead. */
-    .bg-orbs {
+    body:not(.mode-countdown-active) .bg-orbs {
         display: none !important;
     }
 
@@ -41,15 +40,9 @@
     }
 
     /* Simplify box-shadows on heavy cards */
-    .countdown-card,
     .student-card,
     .project-card {
         box-shadow: 0 4px 16px rgba(0,0,0,0.5) !important;
-    }
-
-    /* Disable the card-glow pseudo element (expensive paint) */
-    .card-glow {
-        display: none !important;
     }
 
     /* Reduce CSS animation frame rate hints */
