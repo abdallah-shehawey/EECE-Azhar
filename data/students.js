@@ -269,10 +269,9 @@ const STUDENTS = [
     color: "linear-gradient(135deg, #ef4444, #b91c1c)",
     gender: "male",
     social: {
-      linkedin: "",
-      github: "",
-      whatsapp: "",
-      facebook: "",
+      linkedin: "https://www.linkedin.com/in/omar-elsetawii-153325286",
+      whatsapp: "+201141046007",
+      facebook: "https://www.facebook.com/share/1bbBHjtEWw/",
     },
   },
   {
