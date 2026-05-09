@@ -263,7 +263,7 @@ const STUDENTS = [
     },
   },
   {
-    name: "Omar Elstawy",
+    name: "Omar Elsettawi",
     photo: "Pic/setawey.jpg",
     track: ["Network Engineer", "Embedded Systems", "Digital Design"],
     color: "linear-gradient(135deg, #ef4444, #b91c1c)",

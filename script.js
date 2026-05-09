@@ -207,13 +207,7 @@ function renderYearbook(list = STUDENTS) {
             photoWrap.appendChild(av);
         }
 
-        // ── Gender Badge ──
-        const genderBadge = document.createElement('div');
-        genderBadge.className = 'student-gender-badge';
-        const isFemale = student.gender === 'female';
-        genderBadge.textContent = isFemale ? '👩‍🎓' : '👨‍🎓';
-        genderBadge.title = isFemale ? 'Female' : 'Male';
-        photoWrap.appendChild(genderBadge);
+
 
         const nameEl = document.createElement('p');
         nameEl.className = 'student-name';
@@ -270,19 +264,6 @@ function renderYearbook(list = STUDENTS) {
 
 let selectedCategories = new Set();
 let currentSearchQuery = '';
-let selectedGender = 'male';
-
-function switchGender(gender) {
-    selectedGender = gender;
-    document.querySelectorAll('.gender-tabs .tab').forEach(btn => {
-        if (btn.getAttribute('data-gender') === gender) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
-        }
-    });
-    applyFilters();
-}
 
 function getStudentCategories(student) {
     let tracks = student.track;
@@ -419,14 +400,7 @@ function applyFilters() {
             matchesCategory = Array.from(selectedCategories).some(c => sCats.has(c));
         }
 
-        // Gender filter
-        let matchesGender = true;
-        if (selectedGender !== 'all') {
-            const sGender = s.gender === 'female' ? 'female' : 'male'; // undefined defaults to male
-            matchesGender = sGender === selectedGender;
-        }
-        
-        return matchesText && matchesCategory && matchesGender;
+        return matchesText && matchesCategory;
     });
     
     renderYearbook(filtered);
@@ -671,10 +645,6 @@ function switchMode(mode) {
         document.getElementById('yearbookSearch').value = '';
         currentSearchQuery = '';
         selectedCategories.clear();
-        selectedGender = 'male';
-        document.querySelectorAll('.gender-tabs .tab').forEach(btn => {
-            btn.classList.toggle('active', btn.getAttribute('data-gender') === 'male');
-        });
         applyFilters();
         renderStats();
     } else if (mode === 'projects') {
