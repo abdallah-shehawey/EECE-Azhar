@@ -4,8 +4,8 @@
 
 An interactive, single-page graduation celebration website for the **Class of 2026** of the Communication and Electronics Engineering department. It features a live multi-event countdown timer, a digital class yearbook with filtering and search, and a graduation projects showcase — all wrapped in a modern glassmorphism dark UI with an ambient randomized music playlist.
 
-[![Live Preview](https://img.shields.io/badge/Live%20Preview-GitHub%20Pages-0d1117?logo=github)](https://abdallah-shehawey.github.io/Graduation-Website/)
-[![GitHub](https://img.shields.io/badge/GitHub-abdallah--shehawey-181717?logo=github)](https://github.com/abdallah-shehawey/Graduation-Website)
+[![Live Preview](https://img.shields.io/badge/Live%20Preview-GitHub%20Pages-0d1117?logo=github)](https://abdallah-shehawey.github.io/EECE-Azhar/)
+[![GitHub](https://img.shields.io/badge/GitHub-abdallah--shehawey-181717?logo=github)](https://github.com/abdallah-shehawey/EECE-Azhar)
 
 ---
 
