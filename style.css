@@ -113,7 +113,6 @@ body {
 /* ── Countdown mode: lock layout to one screen so footer is always visible ── */
 body.mode-countdown-active {
     height: 100dvh;
-    overflow: hidden;
 }
 
 body.mode-countdown-active .container {
