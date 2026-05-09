@@ -36,11 +36,14 @@
 
 html {
     scroll-behavior: smooth;
+    background: #04050d;
+    overscroll-behavior: none;
 }
 
 body {
     font-family: var(--font-primary);
     min-height: 100vh;
+    min-height: 100dvh;
     background: #04050d;
     color: var(--text-primary);
     overflow-x: hidden;
