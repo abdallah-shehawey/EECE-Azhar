@@ -40,16 +40,16 @@ const STUDENTS = [
     },
   },
   {
-    name: "Abdelrahman Taha",
-    photo: "Pic/bido.jpeg",
-    track: ["Digital Design and Verification"],
+    name: "Abdallah Saleh",
+    photo: "Pic/saleh.jpg",
+    track: ["Embedded System", "Software Testing"],
     color: "linear-gradient(135deg, #ef4444, #b91c1c)",
     gender: "male",
     social: {
-      linkedin: "https://www.linkedin.com/in/abdalrahman-taha-493a3b237",
-      github: "https://github.com/bidotaha",
-      whatsapp: "+201117947328",
-      facebook: "https://www.facebook.com/bido.taha",
+      linkedin: "",
+      github: "",
+      whatsapp: "",
+      facebook: "",
     },
   },
   {
@@ -74,6 +74,19 @@ const STUDENTS = [
       linkedin: "https://www.linkedin.com/in/abdelrahman-shaban-470834243",
       whatsapp: "+201115737513",
       facebook: "https://www.facebook.com/share/1F175p8e6d/",
+    },
+  },
+  {
+    name: "Abdelrahman Taha",
+    photo: "Pic/bido.jpeg",
+    track: ["Digital Design and Verification"],
+    color: "linear-gradient(135deg, #ef4444, #b91c1c)",
+    gender: "male",
+    social: {
+      linkedin: "https://www.linkedin.com/in/abdalrahman-taha-493a3b237",
+      github: "https://github.com/bidotaha",
+      whatsapp: "+201117947328",
+      facebook: "https://www.facebook.com/bido.taha",
     },
   },
   {
@@ -281,8 +294,7 @@ const STUDENTS = [
     color: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
     gender: "male",
     social: {
-      linkedin:
-        "https://www.linkedin.com/in/yousef-mohamed-abd-el-fattah-3b1a0328b",
+      linkedin: "https://www.linkedin.com/in/yousef-mohamed-abd-el-fattah-3b1a0328b",
       github: "https://github.com/Yousef-fma",
       whatsapp: "+201270809908",
       facebook: "https://www.facebook.com/share/1AdT8F6sbq/",
@@ -300,18 +312,5 @@ const STUDENTS = [
       whatsapp: "+201092223738",
       facebook: "https://www.facebook.com/share/1U4nx8hwUt/",
     },
-  },
-  {
-    name: "Abdallah Saleh",
-    photo: "Pic/saleh.jpg",
-    track: ["Embedded System", "Software Testing"],
-    color: "linear-gradient(135deg, #ef4444, #b91c1c)",
-    gender: "male",
-    social: {
-      linkedin: "",
-      github: "",
-      whatsapp: "",
-      facebook: "",
-    },
-  },
+  }
 ];
