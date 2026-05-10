@@ -225,6 +225,19 @@ const STUDENTS = [
     },
   },
   {
+    name: "Mohamed Saeed",
+    photo: "Pic/saeed.jpg",
+    track: ["Embedded Systems", "Embedded Linux", "DevOps"],
+    color: "linear-gradient(135deg, #8b5cf6, #6d28d9)",
+    gender: "male",
+    social: {
+      linkedin: "https://www.linkedin.com/in/mohamed-saeed-12541a345",
+      github: "https://github.com/sm0074417-ship-it",
+      whatsapp: "+201010470531",
+      facebook: "https://www.facebook.com/mhmd.s.yd.556129",
+    },
+  },
+  {
     name: "Mohammed Taha Khalifa",
     photo: "Pic/khalifa.jpg",
     track: ["Network Engineer"],
