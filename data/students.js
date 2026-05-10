@@ -282,10 +282,10 @@ const STUDENTS = [
     color: "linear-gradient(135deg, #ef4444, #b91c1c)",
     gender: "male",
     social: {
-      linkedin: "",
-      github: "",
-      whatsapp: "",
-      facebook: "",
+      linkedin: "https://www.linkedin.com/in/omar-ahmad-a35484275",
+      github: "https://github.com/OmarAhmad610",
+      whatsapp: "+201015120435",
+      facebook: "https://www.facebook.com/share/1GcmGqhuHz/",
     },
   },
   {
@@ -319,7 +319,8 @@ const STUDENTS = [
     color: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
     gender: "male",
     social: {
-      linkedin: "https://www.linkedin.com/in/yousef-mohamed-abd-el-fattah-3b1a0328b",
+      linkedin:
+        "https://www.linkedin.com/in/yousef-mohamed-abd-el-fattah-3b1a0328b",
       github: "https://github.com/Yousef-fma",
       whatsapp: "+201270809908",
       facebook: "https://www.facebook.com/share/1AdT8F6sbq/",
@@ -337,5 +338,5 @@ const STUDENTS = [
       whatsapp: "+201092223738",
       facebook: "https://www.facebook.com/share/1U4nx8hwUt/",
     },
-  }
+  },
 ];
