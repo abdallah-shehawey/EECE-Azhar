@@ -16,9 +16,13 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, photos: cachedPhotos });
     }
 
-    // ✅ Parse the full JSON credentials stored as one env var
-    // This avoids the \n escape issue with private keys in Vercel
-    const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+    // ✅ Decode base64-encoded JSON credentials
+    // This is the most reliable way to store service account JSON in Vercel
+    const credentialsJson = Buffer.from(
+      process.env.GOOGLE_SERVICE_ACCOUNT_BASE64,
+      'base64'
+    ).toString('utf-8');
+    const credentials = JSON.parse(credentialsJson);
 
     const auth = new google.auth.GoogleAuth({
       credentials,
@@ -36,7 +40,6 @@ export default async function handler(req, res) {
     // Build a map: { "abdallah": "https://drive.google.com/thumbnail?..." }
     const photos = {};
     for (const file of response.data.files) {
-      // Remove extension and convert to lowercase key
       const key = file.name.replace(/\.[^/.]+$/, '').toLowerCase().trim();
       photos[key] = `https://drive.google.com/thumbnail?id=${file.id}&sz=w400`;
     }
