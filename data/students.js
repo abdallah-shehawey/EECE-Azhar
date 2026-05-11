@@ -2,7 +2,7 @@
 const STUDENTS = [
   {
     name: "Abdallah Shehawey",
-    photo: "Pic/abdallahshehawey.jpg",
+    photo: "abdallahshehawey",
     track: ["Embedded Systems", "Embedded Linux", "DevOps"],
     color: "linear-gradient(135deg, #8b5cf6, #6d28d9)",
     gender: "male",
@@ -15,7 +15,7 @@ const STUDENTS = [
   },
   {
     name: "Abdallah Mohamed Salah",
-    photo: "Pic/salah.jpg",
+    photo: "salah",
     track: ["Digital Design & Verification"],
     color: "linear-gradient(135deg, #ef4444, #b91c1c)",
     gender: "male",
@@ -28,7 +28,7 @@ const STUDENTS = [
   },
   {
     name: "Abdelrahman Adwe",
-    photo: "Pic/adwe.jpg",
+    photo: "adwe",
     track: ["Digital IC Design & Verification", "Embedded Systems"],
     color: "linear-gradient(135deg, #8b5cf6, #6d28d9)",
     gender: "male",
@@ -41,7 +41,7 @@ const STUDENTS = [
   },
   {
     name: "Abdallah Saleh",
-    photo: "Pic/saleh.jpg",
+    photo: "saleh",
     track: ["Embedded System", "Software Testing"],
     color: "linear-gradient(135deg, #ef4444, #b91c1c)",
     gender: "male",
@@ -54,7 +54,7 @@ const STUDENTS = [
   },
   {
     name: "Abdelrahman Eid",
-    photo: "Pic/eid.jpg",
+    photo: "eid",
     track: ["Network Engineer"],
     color: "linear-gradient(135deg, #ef4444, #b91c1c)",
     gender: "male",
@@ -66,7 +66,7 @@ const STUDENTS = [
   },
   {
     name: "Abdelrahman Shaban",
-    photo: "Pic/shaban.jpg",
+    photo: "shaban",
     track: ["Network Engineer"],
     color: "linear-gradient(135deg, #ef4444, #b91c1c)",
     gender: "male",
@@ -78,7 +78,7 @@ const STUDENTS = [
   },
   {
     name: "Abdelrahman Taha",
-    photo: "Pic/bido.jpeg",
+    photo: "bido",
     track: ["Digital Design & Verification"],
     color: "linear-gradient(135deg, #ef4444, #b91c1c)",
     gender: "male",
@@ -91,7 +91,7 @@ const STUDENTS = [
   },
   {
     name: "Ahmed Abdulhameed",
-    photo: "Pic/7ameedo.jpeg",
+    photo: "7ameedo",
     track: ["AI", "Digital Design"],
     color: "linear-gradient(135deg, #ef4444, #b91c1c)",
     gender: "male",
@@ -103,7 +103,7 @@ const STUDENTS = [
   },
   {
     name: "Ahmed Elsayed",
-    photo: "Pic/elsyed.jpg",
+    photo: "elsyed",
     track: ["AI", "Network Engineer"],
     color: "linear-gradient(135deg, #ef4444, #b91c1c)",
     gender: "male",
@@ -115,7 +115,7 @@ const STUDENTS = [
   },
   {
     name: "Ahmed Gamal",
-    photo: "Pic/gmal.jpg",
+    photo: "gmal",
     track: ["Embedded System", "Network Engineer"],
     color: "linear-gradient(135deg, #ef4444, #b91c1c)",
     gender: "male",
@@ -128,7 +128,7 @@ const STUDENTS = [
   },
   {
     name: "Ahmed Taha",
-    photo: "Pic/AhmedTaha.jpeg",
+    photo: "AhmedTaha",
     track: "Network security",
     color: "linear-gradient(135deg, #ec4899, #be185d)",
     gender: "male",
@@ -140,7 +140,7 @@ const STUDENTS = [
   },
   {
     name: "Ali Ibrahim",
-    photo: "Pic/ali.jpeg",
+    photo: "ali",
     track: "Network Engineer",
     color: "linear-gradient(135deg, #f59e0b, #b45309)",
     gender: "male",
@@ -151,7 +151,7 @@ const STUDENTS = [
   },
   {
     name: "Anas Ghazy",
-    photo: "Pic/anas.jpeg",
+    photo: "anas",
     track: ["Network Engineer"],
     color: "linear-gradient(135deg, #ec4899, #be185d)",
     gender: "male",
@@ -163,7 +163,7 @@ const STUDENTS = [
   },
   {
     name: "Islam Ahmed Elsafy",
-    photo: "Pic/Islam.webp",
+    photo: "Islam",
     track: ["Network Engineer"],
     color: "linear-gradient(135deg, #ef4444, #b91c1c)",
     gender: "male",
@@ -176,7 +176,7 @@ const STUDENTS = [
   },
   {
     name: "Mohamed Adel",
-    photo: "Pic/adel.jpeg",
+    photo: "adel",
     track: ["Digital Design"],
     color: "linear-gradient(135deg, #ef4444, #b91c1c)",
     gender: "male",
@@ -187,7 +187,7 @@ const STUDENTS = [
   },
   {
     name: "Mohamed Anwar",
-    photo: "Pic/anwar.jpg",
+    photo: "anwar",
     track: ["Digital IC Design & Verification"],
     color: "linear-gradient(135deg, #0ea5e9, #1e3a8a)",
     gender: "male",
@@ -200,7 +200,7 @@ const STUDENTS = [
   },
   {
     name: "Mohamed Behiry",
-    photo: "Pic/behery.jpg",
+    photo: "behery",
     track: ["Network Engineer", "Network Security"],
     color: "linear-gradient(135deg, #8b5cf6, #6d28d9)",
     gender: "male",
@@ -213,7 +213,7 @@ const STUDENTS = [
   },
   {
     name: "Mohamed Elsayed Eldokhmisy",
-    photo: "Pic/dokhmis.jpeg",
+    photo: "dokhmis",
     track: ["Digital Design & Verification"],
     color: "linear-gradient(135deg, #ef4444, #b91c1c)",
     gender: "male",
@@ -226,7 +226,7 @@ const STUDENTS = [
   },
   {
     name: "Mohamed Emadeldin",
-    photo: "Pic/mohemad.jpg",
+    photo: "mohemad",
     track: ["Digital IC Design & Verification"],
     color: "linear-gradient(135deg, #8b5cf6, #6d28d9)",
     gender: "male",
@@ -239,7 +239,7 @@ const STUDENTS = [
   },
   {
     name: "Mohamed Saeed",
-    photo: "Pic/saeed.jpg",
+    photo: "saeed",
     track: ["Network Engineer", "Mobile Communication", "Digital Design"],
     color: "linear-gradient(135deg, #8b5cf6, #6d28d9)",
     gender: "male",
@@ -252,7 +252,7 @@ const STUDENTS = [
   },
   {
     name: "Mohammed Taha Khalifa",
-    photo: "Pic/khalifa.jpg",
+    photo: "khalifa",
     track: ["Network Engineer"],
     color: "linear-gradient(135deg, #8b5cf6, #6d28d9)",
     gender: "male",
@@ -264,7 +264,7 @@ const STUDENTS = [
   },
   {
     name: "Momen Elzaghawy",
-    photo: "Pic/momen.jpg",
+    photo: "momen",
     track: ["Digital Design & Verification", "Asic Verification"],
     color: "linear-gradient(135deg, #8b5cf6, #6d28d9)",
     gender: "male",
@@ -277,7 +277,7 @@ const STUDENTS = [
   },
   {
     name: "Omar Ahmed",
-    photo: "Pic/omar.jpg",
+    photo: "omar",
     track: ["Digital Design"],
     color: "linear-gradient(135deg, #ef4444, #b91c1c)",
     gender: "male",
@@ -290,7 +290,7 @@ const STUDENTS = [
   },
   {
     name: "Omar Elsettawi",
-    photo: "Pic/setawey.jpg",
+    photo: "setawey",
     track: ["Network Engineer", "Embedded Systems", "Digital Design"],
     color: "linear-gradient(135deg, #ef4444, #b91c1c)",
     gender: "male",
@@ -302,7 +302,7 @@ const STUDENTS = [
   },
   {
     name: "Ramadan Khaled",
-    photo: "Pic/ramadan.jpeg",
+    photo: "ramadan",
     track: "Digital Design",
     color: "linear-gradient(135deg, #10b981, #047857)",
     gender: "male",
@@ -314,7 +314,7 @@ const STUDENTS = [
   },
   {
     name: "Yousef Mohamed Abdelfattah",
-    photo: "Pic/Yousef.jpeg",
+    photo: "Yousef",
     track: "Digital Design",
     color: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
     gender: "male",
@@ -328,7 +328,7 @@ const STUDENTS = [
   },
   {
     name: "Youssef Elswase",
-    photo: "Pic/elswase.jpeg",
+    photo: "elswase",
     track: ["Embedded System", "Digital Design"],
     color: "linear-gradient(135deg, #ef4444, #b91c1c)",
     gender: "male",

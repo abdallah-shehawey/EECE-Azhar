@@ -21,6 +21,34 @@ const EVENTS = {
 // ===== Students Data =====
 // Loaded from data/students.js
 
+// ===== Google Drive Photos Cache =====
+// Map of { photoKey: driveUrl } — loaded once on page start
+let drivePhotos = {};
+
+async function loadDrivePhotos() {
+  try {
+    const res = await fetch('/api/photos');
+    const data = await res.json();
+    if (data.success) {
+      drivePhotos = data.photos;
+      // Patch every student's photo field with the real Drive URL
+      STUDENTS.forEach((s) => {
+        if (s.photo) {
+          const key = s.photo.toLowerCase();
+          if (drivePhotos[key]) {
+            s.photo = drivePhotos[key];
+          } else {
+            // Photo key not found on Drive → clear so avatar shows
+            s.photo = null;
+          }
+        }
+      });
+    }
+  } catch (e) {
+    console.warn('Could not load Drive photos, falling back to avatars.', e);
+  }
+}
+
 // ===== Yearbook =====
 function getInitials(name) {
   return name
@@ -172,7 +200,8 @@ function openPhotoModal(student) {
 function openContactModal() {
   const devInfo = {
     name: "Abdallah Shehawey",
-    photo: "Pic/abdallahshehawey.jpg",
+    // Use the already-resolved Drive URL if loaded, otherwise null
+    photo: drivePhotos["abdallahshehawey"] || null,
     track: ["Embedded Systems", "Embedded Linux", "DevOps"],
     color: "linear-gradient(135deg, #8b5cf6, #6d28d9)",
     social: {
@@ -716,13 +745,15 @@ function initSwipeGesture() {
 }
 
 // ===== Initialize =====
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   window.scrollTo(0, 0);
   document.body.classList.add("mode-countdown-active");
   startCountdown();
   startProjectDiscussionCountdown();
   updateLocalTime();
   initAudio();
+  // Load Drive photos first, then render yearbook with real URLs
+  await loadDrivePhotos();
   applyFilters();
   initSwipeGesture();
 });
