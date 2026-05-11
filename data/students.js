@@ -227,7 +227,7 @@ const STUDENTS = [
   {
     name: "Mohamed Emadeldin",
     photo: "Pic/mohemad.jpg",
-    track: ["Digital IC Design", "Digital IC Verification"],
+    track: ["Digital IC Design & Verification"],
     color: "linear-gradient(135deg, #8b5cf6, #6d28d9)",
     gender: "male",
     social: {
@@ -265,7 +265,7 @@ const STUDENTS = [
   {
     name: "Momen Elzaghawy",
     photo: "Pic/momen.jpg",
-    track: ["Digital Design", "Digital Verification", "Asic Verification"],
+    track: ["Digital Design & Verification", "Asic Verification"],
     color: "linear-gradient(135deg, #8b5cf6, #6d28d9)",
     gender: "male",
     social: {
