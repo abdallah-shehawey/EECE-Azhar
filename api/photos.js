@@ -16,11 +16,12 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, photos: cachedPhotos });
     }
 
+    // ✅ Parse the full JSON credentials stored as one env var
+    // This avoids the \n escape issue with private keys in Vercel
+    const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+
     const auth = new google.auth.GoogleAuth({
-      credentials: {
-        client_email: process.env.GOOGLE_CLIENT_EMAIL,
-        private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      },
+      credentials,
       scopes: ['https://www.googleapis.com/auth/drive.readonly'],
     });
 
@@ -32,13 +33,11 @@ export default async function handler(req, res) {
       pageSize: 500,
     });
 
-    // Build a map: { "abdallah": "https://lh3.googleusercontent.com/..." }
+    // Build a map: { "abdallah": "https://drive.google.com/thumbnail?..." }
     const photos = {};
     for (const file of response.data.files) {
       // Remove extension and convert to lowercase key
-      // e.g. "Abdallah.jpg" → key: "abdallah"
       const key = file.name.replace(/\.[^/.]+$/, '').toLowerCase().trim();
-      // Use thumbnail link scaled up — fastest to load, no auth needed
       photos[key] = `https://drive.google.com/thumbnail?id=${file.id}&sz=w400`;
     }
 
