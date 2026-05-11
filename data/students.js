@@ -240,7 +240,7 @@ const STUDENTS = [
   {
     name: "Mohamed Saeed",
     photo: "Pic/saeed.jpg",
-    track: ["Network Engineer", "Digital Design"],
+    track: ["Network Engineer", "Mobile Communication", "Digital Design"],
     color: "linear-gradient(135deg, #8b5cf6, #6d28d9)",
     gender: "male",
     social: {
