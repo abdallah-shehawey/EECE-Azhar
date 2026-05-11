@@ -79,7 +79,7 @@ const STUDENTS = [
   {
     name: "Abdelrahman Taha",
     photo: "Pic/bido.jpeg",
-    track: ["Digital Design and Verification"],
+    track: ["Digital Design & Verification"],
     color: "linear-gradient(135deg, #ef4444, #b91c1c)",
     gender: "male",
     social: {
