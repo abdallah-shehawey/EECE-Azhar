@@ -171,20 +171,52 @@ function openPhotoModal(student) {
     }
   }
 
+  // Build the photo element with retry logic if needed
+  let photoHtml;
+  if (isAvatar) {
+    photoHtml = `<div class="photo-modal-avatar" style="background: ${student.color}">${getInitials(student.name)}</div>`;
+  } else {
+    photoHtml = `<div class="photo-modal-avatar" style="background: ${student.color}" id="_modalAvatarFallback">${getInitials(student.name)}</div>
+      <img id="_modalPhotoImg" src="${student.photo}" alt="${student.name}" style="display:none" />`;
+  }
+
   modal.innerHTML = `
         <span class="photo-modal-close">&times;</span>
         <div class="photo-modal-content">
-            ${
-              isAvatar
-                ? `<div class="photo-modal-avatar" style="background: ${student.color}">${getInitials(student.name)}</div>`
-                : `<img src="${student.photo}" alt="${student.name}" />`
-            }
+            ${photoHtml}
             <h3>${student.name}</h3>
             ${leaderBadgeHtml}
             ${tracksHtml}
             ${socialHtml}
         </div>
     `;
+
+  // Retry logic for modal image
+  if (!isAvatar) {
+    const modalImg = modal.querySelector('#_modalPhotoImg');
+    const modalAv  = modal.querySelector('#_modalAvatarFallback');
+    let modalRetry = 0;
+    const MAX_MODAL_RETRIES = 3;
+    const MODAL_DELAYS = [2000, 4000, 8000];
+
+    function tryModalLoad() {
+      const sep = student.photo.includes('?') ? '&' : '?';
+      modalImg.src = modalRetry === 0 ? student.photo : student.photo + sep + '_r=' + modalRetry;
+      modalImg.onload = () => {
+        modalImg.style.display = '';
+        if (modalAv) modalAv.style.display = 'none';
+      };
+      modalImg.onerror = () => {
+        if (modalRetry < MAX_MODAL_RETRIES && modal.style.display === 'flex') {
+          setTimeout(() => {
+            modalRetry++;
+            tryModalLoad();
+          }, MODAL_DELAYS[modalRetry] || 8000);
+        }
+      };
+    }
+    tryModalLoad();
+  }
 
   modal.style.display = "flex";
   // Trigger reflow for animation
@@ -259,26 +291,35 @@ function renderYearbook(list = STUDENTS) {
       img.style.display = "none"; // hidden until loaded
 
       let retryCount = 0;
+      let cancelled = false; // guard against stale timers after grid clear
       const MAX_RETRIES = 3;
       const RETRY_DELAYS = [2000, 4000, 8000]; // ms
 
-      function tryLoad(url) {
-        img.src = url + (url.includes('?') ? '&' : '?') + '_r=' + retryCount;
+      // Cancel pending retries when the card is removed from DOM
+      const observer = new MutationObserver(() => {
+        if (!document.contains(card)) { cancelled = true; observer.disconnect(); }
+      });
+      observer.observe(document.getElementById('studentsGrid') || document.body, { childList: true });
+
+      function tryLoad() {
+        if (cancelled) return;
+        const sep = student.photo.includes('?') ? '&' : '?';
+        img.src = retryCount === 0 ? student.photo : student.photo + sep + '_r=' + retryCount;
         img.onload = () => {
+          if (cancelled) return;
           img.style.display = "";
           if (photoWrap.contains(av)) photoWrap.replaceChild(img, av);
+          observer.disconnect();
         };
         img.onerror = () => {
+          if (cancelled) return;
           if (retryCount < MAX_RETRIES) {
-            setTimeout(() => {
-              retryCount++;
-              tryLoad(student.photo);
-            }, RETRY_DELAYS[retryCount] || 8000);
+            setTimeout(() => { retryCount++; tryLoad(); }, RETRY_DELAYS[retryCount] || 8000);
           }
           // else: keep showing avatar silently
         };
       }
-      tryLoad(student.photo);
+      tryLoad();
 
       photoWrap.appendChild(img);
     } else {
@@ -626,25 +667,34 @@ function renderProjects() {
         img.style.display = "none";
 
         let retryCount = 0;
+        let cancelled = false;
         const MAX_RETRIES = 3;
         const RETRY_DELAYS = [2000, 4000, 8000];
 
-        function tryLoadMember(url) {
-          img.src = url + (url.includes('?') ? '&' : '?') + '_r=' + retryCount;
+        const grid = document.getElementById('projectsGrid');
+        const obs = new MutationObserver(() => {
+          if (!document.contains(pill)) { cancelled = true; obs.disconnect(); }
+        });
+        if (grid) obs.observe(grid, { childList: true });
+
+        function tryLoadMember() {
+          if (cancelled) return;
+          const sep = student.photo.includes('?') ? '&' : '?';
+          img.src = retryCount === 0 ? student.photo : student.photo + sep + '_r=' + retryCount;
           img.onload = () => {
+            if (cancelled) return;
             img.style.display = "";
             if (pill.contains(fb)) pill.replaceChild(img, fb);
+            obs.disconnect();
           };
           img.onerror = () => {
+            if (cancelled) return;
             if (retryCount < MAX_RETRIES) {
-              setTimeout(() => {
-                retryCount++;
-                tryLoadMember(student.photo);
-              }, RETRY_DELAYS[retryCount] || 8000);
+              setTimeout(() => { retryCount++; tryLoadMember(); }, RETRY_DELAYS[retryCount] || 8000);
             }
           };
         }
-        tryLoadMember(student.photo);
+        tryLoadMember();
         pill.appendChild(img);
       } else {
         const av = document.createElement("span");
