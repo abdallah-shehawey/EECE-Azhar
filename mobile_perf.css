@@ -68,7 +68,13 @@ body {
     opacity: 0.12;
 }
 
+/* ── 4b. Event label — smaller on mobile so full date fits without orphaned "pm" ── */
+.event-label {
+    font-size: clamp(11px, 3vw, 14px);
+}
+
 /* ── 5. Disable hover transforms on touch devices (causes repaints on tap) ── */
+
 .student-card:hover,
 .project-card:hover,
 .project-member-pill:hover,
