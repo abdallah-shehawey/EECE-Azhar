@@ -36,18 +36,34 @@
 
 html {
     scroll-behavior: smooth;
-    background: #04050d;
     overscroll-behavior-x: none;
-    /* Use 100% so browser font-size zoom still works via rem */
     font-size: 100%;
+
+    /* ═══ UNIFIED BACKGROUND SYSTEM ═══
+     * The gradient lives ONLY here on html.
+     * html always fills 100% of the viewport (including empty areas below body).
+     * body is transparent → same gradient shows through content + empty space.
+     * Result: ONE continuous background surface everywhere on the page.
+     *
+     * On desktop: animated orbs float above this for cinematic depth.
+     * On mobile:  orbs are hidden → this gradient IS the full background.
+     */
+    min-height: 100svh; /* static — never recalculates on address-bar hide */
+    background:
+        radial-gradient(circle at 10%  10%, rgba(139, 92,  246, 0.30) 0%, transparent 45%),
+        radial-gradient(circle at 90%  15%, rgba(59,  130, 246, 0.24) 0%, transparent 45%),
+        radial-gradient(circle at 50%  55%, rgba(236, 72,  153, 0.16) 0%, transparent 50%),
+        radial-gradient(circle at 12%  88%, rgba(99,  102, 241, 0.20) 0%, transparent 40%),
+        radial-gradient(circle at 88%  85%, rgba(139, 92,  246, 0.16) 0%, transparent 40%),
+        #04050d;
 }
 
 body {
     font-family: var(--font-primary);
-    min-height: 100vh;
-    min-height: 100dvh;
+    /* svh = static — no layout shift when browser address bar hides/shows */
+    min-height: 100svh;
     overscroll-behavior-x: none;
-    background: #04050d;
+    background: transparent; /* html gradient shows through everywhere */
     color: var(--text-primary);
     overflow-x: hidden;
     position: relative;
@@ -99,7 +115,13 @@ body {
     to   { transform: translate(30px, 40px) scale(1.08); }
 }
 
-/* ===== Container ===== */
+/* ===== Container =====
+ * flex:1 = grows to fill body (min-height:100svh) minus the footer height.
+ * Sticky-footer pattern:
+ *   body (flex column, min-height:100svh)
+ *     ├── .container (flex:1 → fills body, pushes footer down)
+ *     └── footer     (sits at bottom; page scrolls naturally when content is tall)
+ */
 .container {
     position: relative;
     z-index: 1;
@@ -109,7 +131,9 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    min-height: calc(100vh - 60px);
+    flex: 1;        /* push footer to viewport bottom when content is short */
+    min-height: 0;  /* allow shrinking below old calc(100vh-60px) */
+    background: transparent;
 }
 
 /* ── Countdown mode: locked on desktop, natural scroll on mobile ── */
