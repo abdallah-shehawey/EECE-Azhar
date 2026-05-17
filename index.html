@@ -14,6 +14,31 @@
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="mobile_perf.css" media="(max-width: 768px)" />
     <meta name="theme-color" content="#04050d" />
+    <script>
+        /*
+         * Font-scale guard — runs synchronously BEFORE first paint so there is no flash.
+         *
+         * Problem: Android / iOS let users set "Font size" to Large in system settings.
+         *          This inflates the browser's root em (1 rem > 16 px), which scales every
+         *          rem-based value in the CSS and breaks the layout.
+         *
+         * Fix: If 1 rem > 18 px we scale the root font-size proportionally back toward
+         *      16 px while still honouring a small user preference (we allow up to 18 px
+         *      so "slightly large" stays slightly large — only "very large" is capped).
+         *      This keeps ALL rem-based text and spacing consistent without any FOUC.
+         */
+        (function () {
+            var base = 16;          // designed base (px)
+            var cap  = 18;          // maximum root font-size we allow (px)
+            var rem  = parseFloat(getComputedStyle(document.documentElement).fontSize);
+            if (rem > cap) {
+                // Scale down proportionally: keep font slightly larger than base
+                // but never wider than the cap.
+                var capped = base + (cap - base) * 0.5; // ~17 px — feels natural
+                document.documentElement.style.fontSize = capped + 'px';
+            }
+        })();
+    </script>
 </head>
 <body>
     <!-- Background Orbs -->
