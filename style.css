@@ -38,6 +38,8 @@ html {
     scroll-behavior: smooth;
     background: #04050d;
     overscroll-behavior-x: none;
+    /* Use 100% so browser font-size zoom still works via rem */
+    font-size: 100%;
 }
 
 body {
@@ -110,14 +112,15 @@ body {
     min-height: calc(100vh - 60px);
 }
 
-/* ── Countdown mode: lock layout to one screen so footer is always visible ── */
+/* ── Countdown mode: locked on desktop, natural scroll on mobile ── */
 body.mode-countdown-active {
     height: 100dvh;
+    overflow: hidden;       /* desktop: no scroll, no empty space */
 }
 
 body.mode-countdown-active .container {
     flex: 1;
-    min-height: 0;
+    min-height: 0;          /* override calc(100vh-60px) so footer stays visible */
     overflow: hidden;
     justify-content: center;
 }
@@ -129,7 +132,22 @@ body.mode-countdown-active #mode-countdown {
     justify-content: center;
     align-items: center;
     width: 100%;
-    position: relative; /* needed so .celebration absolute child is contained */
+    position: relative;
+}
+
+/* Mobile only: remove the height lock so body grows naturally.
+   Base body already has min-height:100dvh, so content is always at
+   least full-screen; scroll appears only when font/zoom makes it taller. */
+@media (max-width: 768px) {
+    body.mode-countdown-active {
+        height: auto;           /* body sizes to content, not forced 100dvh */
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
+
+    body.mode-countdown-active .container {
+        overflow: visible;
+    }
 }
 
 /* ===== Header ===== */
@@ -415,7 +433,7 @@ body.mode-countdown-active #mode-countdown {
 }
 
 .main-title {
-    font-size: 3rem;
+    font-size: clamp(1.7rem, 5vw, 3rem);
     font-weight: 800;
     letter-spacing: -0.5px;
     background: linear-gradient(135deg, #fff 0%, #e0d4ff 50%, #c4b5fd 100%);
@@ -600,7 +618,7 @@ body.mode-countdown-active #mode-countdown {
 
 .countdown-number {
     display: inline-block;
-    font-size: 4.5rem;
+    font-size: clamp(2rem, 8vw, 4.5rem);
     font-weight: 900;
     line-height: 1;
     letter-spacing: -2px;
@@ -1405,6 +1423,14 @@ body.mode-countdown-active #mode-countdown {
     padding: 6px;
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
+    /* Allow horizontal scroll when tabs don't fit */
+    overflow-x: auto;
+    max-width: 100%;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+.project-tabs::-webkit-scrollbar {
+    display: none;
 }
 
 .project-tab {
@@ -1416,12 +1442,13 @@ body.mode-countdown-active #mode-countdown {
     background: transparent;
     color: var(--text-muted);
     font-family: var(--font-primary);
-    font-size: 15px;
+    font-size: clamp(0.8rem, 2.5vw, 0.9375rem);
     font-weight: 600;
     border-radius: 14px;
     cursor: pointer;
     transition: all 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
     white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .project-tab:hover {
@@ -1989,19 +2016,20 @@ body.mode-countdown-active #mode-countdown {
 
 @media (max-width: 480px) {
     .projects-title {
-        font-size: 1.6rem;
+        font-size: clamp(1.3rem, 5vw, 1.6rem);
     }
 
     .project-tabs {
+        /* On mobile: scroll horizontally, don't stretch tabs */
         width: 100%;
-        justify-content: stretch;
+        justify-content: flex-start;
     }
 
     .project-tab {
-        flex: 1;
+        flex-shrink: 0;
         justify-content: center;
-        padding: 10px 8px;
-        font-size: 13px;
+        padding: 10px 14px;
+        font-size: clamp(0.75rem, 3.2vw, 0.82rem);
         gap: 5px;
     }
 
@@ -2025,7 +2053,7 @@ body.mode-countdown-active #mode-countdown {
     .project-member-pill {
         width: 100%;
         padding: 6px 8px;
-        font-size: 12.5px;
+        font-size: 0.78rem;
         justify-content: flex-start;
     }
 }
@@ -2100,15 +2128,15 @@ body.mode-countdown-active #mode-countdown {
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
     .main-title {
-        font-size: 2.2rem;
+        font-size: clamp(1.5rem, 5.5vw, 2.2rem);
     }
 
     .grad-icon {
-        font-size: 2rem;
+        font-size: clamp(1.6rem, 4vw, 2rem);
     }
 
     .subtitle {
-        font-size: 1rem;
+        font-size: clamp(0.85rem, 3vw, 1rem);
     }
 
     .tabs {
@@ -2125,27 +2153,26 @@ body.mode-countdown-active #mode-countdown {
     }
 
     .tab {
-        font-size: 13px;
+        font-size: clamp(0.75rem, 3vw, 0.82rem);
         padding: 8px 14px;
+        flex-shrink: 0;
     }
 
-    .countdown-number {
-        font-size: 3.2rem;
-    }
+    /* countdown-number already uses clamp — let it scale naturally */
 
     .countdown-label {
-        font-size: 12px;
+        font-size: clamp(0.6rem, 2vw, 0.75rem);
         letter-spacing: 2px;
     }
 
     .countdown-item::after {
-        font-size: 2rem;
+        font-size: clamp(1.2rem, 4vw, 2rem);
         right: -10px;
         top: 5px;
     }
 
     .event-label {
-        font-size: 14px;
+        font-size: clamp(0.8rem, 3vw, 0.875rem);
     }
 
     .card-content {
@@ -2180,13 +2207,13 @@ body.mode-countdown-active #mode-countdown {
 
 @media (max-width: 480px) {
     .main-title {
-        font-size: 1.8rem;
+        font-size: clamp(1.3rem, 6vw, 1.8rem);
         flex-direction: column;
         gap: 5px;
     }
 
     .subtitle {
-        font-size: 0.95rem;
+        font-size: clamp(0.8rem, 3.5vw, 0.95rem);
     }
 
     .yearbook-stats {
@@ -2205,37 +2232,36 @@ body.mode-countdown-active #mode-countdown {
     }
 
     .stat-number {
-        font-size: 1.1rem;
+        font-size: clamp(0.85rem, 3vw, 1.1rem);
         margin-bottom: 0;
     }
 
     .stat-label {
-        font-size: 0.5rem;
+        font-size: clamp(0.45rem, 1.8vw, 0.5rem);
         letter-spacing: -0.2px;
         text-align: center;
         line-height: 1.1;
     }
 
-    .countdown-number {
-        font-size: 2.8rem;
-    }
+    /* countdown-number already uses clamp */
 
     .countdown-label {
-        font-size: 11px;
+        font-size: clamp(0.55rem, 2vw, 0.69rem);
     }
 
     .audio-btn {
         padding: 10px 18px;
-        font-size: 14px;
+        font-size: clamp(0.8rem, 3.5vw, 0.875rem);
     }
 
     .tab {
-        font-size: 12px;
+        font-size: clamp(0.7rem, 3vw, 0.75rem);
         padding: 8px 10px;
+        flex-shrink: 0;
     }
 
     .event-label {
-        font-size: 13px;
+        font-size: clamp(0.75rem, 3vw, 0.82rem);
     }
 
     .audio-hint {
@@ -2247,7 +2273,7 @@ body.mode-countdown-active #mode-countdown {
     }
 
     .card-content {
-        padding: 25px 12px;
+        padding: 20px 12px;
     }
 
     .countdown-grid {
