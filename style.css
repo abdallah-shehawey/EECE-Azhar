@@ -36,9 +36,26 @@
 
 html {
     scroll-behavior: smooth;
-    background: #04050d;
     overscroll-behavior-x: none;
     font-size: 100%;
+
+    /* ═══ UNIFIED BACKGROUND SYSTEM ═══
+     * The gradient lives ONLY here on html.
+     * html always fills 100% of the viewport (including empty areas below body).
+     * body is transparent → same gradient shows through content + empty space.
+     * Result: ONE continuous background surface everywhere on the page.
+     *
+     * On desktop: animated orbs float above this for cinematic depth.
+     * On mobile:  orbs are hidden → this gradient IS the full background.
+     */
+    min-height: 100svh; /* static — never recalculates on address-bar hide */
+    background:
+        radial-gradient(circle at 10%  10%, rgba(139, 92,  246, 0.30) 0%, transparent 45%),
+        radial-gradient(circle at 90%  15%, rgba(59,  130, 246, 0.24) 0%, transparent 45%),
+        radial-gradient(circle at 50%  55%, rgba(236, 72,  153, 0.16) 0%, transparent 50%),
+        radial-gradient(circle at 12%  88%, rgba(99,  102, 241, 0.20) 0%, transparent 40%),
+        radial-gradient(circle at 88%  85%, rgba(139, 92,  246, 0.16) 0%, transparent 40%),
+        #04050d;
 }
 
 body {
@@ -46,7 +63,7 @@ body {
     /* svh = static — no layout shift when browser address bar hides/shows */
     min-height: 100svh;
     overscroll-behavior-x: none;
-    background: #04050d;
+    background: transparent; /* html gradient shows through everywhere */
     color: var(--text-primary);
     overflow-x: hidden;
     position: relative;
