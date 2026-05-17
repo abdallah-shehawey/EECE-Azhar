@@ -4,19 +4,32 @@
    Desktop styles are NEVER affected by this file.
    ========================================================================== */
 
-/* ── 1. Global overflow hardening ── */
+/* ── 1. Global overflow hardening + viewport flicker prevention ──
+ *
+ * WHY FLICKER HAPPENS:
+ * base body has min-height: 100dvh
+ * dvh = DYNAMIC viewport height — it CHANGES when the address bar hides.
+ * Every time the address bar collapses, dvh grows, body recalculates
+ * its height, layout shifts, and the background flashes.
+ *
+ * FIX: Override to 100svh (SMALL viewport height).
+ * svh = always the smallest viewport (address bar visible).
+ * It NEVER recalculates when address bar hides → zero layout shift.
+ * The body may be slightly shorter than the expanded viewport, but
+ * the html element fills the rest visually — no visible difference.
+ */
 html {
-    /* Prevent any element from creating horizontal scroll */
     overflow-x: clip;
+    /* Promote to GPU compositor layer — background repaints stay on GPU */
+    will-change: scroll-position;
 }
 
 body {
-    /* Clip horizontal bleed from absolute/glow elements */
     overflow-x: clip;
-    /* Smoother momentum scrolling on iOS */
     -webkit-overflow-scrolling: touch;
-    /* Prevent overscroll glow effect leaking into background */
     overscroll-behavior-x: none;
+    /* KEY FIX: svh is static, never triggers on address-bar collapse */
+    min-height: 100svh;
 }
 
 /* ── 2. Kill horizontal scroll from animated glow elements ── */
@@ -32,19 +45,11 @@ body {
     overflow: hidden;
 }
 
-/* ── 3. Remove fixed orbs outside countdown (they repaint on address bar resize) ── */
-body:not(.mode-countdown-active) .bg-orbs {
+/* ── 3. Hide all orbs on mobile — body gradient in style.css replaces them ── */
+.bg-orbs {
     display: none !important;
 }
 
-/* Replace with a static CSS gradient — zero repaint cost */
-html,
-body {
-    background:
-        radial-gradient(ellipse at 20% 10%, rgba(139, 92, 246, 0.12) 0%, transparent 55%),
-        radial-gradient(ellipse at 80% 80%, rgba(99, 102, 241, 0.10) 0%, transparent 50%),
-        #04050d !important;
-}
 
 /* ── 4. Performance — remove heavy compositing on mobile ── */
 .photo-modal-content {
@@ -190,4 +195,11 @@ html {
 /* ── 16. Audio hint — hidden on mobile (no room) ── */
 .audio-hint {
     display: none !important;
+}
+
+/* ── 17. Footer — reduce bottom gap so it blends naturally ── */
+.footer {
+    padding-top: 12px;
+    padding-bottom: 6px;  /* minimal gap below buttons — less visible "empty" space */
+    gap: 8px;
 }
