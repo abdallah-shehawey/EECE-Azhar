@@ -38,6 +38,9 @@ html {
     scroll-behavior: smooth;
     background: #04050d;
     overscroll-behavior-x: none;
+    font-size: 16px;                  /* lock 1rem = 16px across ALL browsers */
+    -webkit-text-size-adjust: 100%;   /* prevent Chrome/Safari auto font scaling */
+    text-size-adjust: 100%;           /* prevent Firefox/Edge auto font scaling  */
 }
 
 body {
@@ -120,14 +123,14 @@ body {
 
 /* ── Countdown mode: locked on desktop, natural scroll on mobile ── */
 body.mode-countdown-active {
-    height: 100dvh;
-    overflow: hidden;       /* desktop: no scroll, no empty space */
+    min-height: 100dvh;     /* flexible: bookmarks bar in Chrome won't clip content */
+    overflow-x: hidden;     /* no horizontal scroll */
 }
 
 body.mode-countdown-active .container {
     flex: 1;
     min-height: 0;          /* override calc(100vh-60px) so footer stays visible */
-    overflow: hidden;
+    overflow: clip;         /* no scroll but no clipping of card glow/border */
     justify-content: center;
 }
 
