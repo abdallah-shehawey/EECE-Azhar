@@ -4,32 +4,19 @@
    Desktop styles are NEVER affected by this file.
    ========================================================================== */
 
-/* ── 1. Global overflow hardening + viewport flicker prevention ──
- *
- * WHY FLICKER HAPPENS:
- * base body has min-height: 100dvh
- * dvh = DYNAMIC viewport height — it CHANGES when the address bar hides.
- * Every time the address bar collapses, dvh grows, body recalculates
- * its height, layout shifts, and the background flashes.
- *
- * FIX: Override to 100svh (SMALL viewport height).
- * svh = always the smallest viewport (address bar visible).
- * It NEVER recalculates when address bar hides → zero layout shift.
- * The body may be slightly shorter than the expanded viewport, but
- * the html element fills the rest visually — no visible difference.
- */
+/* ── 1. Global overflow hardening ── */
 html {
+    /* Prevent any element from creating horizontal scroll */
     overflow-x: clip;
-    /* Promote to GPU compositor layer — background repaints stay on GPU */
-    will-change: scroll-position;
 }
 
 body {
+    /* Clip horizontal bleed from absolute/glow elements */
     overflow-x: clip;
+    /* Smoother momentum scrolling on iOS */
     -webkit-overflow-scrolling: touch;
+    /* Prevent overscroll glow effect leaking into background */
     overscroll-behavior-x: none;
-    /* KEY FIX: svh is static, never triggers on address-bar collapse */
-    min-height: 100svh;
 }
 
 /* ── 2. Kill horizontal scroll from animated glow elements ── */
@@ -45,11 +32,22 @@ body {
     overflow: hidden;
 }
 
-/* ── 3. Hide all orbs on mobile — body gradient in style.css replaces them ── */
+/* ── 3. Hide all orbs on mobile — fixed blobs cause a visible
+   'floating layer' on top of the background gradient ── */
 .bg-orbs {
     display: none !important;
 }
 
+/* Seamless multi-point gradient covers all screen corners uniformly */
+html,
+body {
+    background:
+        radial-gradient(ellipse at 15% 10%,  rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 85% 15%,  rgba(59,  130, 246, 0.10) 0%, transparent 45%),
+        radial-gradient(ellipse at 80% 85%,  rgba(99,  102, 241, 0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 20% 90%,  rgba(236, 72,  153, 0.08) 0%, transparent 45%),
+        #04050d !important;
+}
 
 /* ── 4. Performance — remove heavy compositing on mobile ── */
 .photo-modal-content {

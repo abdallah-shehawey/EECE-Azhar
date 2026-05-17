@@ -832,6 +832,7 @@ function initSwipeGesture() {
   let touchStartX = 0;
   let touchStartY = 0;
   let isSwiping = false;
+  let swipeBlockedByScroll = false; // true when touch started inside a scrollable element
 
   document.addEventListener(
     "touchstart",
@@ -839,6 +840,11 @@ function initSwipeGesture() {
       touchStartX = e.touches[0].clientX;
       touchStartY = e.touches[0].clientY;
       isSwiping = true;
+
+      // Block mode-switch if the gesture starts inside a horizontally scrollable element
+      // (e.g. project-tabs track bar) so the user can scroll it freely.
+      const scrollableParent = e.target.closest(".project-tabs, [data-no-swipe]");
+      swipeBlockedByScroll = !!scrollableParent;
     },
     { passive: true },
   );
@@ -848,6 +854,9 @@ function initSwipeGesture() {
     (e) => {
       if (!isSwiping) return;
       isSwiping = false;
+
+      // Don't switch modes if swipe started on a scrollable sub-element
+      if (swipeBlockedByScroll) return;
 
       const deltaX = e.changedTouches[0].clientX - touchStartX;
       const deltaY = e.changedTouches[0].clientY - touchStartY;
@@ -869,6 +878,7 @@ function initSwipeGesture() {
     { passive: true },
   );
 }
+
 
 // ===== Initialize =====
 document.addEventListener("DOMContentLoaded", async () => {
