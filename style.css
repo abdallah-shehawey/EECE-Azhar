@@ -2097,8 +2097,8 @@ body.mode-countdown-active #mode-countdown {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
+    gap: 10px;
+    flex-wrap: nowrap;
 }
 
 .footer-btn {
@@ -2301,6 +2301,17 @@ body.mode-countdown-active #mode-countdown {
 
     .countdown-item::after {
         right: -4px;
+    }
+
+    .footer-btn {
+        padding: 7px 12px;
+        font-size: 11px;
+        gap: 5px;
+    }
+
+    .footer-btn-icon {
+        width: 13px;
+        height: 13px;
     }
 }
 
