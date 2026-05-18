@@ -594,12 +594,10 @@ body.mode-countdown-active #mode-countdown {
 
 .event-label {
     font-family: var(--font-secondary);
-    font-size: 16px;
+    font-size: 1rem;
     color: var(--text-secondary);
     margin-bottom: 30px;
     font-weight: 500;
-    -webkit-text-size-adjust: none;
-    text-size-adjust: none;
 }
 
 .event-label span {
@@ -672,8 +670,6 @@ body.mode-countdown-active #mode-countdown {
     font-size: 14px;
     color: var(--text-muted);
     font-weight: 400;
-    -webkit-text-size-adjust: none;
-    text-size-adjust: none;
 }
 
 /* ===== Celebration ===== */
@@ -1465,15 +1461,13 @@ body.mode-countdown-active #mode-countdown {
     background: transparent;
     color: var(--text-muted);
     font-family: var(--font-primary);
-    font-size: 15px;
+    font-size: clamp(0.8rem, 2.5vw, 0.9375rem);
     font-weight: 600;
     border-radius: 14px;
     cursor: pointer;
     transition: all 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
     white-space: nowrap;
     flex-shrink: 0;
-    -webkit-text-size-adjust: none;
-    text-size-adjust: none;
 }
 
 .project-tab:hover {
@@ -2036,8 +2030,6 @@ body.mode-countdown-active #mode-countdown {
     .project-tab {
         padding: 11px 18px;
         font-size: 14px;
-        -webkit-text-size-adjust: none;
-        text-size-adjust: none;
     }
 }
 
@@ -2049,24 +2041,21 @@ body.mode-countdown-active #mode-countdown {
     .project-tabs {
         width: 100%;
         justify-content: center;
-        flex-wrap: nowrap;
         overflow-x: visible;
     }
 
     .project-tab {
         flex: 1;
-        flex-shrink: 1;
         min-width: 0;
         justify-content: center;
-        padding: 9px 6px;
+        padding: 9px 4px;
         font-size: 11px;
         gap: 4px;
-        -webkit-text-size-adjust: none;
-        text-size-adjust: none;
     }
 
     .ptab-icon {
         font-size: 13px;
+        flex-shrink: 0;
     }
 
     .ptab-icon svg {
@@ -2075,8 +2064,8 @@ body.mode-countdown-active #mode-countdown {
     }
 
     .ptab-img-icon {
-        width: 18px;
-        height: 18px;
+        width: 16px;
+        height: 16px;
     }
 
     .project-card {
@@ -2144,8 +2133,6 @@ body.mode-countdown-active #mode-countdown {
     backdrop-filter: blur(5px);
     -webkit-backdrop-filter: blur(5px);
     text-decoration: none;
-    -webkit-text-size-adjust: none;
-    text-size-adjust: none;
 }
 
 .footer-btn:hover {
@@ -2220,9 +2207,7 @@ body.mode-countdown-active #mode-countdown {
     }
 
     .event-label {
-        font-size: 14px;
-        -webkit-text-size-adjust: none;
-        text-size-adjust: none;
+        font-size: clamp(0.75rem, 3vw, 0.875rem);
     }
 
     .card-content {
@@ -2311,9 +2296,7 @@ body.mode-countdown-active #mode-countdown {
     }
 
     .event-label {
-        font-size: 13px;
-        -webkit-text-size-adjust: none;
-        text-size-adjust: none;
+        font-size: clamp(0.688rem, 3vw, 0.813rem);
     }
 
     .audio-hint {
@@ -2340,8 +2323,6 @@ body.mode-countdown-active #mode-countdown {
         padding: 7px 12px;
         font-size: 11px;
         gap: 5px;
-        -webkit-text-size-adjust: none;
-        text-size-adjust: none;
     }
 
     .footer-btn-icon {
