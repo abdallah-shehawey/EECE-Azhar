@@ -1358,6 +1358,16 @@ body.mode-countdown-active #mode-countdown {
         padding: 12px 10px;
     }
 
+    /* Icons get bigger when label is hidden — no change to button size */
+    .mode-icon {
+        font-size: 26px;
+    }
+
+    .mode-icon svg {
+        width: 26px;
+        height: 26px;
+    }
+
     .students-grid {
         grid-template-columns: repeat(2, 1fr);
         gap: 12px;

@@ -158,6 +158,18 @@ html {
     height: 16px;
 }
 
+/* ── 11b. At ≤480 px the mode-label is hidden — make icons bigger to fill the space ── */
+@media (max-width: 480px) {
+    .mode-icon {
+        font-size: 26px;
+    }
+
+    .mode-icon svg {
+        width: 26px;
+        height: 26px;
+    }
+}
+
 /* ── 12. Countdown card — tighter on small screens ── */
 .card-content {
     padding: 20px 14px;
