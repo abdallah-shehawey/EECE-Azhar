@@ -594,7 +594,7 @@ body.mode-countdown-active #mode-countdown {
 
 .event-label {
     font-family: var(--font-secondary);
-    font-size: 16px;
+    font-size: 1rem;
     color: var(--text-secondary);
     margin-bottom: 30px;
     font-weight: 500;
@@ -2191,9 +2191,7 @@ body.mode-countdown-active #mode-countdown {
     }
 
     .event-label {
-        font-size: clamp(12px, 3vw, 14px);
-        -webkit-text-size-adjust: none;
-        text-size-adjust: none;
+        font-size: clamp(0.75rem, 3vw, 0.875rem);
     }
 
     .card-content {
@@ -2282,9 +2280,7 @@ body.mode-countdown-active #mode-countdown {
     }
 
     .event-label {
-        font-size: clamp(11px, 3vw, 13px);
-        -webkit-text-size-adjust: none;
-        text-size-adjust: none;
+        font-size: clamp(0.688rem, 3vw, 0.813rem);
     }
 
     .audio-hint {
