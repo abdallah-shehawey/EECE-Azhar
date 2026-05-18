@@ -272,7 +272,7 @@ const STUDENTS = [
       linkedin: "linkedin.com/in/momenelzaghawy",
       github: "https://github.com/momenelzaghawy",
       whatsapp: "+201002115038",
-      facebook: "https://www.facebook.com/share/1BHxWsiLCE/",
+      facebook: "https://www.facebook.com/momen.alzaghawy",
     },
   },
   {
