@@ -1505,3 +1505,16 @@ function launchConfetti() {
     }, i * 20);
   }
 }
+
+// ===== Mouse-Wheel → Horizontal Scroll on Project Tabs =====
+// Lets desktop users scroll the tabs with the mouse wheel (no Shift needed)
+(function () {
+  const tabs = document.getElementById("projectTabs");
+  if (!tabs) return;
+  tabs.addEventListener("wheel", function (e) {
+    // Only intercept when the tabs container is actually scrollable
+    if (tabs.scrollWidth <= tabs.clientWidth) return;
+    e.preventDefault();                        // stop page scroll
+    tabs.scrollLeft += e.deltaY || e.deltaX;  // map vertical wheel → horizontal
+  }, { passive: false });
+})();
