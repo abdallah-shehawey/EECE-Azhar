@@ -42,6 +42,7 @@ html {
     -webkit-text-size-adjust: 100%;   /* prevent Chrome/Safari auto font scaling */
     text-size-adjust: 100%;           /* prevent Firefox/Edge auto font scaling  */
     scrollbar-gutter: stable;         /* reserve scrollbar space — prevents layout shift every second */
+    overflow-anchor: none;            /* prevent scroll-anchor jump on countdown tick */
 }
 
 body {
@@ -593,7 +594,6 @@ body.mode-countdown-active #mode-countdown {
     padding: 35px 40px;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
-    contain: layout style;            /* isolate inner reflows — prevents countdown updates from shifting page height */
 }
 
 .event-label {
