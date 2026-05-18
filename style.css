@@ -2043,18 +2043,24 @@ body.mode-countdown-active #mode-countdown {
     }
 
     .project-tabs {
+        display: flex;
         width: 100%;
-        justify-content: center;
         overflow-x: auto;
+        justify-content: space-evenly; /* evenly spaced when they fit */
+        gap: 4px;
+        padding: 4px;
     }
 
     .project-tab {
-        flex: 1;
-        min-width: 0;
+        flex-shrink: 0;        /* natural size — scroll instead of cramping */
         justify-content: center;
-        padding: 9px 4px;
-        font-size: 11px;
+        padding: 9px 8px;
+        font-size: 10px;
         gap: 4px;
+    }
+
+    .project-tab.active {
+        box-shadow: none;
     }
 
     .ptab-icon {
