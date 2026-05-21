@@ -70,12 +70,18 @@ async function fetchFirebaseData({ attempt = 1, maxAttempts = 4, baseDelay = 200
 
     console.log(`Firebase data loaded successfully! (attempt ${attempt})`);
 
+    // Patch photo URLs with Cloudflare base URL now that we have fresh student data
+    if (typeof loadDrivePhotos === "function") await loadDrivePhotos();
+
     // Re-render whichever view is currently active so it reflects live data
     if (typeof renderProjects === "function" && typeof currentMode !== "undefined" && currentMode === "projects") {
       renderProjects();
     }
-    if (typeof applyFilters === "function" && typeof currentMode !== "undefined" && currentMode === "yearbook") {
-      applyFilters();
+    if (typeof applyFilters === "function") {
+      applyFilters(); // always re-filter so stats & grid reflect new data
+    }
+    if (typeof renderStats === "function") {
+      renderStats(); // always refresh student count badges
     }
 
   } catch (error) {
