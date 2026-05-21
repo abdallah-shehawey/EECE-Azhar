@@ -51,10 +51,26 @@ if (students.length === 0 && projects.length === 0) {
   process.exit(1);
 }
 
-// Convert students array to an object keyed by sanitized names
+const PINNED = "abdallah shehawey";
+
+function sanitizeKey(str) {
+  return str.replace(/[\.\$\#\[\]\/\s]/g, "");
+}
+
+// Sort students: Abdallah Shehawey first, then alphabetically
+students.sort((a, b) => {
+  const aPin = a.name.toLowerCase() === PINNED;
+  const bPin = b.name.toLowerCase() === PINNED;
+  if (aPin) return -1;
+  if (bPin) return 1;
+  return a.name.localeCompare(b.name);
+});
+
+// Convert students to index-keyed object so Firebase preserves sort order
 const studentsObj = {};
-students.forEach(s => {
-  const key = s.name.replace(/[\.\$\#\[\]\/\s]/g, "");
+students.forEach((s, i) => {
+  const idx = String(i).padStart(4, "0");
+  const key = `${idx}_${sanitizeKey(s.name)}`;
   studentsObj[key] = s;
 });
 
@@ -62,20 +78,26 @@ students.forEach(s => {
 // This allows multiple projects with the same category to co-exist
 const projectsObj = {};
 projects.forEach(p => {
-  const catKey = p.category.replace(/[\.\$\#\[\]\/\s]/g, "");
-  
-  const teamObj = {};
+  const catKey = sanitizeKey(p.category);
+
   let leaderKey = "Unknown";
-  if (p.team && Array.isArray(p.team)) {
-    p.team.forEach(m => {
-      const memberKey = m.name.replace(/[\.\$\#\[\]\/\s]/g, "");
-      teamObj[memberKey] = {
-        name: m.name,
-        leader: m.leader || false,
-      };
-      if (m.leader) leaderKey = memberKey;
-    });
-  }
+  const teamArr = Array.isArray(p.team) ? [...p.team] : [];
+
+  // Sort team: leader first, then alphabetically
+  teamArr.sort((a, b) => {
+    if (a.leader && !b.leader) return -1;
+    if (!a.leader && b.leader) return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  // Build team object with sort-preserving keys
+  const teamObj = {};
+  teamArr.forEach((m, i) => {
+    const prefix = m.leader ? "0000" : String(i).padStart(4, "0");
+    const memberKey = `${prefix}_${sanitizeKey(m.name)}`;
+    teamObj[memberKey] = { name: m.name, leader: m.leader || false };
+    if (m.leader) leaderKey = sanitizeKey(m.name);
+  });
 
   const key = `${catKey}_${leaderKey}`;
   projectsObj[key] = {
