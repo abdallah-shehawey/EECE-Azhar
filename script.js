@@ -73,6 +73,9 @@ async function fetchFirebaseData({ attempt = 1, maxAttempts = 4, baseDelay = 200
     // Patch photo URLs with Cloudflare base URL now that we have fresh student data
     if (typeof loadDrivePhotos === "function") await loadDrivePhotos();
 
+    // Pre-load photos into browser cache so yearbook shows them instantly
+    prefetchStudentPhotos();
+
     // Re-render whichever view is currently active so it reflects live data
     if (typeof currentMode !== "undefined") {
       if (currentMode === "projects" && typeof renderProjects === "function") {
@@ -119,6 +122,28 @@ async function loadDrivePhotos() {
       s.photo = `${CLOUDFLARE_BASE_URL}/${key}`;
     }
   });
+}
+
+/**
+ * Silently pre-loads all student photos into the browser cache while the user
+ * is still on the countdown tab. Uses requestIdleCallback (or setTimeout fallback)
+ * so it doesn't compete with the initial page render.
+ * When the user opens the yearbook the images are already cached → instant display.
+ */
+function prefetchStudentPhotos() {
+  const run = () => {
+    STUDENTS.forEach((s) => {
+      if (!s.photo) return;
+      const img = new Image();
+      img.src = s.photo;
+    });
+  };
+  // Yield to the browser first, then prefetch during idle time
+  if (typeof requestIdleCallback === "function") {
+    requestIdleCallback(run, { timeout: 3000 });
+  } else {
+    setTimeout(run, 500);
+  }
 }
 
 // ===== Yearbook =====
@@ -1001,6 +1026,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadDrivePhotos();
   applyFilters();
   renderStats();
+  // Pre-load yearbook photos into the browser cache in the background
+  // so they appear instantly when the user opens the yearbook tab
+  prefetchStudentPhotos();
 
   // Fetch fresh data from Firebase in the background — no blocking await.
   // On success it calls loadDrivePhotos + renderStats + re-renders active view.
