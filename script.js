@@ -995,16 +995,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   startProjectDiscussionCountdown();
   updateLocalTime();
   initAudio();
-  // Fetch Firebase data → patches photos + renders on success (retries automatically on failure)
-  await fetchFirebaseData();
-  // If Firebase failed on first try, render local fallback data immediately
-  // so the yearbook isn't empty while background retries run
-  if (STUDENTS.length > 0 && typeof loadDrivePhotos === "function") {
-    await loadDrivePhotos();
-    if (typeof applyFilters === "function") applyFilters();
-    if (typeof renderStats === "function") renderStats();
-  }
-  initSwipeGesture();
+  initSwipeGesture(); // Init immediately — no need to wait for Firebase
+
+  // Render local fallback data right away so the UI is usable from the start
+  await loadDrivePhotos();
+  applyFilters();
+  renderStats();
+
+  // Fetch fresh data from Firebase in the background — no blocking await.
+  // On success it calls loadDrivePhotos + renderStats + re-renders active view.
+  // On failure it retries automatically with exponential backoff.
+  fetchFirebaseData();
 });
 
 // ===== Mode Switching (Top-Level) =====
