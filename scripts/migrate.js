@@ -51,6 +51,20 @@ if (students.length === 0 && projects.length === 0) {
   process.exit(1);
 }
 
+// Convert students array to an object keyed by sanitized names
+const studentsObj = {};
+students.forEach(s => {
+  const key = s.name.replace(/[\.\$\#\[\]\/\s]/g, "");
+  studentsObj[key] = s;
+});
+
+// Convert projects array to an object keyed by sanitized categories
+const projectsObj = {};
+projects.forEach(p => {
+  const key = p.category.replace(/[\.\$\#\[\]\/\s]/g, "");
+  projectsObj[key] = p;
+});
+
 // 3. Define helper to perform PUT request using native HTTPS (no external dependencies)
 function uploadData(nodeName, data) {
   return new Promise((resolve, reject) => {
@@ -98,15 +112,15 @@ async function run() {
   try {
     console.log('Starting migration to Firebase Realtime Database...\n');
     
-    // Upload Students
-    await uploadData('students', students);
+    // Upload Students as name-keyed object
+    await uploadData('students', studentsObj);
     console.log('\x1b[32m✔ Students migrated successfully!\x1b[0m\n');
 
-    // Upload Projects
-    await uploadData('projects', projects);
+    // Upload Projects as category-keyed object
+    await uploadData('projects', projectsObj);
     console.log('\x1b[32m✔ Projects migrated successfully!\x1b[0m\n');
 
-    console.log('\x1b[32m🎉 Migration complete! All data is now live on Firebase.\x1b[0m');
+    console.log('\x1b[32m🎉 Migration complete! All data is now live on Firebase with named keys.\x1b[0m');
   } catch (error) {
     console.error('\x1b[31mMigration failed:\x1b[0m', error.message);
     process.exit(1);
