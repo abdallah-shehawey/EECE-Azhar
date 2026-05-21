@@ -1413,10 +1413,12 @@ function updateCountdown() {
     const minutesStr = String(minutes).padStart(2, "0");
     const secondsStr = String(seconds).padStart(2, "0");
 
-    animateNumber("days", daysStr, previousValues.days);
-    animateNumber("hours", hoursStr, previousValues.hours);
-    animateNumber("minutes", minutesStr, previousValues.minutes);
-    animateNumber("seconds", secondsStr, previousValues.seconds);
+    const skip = _countdownFirstRender;
+    animateNumber("days", daysStr, previousValues.days, skip);
+    animateNumber("hours", hoursStr, previousValues.hours, skip);
+    animateNumber("minutes", minutesStr, previousValues.minutes, skip);
+    animateNumber("seconds", secondsStr, previousValues.seconds, skip);
+    _countdownFirstRender = false;
 
     previousValues = {
       days: daysStr,
@@ -1450,11 +1452,13 @@ function updateCountdown() {
   const minutesStr = String(minutes).padStart(2, "0");
   const secondsStr = String(seconds).padStart(2, "0");
 
-  // Animate number changes
-  animateNumber("days", daysStr, previousValues.days);
-  animateNumber("hours", hoursStr, previousValues.hours);
-  animateNumber("minutes", minutesStr, previousValues.minutes);
-  animateNumber("seconds", secondsStr, previousValues.seconds);
+  // Animate number changes (skip animation on very first render to avoid 00→real flash)
+  const skip = _countdownFirstRender;
+  animateNumber("days", daysStr, previousValues.days, skip);
+  animateNumber("hours", hoursStr, previousValues.hours, skip);
+  animateNumber("minutes", minutesStr, previousValues.minutes, skip);
+  animateNumber("seconds", secondsStr, previousValues.seconds, skip);
+  _countdownFirstRender = false;
 
   previousValues = {
     days: daysStr,
@@ -1467,8 +1471,16 @@ function updateCountdown() {
 }
 
 // ===== Animate Number =====
-function animateNumber(id, newValue, oldValue) {
+let _countdownFirstRender = true; // skip flip animation on very first tick
+
+function animateNumber(id, newValue, oldValue, skipAnimation = false) {
   const el = document.getElementById(id);
+  if (!el) return;
+  if (skipAnimation) {
+    // Write immediately with no animation — used on first render
+    el.textContent = newValue;
+    return;
+  }
   if (newValue !== oldValue) {
     el.textContent = newValue;
     el.classList.remove("number-changed");
