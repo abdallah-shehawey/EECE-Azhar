@@ -26,15 +26,15 @@ const FIREBASE_DB_URL = "https://eece-azhar-6f18d-default-rtdb.firebaseio.com/";
 let STUDENTS = typeof LOCAL_STUDENTS !== "undefined" ? LOCAL_STUDENTS : [];
 let GRADUATION_PROJECTS = typeof LOCAL_GRADUATION_PROJECTS !== "undefined" ? LOCAL_GRADUATION_PROJECTS : [];
 
-async function fetchFirebaseData() {
+async function fetchFirebaseData({ attempt = 1, maxAttempts = 4, baseDelay = 2000 } = {}) {
   if (!FIREBASE_DB_URL || FIREBASE_DB_URL.includes("your-project")) return;
 
   const cleanUrl = FIREBASE_DB_URL.endsWith("/") ? FIREBASE_DB_URL : `${FIREBASE_DB_URL}/`;
 
   try {
-    // Set a timeout of 5 seconds for the fetch so it doesn't hang forever
+    // Set a timeout of 8 seconds for the fetch so it doesn't hang forever
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
     const [resStudents, resProjects] = await Promise.all([
       fetch(`${cleanUrl}students.json`, { signal: controller.signal }),
@@ -55,7 +55,7 @@ async function fetchFirebaseData() {
         ? studentsData.filter(Boolean)
         : Object.values(studentsData);
     }
-    
+
     if (projectsData) {
       GRADUATION_PROJECTS = Array.isArray(projectsData)
         ? projectsData.filter(Boolean)
@@ -68,7 +68,7 @@ async function fetchFirebaseData() {
       });
     }
 
-    console.log("Firebase data loaded successfully!");
+    console.log(`Firebase data loaded successfully! (attempt ${attempt})`);
 
     // Re-render whichever view is currently active so it reflects live data
     if (typeof renderProjects === "function" && typeof currentMode !== "undefined" && currentMode === "projects") {
@@ -77,8 +77,16 @@ async function fetchFirebaseData() {
     if (typeof applyFilters === "function" && typeof currentMode !== "undefined" && currentMode === "yearbook") {
       applyFilters();
     }
+
   } catch (error) {
-    console.warn("Firebase fetch failed, using offline fallback data:", error.message);
+    if (attempt < maxAttempts) {
+      // Exponential backoff: 2s → 4s → 8s
+      const delay = baseDelay * Math.pow(2, attempt - 1);
+      console.warn(`Firebase fetch failed (attempt ${attempt}/${maxAttempts}), retrying in ${delay / 1000}s…`, error.message);
+      setTimeout(() => fetchFirebaseData({ attempt: attempt + 1, maxAttempts, baseDelay }), delay);
+    } else {
+      console.warn(`Firebase fetch failed after ${maxAttempts} attempts, using offline fallback data:`, error.message);
+    }
   }
 }
 
