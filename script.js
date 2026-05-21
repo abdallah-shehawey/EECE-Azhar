@@ -18,8 +18,56 @@ const EVENTS = {
   },
 };
 
-// ===== Students Data =====
-// Loaded from data/students.js
+// ===== Firebase Realtime Database Config =====
+// Replace this with your exact Firebase Realtime Database URL
+const FIREBASE_DB_URL = "https://eece-azhar-default-rtdb.firebaseio.com";
+
+// Initialize students and projects from local files (offline fallback)
+let STUDENTS = typeof LOCAL_STUDENTS !== "undefined" ? LOCAL_STUDENTS : [];
+let GRADUATION_PROJECTS = typeof LOCAL_GRADUATION_PROJECTS !== "undefined" ? LOCAL_GRADUATION_PROJECTS : [];
+
+async function fetchFirebaseData() {
+  if (!FIREBASE_DB_URL || FIREBASE_DB_URL.includes("your-project")) return;
+
+  const cleanUrl = FIREBASE_DB_URL.endsWith("/") ? FIREBASE_DB_URL : `${FIREBASE_DB_URL}/`;
+
+  try {
+    // Set a timeout of 5 seconds for the fetch so it doesn't hang forever
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    const [resStudents, resProjects] = await Promise.all([
+      fetch(`${cleanUrl}students.json`, { signal: controller.signal }),
+      fetch(`${cleanUrl}projects.json`, { signal: controller.signal })
+    ]);
+
+    clearTimeout(timeoutId);
+
+    if (!resStudents.ok || !resProjects.ok) {
+      throw new Error(`HTTP error! status: ${resStudents.status} / ${resProjects.status}`);
+    }
+
+    const studentsData = await resStudents.json();
+    const projectsData = await resProjects.json();
+
+    if (studentsData) {
+      STUDENTS = Array.isArray(studentsData)
+        ? studentsData.filter(Boolean)
+        : Object.values(studentsData);
+    }
+    
+    if (projectsData) {
+      GRADUATION_PROJECTS = Array.isArray(projectsData)
+        ? projectsData.filter(Boolean)
+        : Object.values(projectsData);
+    }
+
+    console.log("Firebase data loaded successfully!");
+  } catch (error) {
+    console.warn("Firebase fetch failed, using offline fallback data:", error.message);
+  }
+}
+
 
 // ===== Cloudflare Photos Backend =====
 // Replace this with your Cloudflare R2 bucket public URL
@@ -891,7 +939,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   startProjectDiscussionCountdown();
   updateLocalTime();
   initAudio();
-  // Load Drive photos first, then render yearbook with real URLs
+  // Fetch from Firebase first
+  await fetchFirebaseData();
+  // Load Cloudflare photos using the resolved data
   await loadDrivePhotos();
   applyFilters();
   initSwipeGesture();

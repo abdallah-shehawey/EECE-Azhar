@@ -1,5 +1,5 @@
 // ===== Graduation Projects Data =====
-const GRADUATION_PROJECTS = [
+const LOCAL_GRADUATION_PROJECTS = [
   // ── Network ──
   {
     category: "Network",

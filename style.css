@@ -2411,3 +2411,68 @@ body.mode-countdown-active #mode-countdown {
         opacity: 0;
     }
 }
+
+/* ===== Skeleton Loader ===== */
+.skeleton-card {
+    position: relative;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(139, 92, 246, 0.08);
+    border-radius: 22px;
+    padding: 32px 22px 26px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    height: 330px;
+    overflow: hidden;
+}
+
+.skeleton-photo {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.skeleton-text {
+    width: 70%;
+    height: 20px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.skeleton-text-sub {
+    width: 50%;
+    height: 14px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.skeleton-socials {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.skeleton-social {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.skeleton-photo,
+.skeleton-text,
+.skeleton-text-sub,
+.skeleton-social {
+    animation: skeletonPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes skeletonPulse {
+    0%, 100% {
+        opacity: 0.6;
+    }
+    50% {
+        opacity: 0.35;
+    }
+}

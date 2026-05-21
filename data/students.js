@@ -1,5 +1,5 @@
 // ===== Students Data =====
-const STUDENTS = [
+const LOCAL_STUDENTS = [
   {
     name: "Abdallah Shehawey",
     photo: "abdallahshehawey.jpg",
