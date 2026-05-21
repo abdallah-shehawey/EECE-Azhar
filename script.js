@@ -28,12 +28,15 @@ const CLOUDFLARE_IMAGE_EXT = ".jpg"; // e.g. .jpg, .png, .webp
 
 async function loadDrivePhotos() {
   // Directly patch every student's photo field with the Cloudflare URL.
-  // We kept the function name `loadDrivePhotos` to avoid changing other parts of the code.
-  // The existing image fallback logic handles 404s natively if an image doesn't exist.
   STUDENTS.forEach((s) => {
     if (s.photo) {
-      const key = s.photo.toLowerCase().trim();
-      s.photo = `${CLOUDFLARE_BASE_URL}/${key}${CLOUDFLARE_IMAGE_EXT}`;
+      let key = s.photo.trim();
+      // If you added the extension in students.js (e.g. "Islam.webp"), use it directly.
+      // Otherwise, fallback to trying .jpg then .jpeg then .webp
+      if (!key.includes('.')) {
+        key += '.jpg';
+      }
+      s.photo = `${CLOUDFLARE_BASE_URL}/${key}`;
     }
   });
 }
@@ -192,9 +195,11 @@ function openPhotoModal(student) {
       let url = student.photo;
       if (modalRetry === 1) {
         url = url.replace(/\.jpg$/i, '.jpeg'); // Try .jpeg on first retry
-      } else if (modalRetry > 1) {
+      } else if (modalRetry === 2) {
+        url = url.replace(/\.jpg$/i, '.webp'); // Try .webp on second retry
+      } else if (modalRetry > 2) {
         const sep = url.includes("?") ? "&" : "?";
-        url = url.replace(/\.jpg$/i, '.jpeg') + sep + "_r=" + modalRetry;
+        url = url.replace(/\.jpg$/i, '.webp') + sep + "_r=" + modalRetry;
       }
       // Attach handlers BEFORE setting src — prevents race with cached images firing onload immediately
       modalImg.onload = () => {
@@ -307,9 +312,11 @@ function renderYearbook(list = STUDENTS) {
         let url = student.photo;
         if (retryCount === 1) {
           url = url.replace(/\.jpg$/i, '.jpeg'); // Try .jpeg on first retry
-        } else if (retryCount > 1) {
+        } else if (retryCount === 2) {
+          url = url.replace(/\.jpg$/i, '.webp'); // Try .webp on second retry
+        } else if (retryCount > 2) {
           const sep = url.includes("?") ? "&" : "?";
-          url = url.replace(/\.jpg$/i, '.jpeg') + sep + "_r=" + retryCount;
+          url = url.replace(/\.jpg$/i, '.webp') + sep + "_r=" + retryCount;
         }
         // Set handlers BEFORE src — prevents race with cached images firing onload immediately
         img.onload = () => {
@@ -696,9 +703,11 @@ function renderProjects() {
           let url = student.photo;
           if (retryCount === 1) {
             url = url.replace(/\.jpg$/i, '.jpeg'); // Try .jpeg on first retry
-          } else if (retryCount > 1) {
+          } else if (retryCount === 2) {
+            url = url.replace(/\.jpg$/i, '.webp'); // Try .webp on second retry
+          } else if (retryCount > 2) {
             const sep = url.includes("?") ? "&" : "?";
-            url = url.replace(/\.jpg$/i, '.jpeg') + sep + "_r=" + retryCount;
+            url = url.replace(/\.jpg$/i, '.webp') + sep + "_r=" + retryCount;
           }
           // Set handlers BEFORE src — prevents race with cached images firing onload immediately
           img.onload = () => {
