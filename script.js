@@ -60,9 +60,23 @@ async function fetchFirebaseData() {
       GRADUATION_PROJECTS = Array.isArray(projectsData)
         ? projectsData.filter(Boolean)
         : Object.values(projectsData);
+
+      GRADUATION_PROJECTS.forEach(project => {
+        if (project.team && !Array.isArray(project.team)) {
+          project.team = Object.values(project.team);
+        }
+      });
     }
 
     console.log("Firebase data loaded successfully!");
+
+    // Re-render whichever view is currently active so it reflects live data
+    if (typeof renderProjects === "function" && typeof currentMode !== "undefined" && currentMode === "projects") {
+      renderProjects();
+    }
+    if (typeof applyFilters === "function" && typeof currentMode !== "undefined" && currentMode === "yearbook") {
+      applyFilters();
+    }
   } catch (error) {
     console.warn("Firebase fetch failed, using offline fallback data:", error.message);
   }
