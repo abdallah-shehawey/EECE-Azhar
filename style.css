@@ -5,6 +5,30 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent; /* Remove ugly default mobile tap highlight */
+}
+
+/* Custom premium focus indicator for accessibility */
+*:focus {
+    outline: none;
+}
+*:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: inherit;
+}
+
+/* tactile touch feedback for clickable elements */
+.mode-btn:active,
+.tab:active,
+.project-tab:active,
+.audio-btn:active,
+.student-card:active,
+.footer-btn:active,
+.social-icon-btn:active {
+    transform: scale(0.97);
+    box-shadow: inset 0 0 0 1.5px var(--accent-light), 0 0 15px var(--accent-glow) !important;
+    transition: transform 0.05s ease, box-shadow 0.05s ease;
 }
 
 /* ===== Custom Font ===== */
