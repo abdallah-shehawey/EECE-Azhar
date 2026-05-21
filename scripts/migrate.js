@@ -58,11 +58,30 @@ students.forEach(s => {
   studentsObj[key] = s;
 });
 
-// Convert projects array to an object keyed by sanitized categories
+// Convert projects array to an object keyed by category_LeaderName
+// This allows multiple projects with the same category to co-exist
 const projectsObj = {};
 projects.forEach(p => {
-  const key = p.category.replace(/[\.\$\#\[\]\/\s]/g, "");
-  projectsObj[key] = p;
+  const catKey = p.category.replace(/[\.\$\#\[\]\/\s]/g, "");
+  
+  const teamObj = {};
+  let leaderKey = "Unknown";
+  if (p.team && Array.isArray(p.team)) {
+    p.team.forEach(m => {
+      const memberKey = m.name.replace(/[\.\$\#\[\]\/\s]/g, "");
+      teamObj[memberKey] = {
+        name: m.name,
+        leader: m.leader || false,
+      };
+      if (m.leader) leaderKey = memberKey;
+    });
+  }
+
+  const key = `${catKey}_${leaderKey}`;
+  projectsObj[key] = {
+    ...p,
+    team: teamObj,
+  };
 });
 
 // 3. Define helper to perform PUT request using native HTTPS (no external dependencies)
