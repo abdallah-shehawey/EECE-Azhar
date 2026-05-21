@@ -619,6 +619,16 @@ function applyFilters() {
     return matchesText && matchesCategory;
   });
 
+  // Sort alphabetically, but always keep Abdallah Shehawey first
+  filtered.sort((a, b) => {
+    const PINNED = "abdallah shehawey";
+    const aPin = a.name.toLowerCase() === PINNED;
+    const bPin = b.name.toLowerCase() === PINNED;
+    if (aPin) return -1;
+    if (bPin) return 1;
+    return a.name.localeCompare(b.name);
+  });
+
   renderYearbook(filtered);
 }
 
@@ -658,9 +668,16 @@ function renderProjects() {
   const grid = document.getElementById("projectsGrid");
   if (!grid) return;
 
-  const filtered = GRADUATION_PROJECTS.filter(
-    (p) => p.category === currentProjectCat,
-  );
+  // Sort projects: alphabetically by leader name within the category
+  const filtered = GRADUATION_PROJECTS
+    .filter((p) => p.category === currentProjectCat)
+    .sort((a, b) => {
+      const aLeader = (a.team || []).find(m => m.leader);
+      const bLeader = (b.team || []).find(m => m.leader);
+      const aName = aLeader ? aLeader.name : "";
+      const bName = bLeader ? bLeader.name : "";
+      return aName.localeCompare(bName);
+    });
 
   if (filtered.length === 0) {
     grid.innerHTML =
@@ -716,7 +733,14 @@ function renderProjects() {
     const membersRow = document.createElement("div");
     membersRow.className = "project-members";
 
-    project.team.forEach((member) => {
+    // Sort team: leader first, then rest alphabetically
+    const sortedTeam = [...(project.team || [])].sort((a, b) => {
+      if (a.leader && !b.leader) return -1;
+      if (!a.leader && b.leader) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    sortedTeam.forEach((member) => {
       const student = STUDENTS.find((s) => s.name === member.name);
 
       const pill = document.createElement("button");
