@@ -21,32 +21,21 @@ const EVENTS = {
 // ===== Students Data =====
 // Loaded from data/students.js
 
-// ===== Google Drive Photos Cache =====
-// Map of { photoKey: driveUrl } — loaded once on page start
-let drivePhotos = {};
+// ===== Cloudflare Photos Backend =====
+// Replace this with your Cloudflare R2 bucket public URL
+const CLOUDFLARE_BASE_URL = "https://pub-ce440e8089f54fd1b94098e019b0b3dd.r2.dev";
+const CLOUDFLARE_IMAGE_EXT = ".jpg"; // e.g. .jpg, .png, .webp
 
 async function loadDrivePhotos() {
-  try {
-    const res = await fetch("/api/photos");
-    const data = await res.json();
-    if (data.success) {
-      drivePhotos = data.photos;
-      // Patch every student's photo field with the real Drive URL
-      STUDENTS.forEach((s) => {
-        if (s.photo) {
-          const key = s.photo.toLowerCase();
-          if (drivePhotos[key]) {
-            s.photo = drivePhotos[key];
-          } else {
-            // Photo key not found on Drive → clear so avatar shows
-            s.photo = null;
-          }
-        }
-      });
+  // Directly patch every student's photo field with the Cloudflare URL.
+  // We kept the function name `loadDrivePhotos` to avoid changing other parts of the code.
+  // The existing image fallback logic handles 404s natively if an image doesn't exist.
+  STUDENTS.forEach((s) => {
+    if (s.photo) {
+      const key = s.photo.toLowerCase().trim();
+      s.photo = `${CLOUDFLARE_BASE_URL}/${key}${CLOUDFLARE_IMAGE_EXT}`;
     }
-  } catch (e) {
-    console.warn("Could not load Drive photos, falling back to avatars.", e);
-  }
+  });
 }
 
 // ===== Yearbook =====
@@ -200,11 +189,13 @@ function openPhotoModal(student) {
     const MODAL_DELAYS = [2000, 4000, 8000];
 
     function tryModalLoad() {
-      const sep = student.photo.includes("?") ? "&" : "?";
-      const url =
-        modalRetry === 0
-          ? student.photo
-          : student.photo + sep + "_r=" + modalRetry;
+      let url = student.photo;
+      if (modalRetry === 1) {
+        url = url.replace(/\.jpg$/i, '.jpeg'); // Try .jpeg on first retry
+      } else if (modalRetry > 1) {
+        const sep = url.includes("?") ? "&" : "?";
+        url = url.replace(/\.jpg$/i, '.jpeg') + sep + "_r=" + modalRetry;
+      }
       // Attach handlers BEFORE setting src — prevents race with cached images firing onload immediately
       modalImg.onload = () => {
         modalImg.style.display = "";
@@ -237,8 +228,7 @@ function openPhotoModal(student) {
 function openContactModal() {
   const devInfo = {
     name: "Abdallah Shehawey",
-    // Use the already-resolved Drive URL if loaded, otherwise null
-    photo: drivePhotos["abdallahshehawey"] || null,
+    photo: `${CLOUDFLARE_BASE_URL}/abdallahshehawey${CLOUDFLARE_IMAGE_EXT}`,
     track: ["Embedded Systems", "Embedded Linux", "DevOps"],
     color: "linear-gradient(135deg, #8b5cf6, #6d28d9)",
     social: {
@@ -314,11 +304,13 @@ function renderYearbook(list = STUDENTS) {
 
       function tryLoad() {
         if (cancelled) return;
-        const sep = student.photo.includes("?") ? "&" : "?";
-        const url =
-          retryCount === 0
-            ? student.photo
-            : student.photo + sep + "_r=" + retryCount;
+        let url = student.photo;
+        if (retryCount === 1) {
+          url = url.replace(/\.jpg$/i, '.jpeg'); // Try .jpeg on first retry
+        } else if (retryCount > 1) {
+          const sep = url.includes("?") ? "&" : "?";
+          url = url.replace(/\.jpg$/i, '.jpeg') + sep + "_r=" + retryCount;
+        }
         // Set handlers BEFORE src — prevents race with cached images firing onload immediately
         img.onload = () => {
           if (cancelled) return;
@@ -701,11 +693,13 @@ function renderProjects() {
 
         function tryLoadMember() {
           if (cancelled) return;
-          const sep = student.photo.includes("?") ? "&" : "?";
-          const url =
-            retryCount === 0
-              ? student.photo
-              : student.photo + sep + "_r=" + retryCount;
+          let url = student.photo;
+          if (retryCount === 1) {
+            url = url.replace(/\.jpg$/i, '.jpeg'); // Try .jpeg on first retry
+          } else if (retryCount > 1) {
+            const sep = url.includes("?") ? "&" : "?";
+            url = url.replace(/\.jpg$/i, '.jpeg') + sep + "_r=" + retryCount;
+          }
           // Set handlers BEFORE src — prevents race with cached images firing onload immediately
           img.onload = () => {
             if (cancelled) return;
