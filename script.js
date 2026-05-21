@@ -74,14 +74,16 @@ async function fetchFirebaseData({ attempt = 1, maxAttempts = 4, baseDelay = 200
     if (typeof loadDrivePhotos === "function") await loadDrivePhotos();
 
     // Re-render whichever view is currently active so it reflects live data
-    if (typeof renderProjects === "function" && typeof currentMode !== "undefined" && currentMode === "projects") {
-      renderProjects();
+    if (typeof currentMode !== "undefined") {
+      if (currentMode === "projects" && typeof renderProjects === "function") {
+        renderProjects();
+      } else if (currentMode === "yearbook" && typeof applyFilters === "function") {
+        applyFilters();
+      }
     }
-    if (typeof applyFilters === "function") {
-      applyFilters(); // always re-filter so stats & grid reflect new data
-    }
+    // Always refresh student count badges regardless of active tab
     if (typeof renderStats === "function") {
-      renderStats(); // always refresh student count badges
+      renderStats();
     }
 
   } catch (error) {
@@ -107,6 +109,8 @@ async function loadDrivePhotos() {
   STUDENTS.forEach((s) => {
     if (s.photo) {
       let key = s.photo.trim();
+      // Skip URLs that are already patched (idempotent guard — prevents double-patching on retries)
+      if (key.startsWith(CLOUDFLARE_BASE_URL)) return;
       // If you added the extension in students.js (e.g. "Islam.webp"), use it directly.
       // Otherwise, fallback to trying .jpg then .jpeg then .webp
       if (!key.includes('.')) {
@@ -991,11 +995,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   startProjectDiscussionCountdown();
   updateLocalTime();
   initAudio();
-  // Fetch from Firebase first
+  // Fetch Firebase data → patches photos + renders on success (retries automatically on failure)
   await fetchFirebaseData();
-  // Load Cloudflare photos using the resolved data
-  await loadDrivePhotos();
-  applyFilters();
+  // If Firebase failed on first try, render local fallback data immediately
+  // so the yearbook isn't empty while background retries run
+  if (STUDENTS.length > 0 && typeof loadDrivePhotos === "function") {
+    await loadDrivePhotos();
+    if (typeof applyFilters === "function") applyFilters();
+    if (typeof renderStats === "function") renderStats();
+  }
   initSwipeGesture();
 });
 
