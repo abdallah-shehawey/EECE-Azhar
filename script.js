@@ -20,7 +20,7 @@ const EVENTS = {
 
 // ===== Firebase Realtime Database Config =====
 // Replace this with your exact Firebase Realtime Database URL
-const FIREBASE_DB_URL = "https://eece-azhar-default-rtdb.firebaseio.com";
+const FIREBASE_DB_URL = "https://eece-azhar-6f18d-default-rtdb.firebaseio.com/";
 
 // Initialize students and projects from local files (offline fallback)
 let STUDENTS = typeof LOCAL_STUDENTS !== "undefined" ? LOCAL_STUDENTS : [];
