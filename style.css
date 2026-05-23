@@ -92,7 +92,23 @@ body {
 /* ════════════════════════════════════════════
    BACKGROUND — Orbs & Particles
 ════════════════════════════════════════════ */
-.bg-orbs { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+.bg-orbs {
+    position: fixed;
+    inset: 0;
+    /* On mobile, height:100vh doesn't update when the browser toolbar
+       slides in/out — this makes the background clip or jump.
+       100dvh (dynamic viewport height) adjusts instantly with the toolbar. */
+    height: 100vh;        /* fallback for older browsers */
+    height: 100dvh;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+    /* Promote to GPU compositing layer so the browser repaints the orbs
+       independently — eliminates the lag/jump on mobile scroll. */
+    will-change: transform;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+}
 
 .orb {
     position: absolute;
@@ -1129,6 +1145,7 @@ body.mode-countdown-active #mode-countdown {
     left: 0;
     width: 100vw;
     height: 100vh;
+    height: 100dvh;
     background: rgba(10, 10, 15, 0.85);
     backdrop-filter: blur(8px);
     z-index: 9999;
