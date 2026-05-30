@@ -6,7 +6,7 @@ if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 const EVENTS = {
   exam: {
     label: "Final Exam",
-    date: new Date("2026-06-03T13:00:00"), // End time is 1:00 PM
+    date: new Date("2026-06-14T13:00:00"), // End time is 1:00 PM
   },
   discussion: {
     label: "Project Discussion",
