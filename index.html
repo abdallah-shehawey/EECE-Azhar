@@ -6,6 +6,9 @@
     <title>EECE Class of 2026</title>
     <meta name="description" content="Class of 2026 - Electronics & Communication Dep., Faculty of Engineering, Al-Azhar University" />
     <link rel="preload" href="font/PoetsenOne-Regular.ttf" as="font" type="font/ttf" crossorigin />
+    <!-- Preload logos as WebP for fast first paint -->
+    <link rel="preload" href="logo-faculty.webp" as="image" type="image/webp" />
+    <link rel="preload" href="logo-university.webp" as="image" type="image/webp" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -71,10 +74,16 @@
             </div>
             <div class="logos-wrapper">
                 <div class="logo-container">
-                    <img src="logo-faculty.png" alt="Faculty of Engineering Logo" class="university-logo" />
+                    <picture>
+                        <source srcset="logo-faculty.webp" type="image/webp" />
+                        <img src="logo-faculty.png" alt="Faculty of Engineering Logo" class="university-logo" width="300" height="300" fetchpriority="high" />
+                    </picture>
                 </div>
                 <div class="logo-container">
-                    <img src="logo-university.png" alt="Al-Azhar University Logo" class="university-logo" />
+                    <picture>
+                        <source srcset="logo-university.webp" type="image/webp" />
+                        <img src="logo-university.png" alt="Al-Azhar University Logo" class="university-logo" width="300" height="300" fetchpriority="high" />
+                    </picture>
                 </div>
             </div>
         </header>
