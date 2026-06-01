@@ -22,9 +22,9 @@ const EVENTS = {
 // Replace this with your exact Firebase Realtime Database URL
 const FIREBASE_DB_URL = "https://eece-azhar-6f18d-default-rtdb.firebaseio.com/";
 
-// Initialize students and projects from local files (offline fallback)
-let STUDENTS = typeof LOCAL_STUDENTS !== "undefined" ? LOCAL_STUDENTS : [];
-let GRADUATION_PROJECTS = typeof LOCAL_GRADUATION_PROJECTS !== "undefined" ? LOCAL_GRADUATION_PROJECTS : [];
+// Students and projects — populated by fetchFirebaseData()
+let STUDENTS = [];
+let GRADUATION_PROJECTS = [];
 
 async function fetchFirebaseData({ attempt = 1, maxAttempts = 4, baseDelay = 2000 } = {}) {
   if (!FIREBASE_DB_URL || FIREBASE_DB_URL.includes("your-project")) return;
