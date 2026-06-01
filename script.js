@@ -73,9 +73,6 @@ async function fetchFirebaseData({ attempt = 1, maxAttempts = 4, baseDelay = 200
     // Patch photo URLs with Cloudflare base URL now that we have fresh student data
     if (typeof loadDrivePhotos === "function") await loadDrivePhotos();
 
-    // Pre-load photos into browser cache so yearbook shows them instantly
-    prefetchStudentPhotos();
-
     // Re-render whichever view is currently active so it reflects live data
     if (typeof currentMode !== "undefined") {
       if (currentMode === "projects" && typeof renderProjects === "function") {
@@ -88,6 +85,11 @@ async function fetchFirebaseData({ attempt = 1, maxAttempts = 4, baseDelay = 200
     if (typeof renderStats === "function") {
       renderStats();
     }
+
+    // Now that Firebase data + critical re-renders are done, start caching
+    // yearbook photos in the background. The prefetch function already uses
+    // requestIdleCallback + batching so it won't block the main thread.
+    prefetchStudentPhotos();
 
   } catch (error) {
     if (attempt < maxAttempts) {
@@ -1074,13 +1076,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadDrivePhotos();
   applyFilters();
   renderStats();
-  // Pre-load yearbook photos into the browser cache in the background
-  // so they appear instantly when the user opens the yearbook tab
-  prefetchStudentPhotos();
 
   // Fetch fresh data from Firebase in the background — no blocking await.
   // On success it calls loadDrivePhotos + renderStats + re-renders active view.
   // On failure it retries automatically with exponential backoff.
+  // NOTE: prefetchStudentPhotos() is NOT called here — it runs on-demand
+  //       when the user opens the Yearbook tab, to avoid competing with the
+  //       page's critical resources (logo, CSS, Firebase) on initial load.
   fetchFirebaseData();
 });
 
