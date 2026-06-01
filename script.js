@@ -125,40 +125,11 @@ async function loadDrivePhotos() {
 }
 
 /**
- * Silently pre-loads student photos in small batches during idle time.
- * Batching prevents loading all images simultaneously which causes high RAM usage.
- * Each batch of 10 images is loaded, then the next batch waits for the next idle slot.
+ * Prefetch is intentionally disabled.
+ * Images are now lazy-loaded via IntersectionObserver in renderYearbook().
+ * Eagerly pre-loading all photos at once caused ~3 GB RAM spikes.
  */
-function prefetchStudentPhotos() {
-  const BATCH_SIZE = 10;
-  const photos = STUDENTS.filter((s) => s.photo).map((s) => s.photo);
-  let batchIndex = 0;
-
-  function loadBatch() {
-    if (batchIndex >= photos.length) return; // all done
-    const batch = photos.slice(batchIndex, batchIndex + BATCH_SIZE);
-    batchIndex += BATCH_SIZE;
-    batch.forEach((src) => {
-      const img = new Image();
-      img.src = src;
-    });
-    // Schedule next batch during next idle window
-    if (batchIndex < photos.length) {
-      if (typeof requestIdleCallback === "function") {
-        requestIdleCallback(loadBatch, { timeout: 5000 });
-      } else {
-        setTimeout(loadBatch, 1000);
-      }
-    }
-  }
-
-  // Start first batch during idle time
-  if (typeof requestIdleCallback === "function") {
-    requestIdleCallback(loadBatch, { timeout: 4000 });
-  } else {
-    setTimeout(loadBatch, 1500);
-  }
-}
+function prefetchStudentPhotos() { /* no-op — lazy loading is used instead */ }
 
 // ===== Yearbook =====
 function getInitials(name) {
@@ -396,7 +367,7 @@ function renderYearbook(list = STUDENTS) {
     });
 
     if (student.photo) {
-      // Show avatar placeholder first, then swap to real image once loaded
+      // Avatar placeholder shown immediately; real photo loads only when card enters viewport
       const av = document.createElement("div");
       av.className = "student-avatar";
       av.style.background = student.color;
@@ -408,27 +379,23 @@ function renderYearbook(list = STUDENTS) {
       img.alt = student.name;
       img.decoding = "async";
       img.style.display = "none"; // hidden until loaded
+      photoWrap.appendChild(img);
 
       let retryCount = 0;
-      let cancelled = false; // guard against stale timers after grid clear
+      let cancelled = false;
       const MAX_RETRIES = 3;
-      const RETRY_DELAYS = [2000, 4000, 8000]; // ms
-
-      // Use the shared grid observer instead of creating one per card
+      const RETRY_DELAYS = [2000, 4000, 8000];
       const unwatch = _watchCardRemoval(card, "studentsGrid", () => { cancelled = true; });
 
       function tryLoad() {
         if (cancelled) return;
         let url = student.photo;
-        if (retryCount === 1) {
-          url = url.replace(/\.jpg$/i, '.jpeg'); // Try .jpeg on first retry
-        } else if (retryCount === 2) {
-          url = url.replace(/\.jpg$/i, '.webp'); // Try .webp on second retry
-        } else if (retryCount > 2) {
+        if (retryCount === 1) url = url.replace(/\.jpg$/i, '.jpeg');
+        else if (retryCount === 2) url = url.replace(/\.jpg$/i, '.webp');
+        else if (retryCount > 2) {
           const sep = url.includes("?") ? "&" : "?";
           url = url.replace(/\.jpg$/i, '.webp') + sep + "_r=" + retryCount;
         }
-        // Set handlers BEFORE src — prevents race with cached images firing onload immediately
         img.onload = () => {
           if (cancelled) return;
           img.style.display = "";
@@ -438,18 +405,21 @@ function renderYearbook(list = STUDENTS) {
         img.onerror = () => {
           if (cancelled) return;
           if (retryCount < MAX_RETRIES) {
-            setTimeout(() => {
-              retryCount++;
-              tryLoad();
-            }, RETRY_DELAYS[retryCount] || 8000);
+            setTimeout(() => { retryCount++; tryLoad(); }, RETRY_DELAYS[retryCount] || 8000);
           }
-          // else: keep showing avatar silently
         };
-        img.src = url; // set src last — handlers already in place
+        img.src = url;
       }
-      tryLoad();
 
-      photoWrap.appendChild(img);
+      // ── Lazy load: start fetching only when card enters the viewport ──
+      const io = new IntersectionObserver((entries, obs) => {
+        if (entries[0].isIntersecting) {
+          obs.disconnect();
+          tryLoad();
+        }
+      }, { rootMargin: "200px" }); // start loading 200px before visible
+      io.observe(card);
+
     } else {
       const av = document.createElement("div");
       av.className = "student-avatar";
@@ -805,7 +775,7 @@ function renderProjects() {
         pill.appendChild(leaderIcon);
       }
 
-      // Avatar — show initials first, swap to photo when loaded
+      // Avatar — show initials first, swap to photo lazily when card enters viewport
       if (student && student.photo) {
         const fb = document.createElement("span");
         fb.className = "member-avatar-sm-initials";
@@ -817,27 +787,23 @@ function renderProjects() {
         img.alt = member.name;
         img.className = "member-avatar-sm";
         img.style.display = "none";
+        pill.appendChild(img);
 
         let retryCount = 0;
         let cancelled = false;
         const MAX_RETRIES = 3;
         const RETRY_DELAYS = [2000, 4000, 8000];
-
-        // Use the shared grid observer instead of creating one per pill
         const unwatch = _watchCardRemoval(pill, "projectsGrid", () => { cancelled = true; });
 
         function tryLoadMember() {
           if (cancelled) return;
           let url = student.photo;
-          if (retryCount === 1) {
-            url = url.replace(/\.jpg$/i, '.jpeg'); // Try .jpeg on first retry
-          } else if (retryCount === 2) {
-            url = url.replace(/\.jpg$/i, '.webp'); // Try .webp on second retry
-          } else if (retryCount > 2) {
+          if (retryCount === 1) url = url.replace(/\.jpg$/i, '.jpeg');
+          else if (retryCount === 2) url = url.replace(/\.jpg$/i, '.webp');
+          else if (retryCount > 2) {
             const sep = url.includes("?") ? "&" : "?";
             url = url.replace(/\.jpg$/i, '.webp') + sep + "_r=" + retryCount;
           }
-          // Set handlers BEFORE src — prevents race with cached images firing onload immediately
           img.onload = () => {
             if (cancelled) return;
             img.style.display = "";
@@ -847,16 +813,22 @@ function renderProjects() {
           img.onerror = () => {
             if (cancelled) return;
             if (retryCount < MAX_RETRIES) {
-              setTimeout(() => {
-                retryCount++;
-                tryLoadMember();
-              }, RETRY_DELAYS[retryCount] || 8000);
+              setTimeout(() => { retryCount++; tryLoadMember(); }, RETRY_DELAYS[retryCount] || 8000);
             }
           };
-          img.src = url; // set src last — handlers already in place
+          img.src = url;
         }
-        tryLoadMember();
-        pill.appendChild(img);
+
+        // ── Lazy load: start only when the project card enters the viewport ──
+        const io = new IntersectionObserver((entries, obs) => {
+          if (entries[0].isIntersecting) {
+            obs.disconnect();
+            tryLoadMember();
+          }
+        }, { rootMargin: "200px" });
+        // Observe the parent project-card (pill may not be in DOM yet)
+        const parentCard = pill.closest(".project-card") || pill;
+        io.observe(parentCard);
       } else {
         const av = document.createElement("span");
         av.className = "member-avatar-sm-initials";
