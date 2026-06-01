@@ -125,24 +125,38 @@ async function loadDrivePhotos() {
 }
 
 /**
- * Silently pre-loads all student photos into the browser cache while the user
- * is still on the countdown tab. Uses requestIdleCallback (or setTimeout fallback)
- * so it doesn't compete with the initial page render.
- * When the user opens the yearbook the images are already cached → instant display.
+ * Silently pre-loads student photos in small batches during idle time.
+ * Batching prevents loading all images simultaneously which causes high RAM usage.
+ * Each batch of 10 images is loaded, then the next batch waits for the next idle slot.
  */
 function prefetchStudentPhotos() {
-  const run = () => {
-    STUDENTS.forEach((s) => {
-      if (!s.photo) return;
+  const BATCH_SIZE = 10;
+  const photos = STUDENTS.filter((s) => s.photo).map((s) => s.photo);
+  let batchIndex = 0;
+
+  function loadBatch() {
+    if (batchIndex >= photos.length) return; // all done
+    const batch = photos.slice(batchIndex, batchIndex + BATCH_SIZE);
+    batchIndex += BATCH_SIZE;
+    batch.forEach((src) => {
       const img = new Image();
-      img.src = s.photo;
+      img.src = src;
     });
-  };
-  // Yield to the browser first, then prefetch during idle time
+    // Schedule next batch during next idle window
+    if (batchIndex < photos.length) {
+      if (typeof requestIdleCallback === "function") {
+        requestIdleCallback(loadBatch, { timeout: 5000 });
+      } else {
+        setTimeout(loadBatch, 1000);
+      }
+    }
+  }
+
+  // Start first batch during idle time
   if (typeof requestIdleCallback === "function") {
-    requestIdleCallback(run, { timeout: 3000 });
+    requestIdleCallback(loadBatch, { timeout: 4000 });
   } else {
-    setTimeout(run, 500);
+    setTimeout(loadBatch, 1500);
   }
 }
 
@@ -400,17 +414,8 @@ function renderYearbook(list = STUDENTS) {
       const MAX_RETRIES = 3;
       const RETRY_DELAYS = [2000, 4000, 8000]; // ms
 
-      // Cancel pending retries when the card is removed from DOM
-      const observer = new MutationObserver(() => {
-        if (!document.contains(card)) {
-          cancelled = true;
-          observer.disconnect();
-        }
-      });
-      observer.observe(
-        document.getElementById("studentsGrid") || document.body,
-        { childList: true },
-      );
+      // Use the shared grid observer instead of creating one per card
+      const unwatch = _watchCardRemoval(card, "studentsGrid", () => { cancelled = true; });
 
       function tryLoad() {
         if (cancelled) return;
@@ -428,7 +433,7 @@ function renderYearbook(list = STUDENTS) {
           if (cancelled) return;
           img.style.display = "";
           if (photoWrap.contains(av)) photoWrap.replaceChild(img, av);
-          observer.disconnect();
+          unwatch();
         };
         img.onerror = () => {
           if (cancelled) return;
@@ -818,14 +823,8 @@ function renderProjects() {
         const MAX_RETRIES = 3;
         const RETRY_DELAYS = [2000, 4000, 8000];
 
-        const grid = document.getElementById("projectsGrid");
-        const obs = new MutationObserver(() => {
-          if (!document.contains(pill)) {
-            cancelled = true;
-            obs.disconnect();
-          }
-        });
-        if (grid) obs.observe(grid, { childList: true });
+        // Use the shared grid observer instead of creating one per pill
+        const unwatch = _watchCardRemoval(pill, "projectsGrid", () => { cancelled = true; });
 
         function tryLoadMember() {
           if (cancelled) return;
@@ -843,7 +842,7 @@ function renderProjects() {
             if (cancelled) return;
             img.style.display = "";
             if (pill.contains(fb)) pill.replaceChild(img, fb);
-            obs.disconnect();
+            unwatch();
           };
           img.onerror = () => {
             if (cancelled) return;
@@ -956,6 +955,49 @@ const CELEBRATION_WINDOW_MS = 10 * 60 * 1000;
 // In-memory flag: prevents overlay showing twice in the same session
 let celebrationShown = {};
 let countUpMode = {};
+
+// ===== Shared DOM Removal Watcher =====
+// One MutationObserver per grid (not one per card) to avoid hundreds of observers.
+// gridId: "studentsGrid" or "projectsGrid" — looked up lazily so it works before
+//         the card is added to the DOM.
+// Usage: const unwatch = _watchCardRemoval(el, "studentsGrid", onRemoved)
+const _cardWatchers = new Map(); // gridId → { obs, callbacks: Map<el, fn> }
+function _watchCardRemoval(el, gridId, onRemoved) {
+  if (!_cardWatchers.has(gridId)) {
+    const callbacks = new Map();
+    const obs = new MutationObserver(() => {
+      const gridEl = document.getElementById(gridId);
+      callbacks.forEach((cb, watchedEl) => {
+        if (!gridEl || !gridEl.contains(watchedEl)) {
+          cb();
+          callbacks.delete(watchedEl);
+        }
+      });
+      // Self-cleanup when no more watchers
+      if (callbacks.size === 0) {
+        obs.disconnect();
+        _cardWatchers.delete(gridId);
+      }
+    });
+    // Observe the grid when available, otherwise observe body as fallback
+    const target = document.getElementById(gridId) || document.body;
+    obs.observe(target, { childList: true, subtree: true });
+    _cardWatchers.set(gridId, { obs, callbacks });
+  }
+
+  const { callbacks } = _cardWatchers.get(gridId);
+  callbacks.set(el, onRemoved);
+
+  // Return an unwatch function so the caller can clean up on success
+  return function unwatch() {
+    callbacks.delete(el);
+    const entry = _cardWatchers.get(gridId);
+    if (entry && entry.callbacks.size === 0) {
+      entry.obs.disconnect();
+      _cardWatchers.delete(gridId);
+    }
+  };
+}
 
 // ===== Swipe Gesture (Mode Switching) =====
 const MODES = ["countdown", "yearbook", "projects"];
@@ -1624,7 +1666,7 @@ function launchConfetti() {
   ];
   const shapes = ["circle", "square", "triangle", "star"];
 
-  for (let i = 0; i < 150; i++) {
+  for (let i = 0; i < 80; i++) {
     setTimeout(() => {
       const confetti = document.createElement("div");
       confetti.classList.add("confetti");
