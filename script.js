@@ -125,11 +125,45 @@ async function loadDrivePhotos() {
 }
 
 /**
- * Prefetch is intentionally disabled.
- * Images are now lazy-loaded via IntersectionObserver in renderYearbook().
- * Eagerly pre-loading all photos at once caused ~3 GB RAM spikes.
+ * Pre-loads student photos in small batches during idle time while the user
+ * is on the countdown page, so images are already cached when they open the Yearbook.
+ *
+ * Batching (10 images per idle slot) prevents the ~3 GB RAM spike caused by
+ * decoding all images simultaneously. The IntersectionObserver in renderYearbook()
+ * acts as a safety net for any cards that become visible before their batch runs.
  */
-function prefetchStudentPhotos() { /* no-op — lazy loading is used instead */ }
+function prefetchStudentPhotos() {
+  const BATCH_SIZE = 10;
+  const photos = STUDENTS.filter((s) => s.photo).map((s) => s.photo);
+  if (!photos.length) return;
+  let batchIndex = 0;
+
+  function loadBatch() {
+    if (batchIndex >= photos.length) return; // all done
+    const batch = photos.slice(batchIndex, batchIndex + BATCH_SIZE);
+    batchIndex += BATCH_SIZE;
+    batch.forEach((src) => {
+      const img = new Image();
+      img.src = src;
+    });
+    // Schedule next batch during next idle window (generous timeout so it
+    // never competes with user interactions)
+    if (batchIndex < photos.length) {
+      if (typeof requestIdleCallback === "function") {
+        requestIdleCallback(loadBatch, { timeout: 8000 });
+      } else {
+        setTimeout(loadBatch, 2000);
+      }
+    }
+  }
+
+  // Start first batch after a short delay so the initial page render finishes first
+  if (typeof requestIdleCallback === "function") {
+    requestIdleCallback(loadBatch, { timeout: 5000 });
+  } else {
+    setTimeout(loadBatch, 3000);
+  }
+}
 
 // ===== Yearbook =====
 function getInitials(name) {
