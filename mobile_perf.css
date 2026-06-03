@@ -37,6 +37,19 @@ body {
 /* Ensure bg-orbs never extend the document width */
 .bg-orbs {
     overflow: hidden;
+    /* Promote to its own GPU compositing layer so scroll never triggers a repaint */
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    will-change: transform;
+}
+
+/* Reduce blur cost on mobile — 80px blur on a fixed element is the main scroll-glitch cause */
+.orb {
+    filter: blur(45px);
+    /* Each orb on its own layer — prevents the fixed container from repainting on scroll */
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    will-change: transform;
 }
 
 /* ── 4. Performance — remove heavy compositing on mobile ── */
