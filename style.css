@@ -994,6 +994,8 @@ body.mode-countdown-active #mode-countdown {
     transition: all 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
     overflow: hidden;
     cursor: default;
+    content-visibility: auto;
+    contain-intrinsic-size: 0 330px;
 }
 
 .student-card::before {
@@ -1605,6 +1607,8 @@ body.mode-countdown-active #mode-countdown {
     transition: all 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
     overflow: hidden;
     animation: fadeInUp 0.55s ease-out both;
+    content-visibility: auto;
+    contain-intrinsic-size: 0 320px;
 }
 
 .project-card::before {
@@ -2373,6 +2377,30 @@ body.mode-countdown-active #mode-countdown {
         width: 13px;
         height: 13px;
     }
+}
+
+/* ===== Reduced Motion — respects user OS setting ===== */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+    .orb { animation: none !important; }
+    .card-glow::before { animation: none !important; }
+    .grad-icon { animation: none !important; }
+    .audio-btn:not(.playing) { animation: none !important; box-shadow: none; }
+    .audio-hint { animation: none !important; }
+    .audio-hint::before { animation: none !important; }
+    .hint-arrow { animation: none !important; }
+    .heart { animation: none !important; }
+    .skeleton-photo,
+    .skeleton-text,
+    .skeleton-text-sub,
+    .skeleton-social { animation: none !important; opacity: 0.4; }
+    .cs-pulse-ring { animation: none !important; }
 }
 
 /* ===== Number Flip Animation ===== */

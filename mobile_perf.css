@@ -15,6 +15,8 @@ html {
      */
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+    /* Mobile has no visible scrollbar — remove the reserved gutter space */
+    scrollbar-gutter: auto;
 }
 
 body {
@@ -52,6 +54,18 @@ body {
     will-change: transform;
 }
 
+/* On very small screens, shrink and simplify orbs even further */
+@media (max-width: 480px) {
+    .orb-1 { width: 280px; height: 280px; filter: blur(35px); }
+    .orb-2 { width: 240px; height: 240px; filter: blur(30px); }
+    .orb-3 { width: 200px; height: 200px; filter: blur(25px); }
+}
+
+/* Kill all orb animation for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .orb { animation: none !important; }
+}
+
 /* ── 4. Performance — remove heavy compositing on mobile ── */
 .photo-modal-content {
     backdrop-filter: none !important;
@@ -63,6 +77,23 @@ body {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
     background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Kill backdrop-filter on all cards — too expensive on mid-range phones */
+.student-card,
+.project-card,
+.stat-item,
+.tabs,
+.mode-nav,
+.project-tabs,
+.yearbook-search-wrapper {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+.audio-btn {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
 }
 
 /* Kill stagger animation on coming-soon rings — saves GPU */

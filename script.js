@@ -184,7 +184,7 @@ const SOCIAL_CONFIG = {
     buildUrl: (v) => v,
   },
   whatsapp: {
-    icon: "icons/whatsapp(1).png",
+    icon: "icons/whatsapp.svg",
     title: "WhatsApp",
     buildUrl: (v) => `https://wa.me/${v.replace(/\D/g, "")}`,
   },
