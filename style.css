@@ -2187,8 +2187,8 @@ body.mode-countdown-active #mode-countdown {
     min-width: 0;
     justify-content: center;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    /* Scale font down with viewport so text is never clipped, just smaller */
+    font-size: clamp(10px, 3vw, 13px);
 }
 
 .footer-btn {
