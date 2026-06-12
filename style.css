@@ -2167,27 +2167,17 @@ body.mode-countdown-active #mode-countdown {
     align-items: center;
     width: 100%;
     gap: 10px;
-    flex-wrap: wrap;
-}
-
-/* Source Code + Contact Developer always stay on the same row.
-   They shrink equally so neither overflows the viewport. */
-.footer-btn-pair {
-    display: flex;
+    /* Never wrap — all 3 buttons stay in one row regardless of font size */
     flex-wrap: nowrap;
-    gap: 10px;
-    flex: 1 1 auto;
-    min-width: 0;
-    max-width: 100%;
-    justify-content: center;
 }
 
-.footer-btn-pair .footer-btn {
+/* All 3 footer buttons share the row equally and shrink together */
+.footer-actions .footer-btn {
     flex: 1 1 0;
     min-width: 0;
     justify-content: center;
     white-space: nowrap;
-    /* Scale font down with viewport so text is never clipped, just smaller */
+    /* Scale font with viewport so text shrinks before anything wraps or overflows */
     font-size: clamp(10px, 3vw, 13px);
 }
 
