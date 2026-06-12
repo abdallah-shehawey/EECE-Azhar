@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://eece57-azhar.vercel.app/sitemap.xml

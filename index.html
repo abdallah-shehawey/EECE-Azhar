@@ -3,16 +3,49 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EECE Class of 2026</title>
-    <meta name="description" content="Class of 2026 - Electronics & Communication Dep., Faculty of Engineering, Al-Azhar University" />
-    <link rel="preload" href="font/PoetsenOne-Regular.ttf" as="font" type="font/ttf" crossorigin />
+    <title>EECE — Class of 2026 · Al-Azhar University</title>
+    <meta name="description" content="Class of 2026 — Electronics & Communication Engineering, Faculty of Engineering, Al-Azhar University. Live countdown, digital class yearbook, and graduation projects." />
+    <meta name="author" content="Abdallah Shehawey" />
+    <link rel="canonical" href="https://eece57-azhar.vercel.app/" />
+
+    <!-- ===== Open Graph (Facebook / WhatsApp / Telegram / LinkedIn) ===== -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="EECE Class of 2026" />
+    <meta property="og:title" content="EECE — Class of 2026 · Al-Azhar University" />
+    <meta property="og:description" content="Live countdown, digital class yearbook, and graduation projects — Electronics & Communication Engineering, Class of 2026." />
+    <meta property="og:url" content="https://eece57-azhar.vercel.app/" />
+    <meta property="og:image" content="https://eece57-azhar.vercel.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="EECE — Class of 2026, Faculty of Engineering, Al-Azhar University" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- ===== Twitter / X Card ===== -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="EECE — Class of 2026 · Al-Azhar University" />
+    <meta name="twitter:description" content="Live countdown, digital class yearbook, and graduation projects — Electronics & Communication Engineering, Class of 2026." />
+    <meta name="twitter:image" content="https://eece57-azhar.vercel.app/og-image.png" />
+
+    <link rel="preload" href="font/PoetsenOne-Regular.woff2" as="font" type="font/woff2" crossorigin />
     <!-- Preload logos as WebP for fast first paint -->
     <link rel="preload" href="logo-faculty.webp" as="image" type="image/webp" />
     <link rel="preload" href="logo-university.webp" as="image" type="image/webp" />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
     <link rel="icon" type="image/png" sizes="64x64" href="websiteicon.png" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+
+    <!-- ===== Installable PWA ===== -->
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="application-name" content="EECE 2026" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="EECE 2026" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
     <!-- Preconnect to Cloudflare R2 for faster image loading -->
     <link rel="preconnect" href="https://pub-ce440e8089f54fd1b94098e019b0b3dd.r2.dev" />
+    <!-- Firebase Realtime DB — warm up the connection early -->
+    <link rel="preconnect" href="https://eece-azhar-6f18d-default-rtdb.firebaseio.com" crossorigin />
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="mobile_perf.css" media="(max-width: 768px)" />
     <meta name="theme-color" content="#04050d" />
@@ -44,7 +77,7 @@
 </head>
 <body>
     <!-- Background Orbs -->
-    <div class="bg-orbs">
+    <div class="bg-orbs" aria-hidden="true">
         <div class="orb orb-1"></div>
         <div class="orb orb-2"></div>
         <div class="orb orb-3"></div>
@@ -60,7 +93,7 @@
                     <span class="dept-year">Class of 2026</span>
                 </div>
                 <div class="audio-wrapper">
-                    <button id="audioBtn" class="audio-btn" onclick="toggleAudio()">
+                    <button id="audioBtn" class="audio-btn" onclick="toggleAudio()" aria-label="Play background music" aria-pressed="false">
                         <span id="audioBtnText">🔇 Tap to Play</span>
                     </button>
                     <div class="audio-hint" id="audioHint">
@@ -73,25 +106,25 @@
                 <div class="logo-container">
                     <picture>
                         <source srcset="logo-faculty.webp" type="image/webp" />
-                        <img src="logo-faculty.png" alt="Faculty of Engineering Logo" class="university-logo" width="300" height="300" fetchpriority="high" />
+                        <img src="logo-faculty.webp" alt="Faculty of Engineering Logo" class="university-logo" width="300" height="300" fetchpriority="high" />
                     </picture>
                 </div>
                 <div class="logo-container">
                     <picture>
                         <source srcset="logo-university.webp" type="image/webp" />
-                        <img src="logo-university.png" alt="Al-Azhar University Logo" class="university-logo" width="300" height="300" fetchpriority="high" />
+                        <img src="logo-university.webp" alt="Al-Azhar University Logo" class="university-logo" width="300" height="300" fetchpriority="high" />
                     </picture>
                 </div>
             </div>
         </header>
 
         <!-- ===== Top-Level Mode Navigation ===== -->
-        <nav class="mode-nav" id="modeNav">
-            <button class="mode-btn active" id="modeCountdownBtn" data-mode="countdown" onclick="switchMode('countdown')">
-                <span class="mode-icon">⏱</span>
+        <nav class="mode-nav" id="modeNav" aria-label="Section navigation">
+            <button class="mode-btn active" id="modeCountdownBtn" data-mode="countdown" onclick="switchMode('countdown')" aria-label="Countdown">
+                <span class="mode-icon" aria-hidden="true">⏱</span>
                 <span class="mode-label">Countdown</span>
             </button>
-            <button class="mode-btn" id="modeYearbookBtn" data-mode="yearbook" onclick="switchMode('yearbook')">
+            <button class="mode-btn" id="modeYearbookBtn" data-mode="yearbook" onclick="switchMode('yearbook')" aria-label="Class Yearbook">
                 <span class="mode-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em">
                         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
@@ -100,7 +133,7 @@
                 </span>
                 <span class="mode-label">Class Yearbook</span>
             </button>
-            <button class="mode-btn" id="modeProjectsBtn" data-mode="projects" onclick="switchMode('projects')">
+            <button class="mode-btn" id="modeProjectsBtn" data-mode="projects" onclick="switchMode('projects')" aria-label="GP Projects">
                 <span class="mode-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em">
                         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -128,7 +161,7 @@
             <!-- Title Section -->
             <div class="title-section">
                 <h1 class="main-title">
-                    <span class="grad-icon">🎓</span>
+                    <span class="grad-icon" aria-hidden="true">🎓</span>
                     Class of 2026
                 </h1>
                 <p class="subtitle">
@@ -188,12 +221,14 @@
                 </div>
 
                 <div class="yearbook-search-wrapper">
-                    <span class="search-icon">🔍</span>
+                    <span class="search-icon" aria-hidden="true">🔍</span>
                     <input
-                        type="text"
+                        type="search"
                         id="yearbookSearch"
                         class="yearbook-search"
                         placeholder="Search by name or track..."
+                        aria-label="Search students by name or track"
+                        autocomplete="off"
                         oninput="filterStudents(this.value)"
                     />
                 </div>
@@ -289,14 +324,24 @@
     <footer class="footer">
         <p>Made by Abdallah Shehawey</p>
         <div class="footer-actions">
+            <button class="footer-btn footer-btn-share" onclick="shareSite()" aria-label="Share this website">
+                <span aria-hidden="true">🔗</span> Share
+            </button>
             <a href="https://github.com/abdallah-shehawey/Graduation-Website" target="_blank" rel="noopener noreferrer" class="footer-btn">
-                <img src="icons/github.svg" alt="GitHub" class="footer-btn-icon"> Source Code
+                <img src="icons/github.svg" alt="" class="footer-btn-icon"> Source Code
             </a>
             <button class="footer-btn" onclick="openContactModal()">
-                <span>✉️</span> Contact Developer
+                <span aria-hidden="true">✉️</span> Contact Developer
             </button>
         </div>
     </footer>
+
+    <!-- Back-to-top button (appears after scrolling on Yearbook / Projects) -->
+    <button id="scrollTopBtn" class="scroll-top-btn" aria-label="Back to top" title="Back to top">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 19V5M5 12l7-7 7 7"/>
+        </svg>
+    </button>
 
     <!-- Audio Player -->
     <audio id="bgAudio"></audio>

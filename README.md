@@ -24,6 +24,10 @@ An interactive, single-page graduation celebration website for the **Class of 20
 | 🎵 Music Player | Randomized ambient playlist, tap to play |
 | 🎨 Glassmorphism UI | Dark theme, blur cards, floating particles |
 | 📱 Mobile-Optimized | Separate performance CSS for mobile devices |
+| 📲 Installable PWA | Web manifest + service worker — add to home screen, works offline, instant repeat loads |
+| 🔗 Share | Native share sheet (mobile) with clipboard-copy fallback (desktop) |
+| 🔍 Rich Link Previews | Open Graph + Twitter Card meta with a branded preview image |
+| ⌨️ Keyboard & Swipe | Arrow keys / `1-2-3` on desktop, swipe gestures on mobile |
 
 ---
 
@@ -34,17 +38,21 @@ EECE-Azhar/
 ├── index.html          # Main HTML — structure, navigation, and layout
 ├── style.css           # Core styles (glassmorphism, animations, grid layouts)
 ├── mobile_perf.css     # Mobile-specific performance optimizations
-├── script.js           # All JavaScript logic (data, countdown, yearbook, projects)
+├── script.js           # All JavaScript logic (data, countdown, yearbook, projects, PWA)
+├── sw.js               # Service worker (offline shell + instant repeat loads)
+├── manifest.webmanifest# PWA manifest (installable / add-to-home-screen)
+├── og-image.png        # 1200×630 social share preview image
+├── robots.txt          # Crawler directives + sitemap pointer
+├── sitemap.xml         # Sitemap for search engines
 ├── sort_students.js    # Utility script for sorting student data
-├── bg.jpg              # Full-page background image
 ├── favicon.ico         # Browser tab icon
 ├── websiteicon.png     # 64×64 PNG site icon
-├── logo-faculty.png    # Faculty of Engineering logo
-├── logo-university.png # Al-Azhar University logo
-├── Pic/                # Student profile photos (25 × .jpg/.jpeg)
+├── apple-touch-icon.png# 180×180 iOS home-screen icon
+├── logo-faculty.webp   # Faculty of Engineering logo
+├── logo-university.webp # Al-Azhar University logo
 ├── audio/              # Background music tracks (4 × .m4a)
-├── icons/              # Social media and UI icons (SVG + PNG)
-└── font/               # Self-hosted PoetsenOne font (TTF)
+├── icons/              # Social/UI icons (SVG + PNG) + PWA icons (192/512/maskable)
+└── font/               # Self-hosted PoetsenOne font (WOFF2 + TTF fallback)
 ```
 
 ---
@@ -56,7 +64,8 @@ EECE-Azhar/
 | Structure | HTML5 (semantic elements) |
 | Styling | Vanilla CSS3 (variables, Grid, Flexbox, `backdrop-filter`) |
 | Logic | Vanilla JavaScript ES6+ (no frameworks, no build step) |
-| Fonts | PoetsenOne (self-hosted TTF) · Outfit & DM Sans (Google Fonts) |
+| PWA | Web App Manifest + Service Worker (installable, offline-capable) |
+| Fonts | PoetsenOne (self-hosted WOFF2, TTF fallback) · Outfit & DM Sans (Google Fonts) |
 | Icons | Custom SVG + PNG icon set |
 | Audio | HTML5 `<audio>` API |
 

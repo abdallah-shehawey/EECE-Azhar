@@ -34,7 +34,10 @@
 /* ===== Custom Font ===== */
 @font-face {
     font-family: 'PoetsenOne';
-    src: url('font/PoetsenOne-Regular.ttf') format('truetype');
+    /* WOFF2 first (≈47 KB, 73% smaller than the TTF) — TTF kept as a fallback
+       for any ancient browser that lacks WOFF2 support. */
+    src: url('font/PoetsenOne-Regular.woff2') format('woff2'),
+         url('font/PoetsenOne-Regular.ttf') format('truetype');
     font-weight: normal;
     font-style: normal;
     font-display: swap;
@@ -2145,6 +2148,7 @@ body.mode-countdown-active #mode-countdown {
 .footer {
     position: relative;
     z-index: 1;
+    width: 100%;          /* span the viewport so footer-actions can wrap, not overflow */
     text-align: center;
     padding: 20px;
     color: var(--text-muted);
@@ -2161,8 +2165,11 @@ body.mode-countdown-active #mode-countdown {
     display: flex;
     justify-content: center;
     align-items: center;
+    width: 100%;          /* fill the footer so flex-wrap kicks in at narrow widths */
     gap: 10px;
-    flex-wrap: nowrap;
+    /* Wrap to a second line on narrow screens instead of overflowing
+       (3 buttons don't fit on a ~360-390px phone in a single row). */
+    flex-wrap: wrap;
 }
 
 .footer-btn {
@@ -2503,4 +2510,104 @@ body.mode-countdown-active #mode-countdown {
     50% {
         opacity: 0.35;
     }
+}
+
+/* ===== Share button (accent so it stands out) ===== */
+.footer-btn-share {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(236, 72, 153, 0.22));
+    border-color: rgba(139, 92, 246, 0.45);
+    color: var(--text-primary);
+}
+
+.footer-btn-share:hover {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.4), rgba(236, 72, 153, 0.35));
+    border-color: var(--accent);
+}
+
+/* ===== Back-to-Top Button ===== */
+.scroll-top-btn {
+    position: fixed;
+    right: clamp(14px, 4vw, 28px);
+    bottom: clamp(14px, 4vw, 28px);
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: linear-gradient(135deg, #8b5cf6, #ec4899);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 9000;
+    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.45);
+    /* Hidden until the user scrolls down */
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(16px) scale(0.85);
+    transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), visibility 0.3s;
+}
+
+.scroll-top-btn.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+}
+
+.scroll-top-btn:hover {
+    transform: translateY(-3px) scale(1.06);
+    box-shadow: 0 12px 30px rgba(139, 92, 246, 0.6);
+}
+
+.scroll-top-btn:active {
+    transform: scale(0.94);
+}
+
+.scroll-top-btn svg {
+    width: 22px;
+    height: 22px;
+}
+
+@media (max-width: 480px) {
+    .scroll-top-btn { width: 44px; height: 44px; }
+    .scroll-top-btn svg { width: 20px; height: 20px; }
+}
+
+/* ===== Toast (share/copy feedback) ===== */
+.eece-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 28px;
+    transform: translate(-50%, 24px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: calc(100vw - 32px);
+    padding: 12px 22px;
+    border-radius: 50px;
+    background: rgba(20, 16, 38, 0.92);
+    border: 1px solid rgba(139, 92, 246, 0.5);
+    color: var(--text-primary);
+    font-family: var(--font-primary);
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5), 0 0 24px rgba(139, 92, 246, 0.25);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.eece-toast.show {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .scroll-top-btn,
+    .eece-toast { transition: opacity 0.01ms !important; }
 }

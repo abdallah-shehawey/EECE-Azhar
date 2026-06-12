@@ -184,7 +184,7 @@ const SOCIAL_CONFIG = {
     buildUrl: (v) => v,
   },
   whatsapp: {
-    icon: "icons/whatsapp.svg",
+    icon: "icons/whatsapp(1).png",
     title: "WhatsApp",
     buildUrl: (v) => `https://wa.me/${v.replace(/\D/g, "")}`,
   },
@@ -213,6 +213,9 @@ function openPhotoModal(student) {
     modal = document.createElement("div");
     modal.id = "photoModal";
     modal.className = "photo-modal";
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.setAttribute("aria-label", "Student details");
 
     modal.closeModal = (fromPopState = false) => {
       modal.classList.remove("active");
@@ -224,6 +227,17 @@ function openPhotoModal(student) {
 
     modal.addEventListener("click", (e) => {
       if (e.target === modal || e.target.className === "photo-modal-close") {
+        modal.closeModal();
+      }
+    });
+
+    // Keyboard activation of the close button (Enter / Space)
+    modal.addEventListener("keydown", (e) => {
+      if (
+        (e.key === "Enter" || e.key === " ") &&
+        e.target.classList.contains("photo-modal-close")
+      ) {
+        e.preventDefault();
         modal.closeModal();
       }
     });
@@ -298,8 +312,9 @@ function openPhotoModal(student) {
       <img id="_modalPhotoImg" alt="${student.name}" style="display:none" />`;
   }
 
+  modal.setAttribute("aria-label", `${student.name} — details`);
   modal.innerHTML = `
-        <span class="photo-modal-close">&times;</span>
+        <span class="photo-modal-close" role="button" tabindex="0" aria-label="Close">&times;</span>
         <div class="photo-modal-content">
             ${photoHtml}
             <h3>${student.name}</h3>
@@ -1062,6 +1077,42 @@ function initSwipeGesture() {
 }
 
 
+// ===== Keyboard Navigation (desktop — mirrors the mobile swipe) =====
+// ← / → cycle through modes, and 1 / 2 / 3 jump straight to a mode.
+function initKeyboardNav() {
+  document.addEventListener("keydown", (e) => {
+    // Never hijack typing or shortcut combos
+    const tag = (e.target.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "textarea" || e.target.isContentEditable) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+    // Don't switch modes while the photo modal is open (Esc closes it)
+    const modal = document.getElementById("photoModal");
+    if (modal && modal.style.display === "flex") return;
+
+    const idx = MODES.indexOf(currentMode);
+    switch (e.key) {
+      case "ArrowRight":
+        switchMode(MODES[(idx + 1) % MODES.length]);
+        break;
+      case "ArrowLeft":
+        switchMode(MODES[(idx - 1 + MODES.length) % MODES.length]);
+        break;
+      case "1":
+        switchMode("countdown");
+        break;
+      case "2":
+        switchMode("yearbook");
+        break;
+      case "3":
+        switchMode("projects");
+        break;
+      default:
+        return;
+    }
+  });
+}
+
 // ===== Initialize =====
 document.addEventListener("DOMContentLoaded", async () => {
   window.scrollTo(0, 0);
@@ -1071,6 +1122,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   updateLocalTime();
   initAudio();
   initSwipeGesture(); // Init immediately — no need to wait for Firebase
+  initKeyboardNav();
 
   // Render local fallback data right away so the UI is usable from the start
   await loadDrivePhotos();
@@ -1365,9 +1417,10 @@ function showCelebrationOverlay(tab) {
       <div id="co-title">${msg.title}</div>
       <div id="co-divider"></div>
       <div id="co-en">${msg.en}</div>
-      <div id="co-ar">${msg.ar}</div>
+      <div id="co-ar" lang="ar" dir="rtl">${msg.ar}</div>
       <div id="co-progress-wrap">
         <div id="co-progress-bar"></div>
+      </div>
     </div>
   `;
 
@@ -1610,6 +1663,7 @@ function hideHint() {
 function updateAudioButton(playing) {
   const btn = document.getElementById("audioBtn");
   const btnText = document.getElementById("audioBtnText");
+  btn.setAttribute("aria-pressed", playing ? "true" : "false");
   if (playing) {
     btn.classList.add("playing");
     btnText.textContent = "🔊 Playing";
@@ -1722,3 +1776,83 @@ function launchConfetti() {
     tabs.scrollLeft += e.deltaY || e.deltaX;  // map vertical wheel → horizontal
   }, { passive: false });
 })();
+
+// ===== Toast (small transient feedback) =====
+let _toastTimer = null;
+function showToast(message) {
+  let toast = document.getElementById("eeceToast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "eeceToast";
+    toast.className = "eece-toast";
+    toast.setAttribute("role", "status");
+    toast.setAttribute("aria-live", "polite");
+    document.body.appendChild(toast);
+  }
+  toast.textContent = message;
+  void toast.offsetWidth; // reflow so the transition always plays
+  toast.classList.add("show");
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => toast.classList.remove("show"), 2600);
+}
+
+// ===== Share =====
+// Native share sheet on mobile; clipboard copy (with toast) everywhere else.
+// Always shares the canonical production URL, never the dev preview deploy.
+function shareSite() {
+  const canonical =
+    document.querySelector('link[rel="canonical"]')?.href ||
+    location.origin + location.pathname;
+  const shareData = {
+    title: "EECE — Class of 2026",
+    text: "EECE Class of 2026 — countdown, class yearbook & graduation projects 🎓",
+    url: canonical,
+  };
+
+  if (navigator.share) {
+    navigator.share(shareData).catch(() => {}); // user dismissed — ignore
+  } else if (navigator.clipboard?.writeText) {
+    navigator.clipboard
+      .writeText(canonical)
+      .then(() => showToast("🔗 Link copied to clipboard!"))
+      .catch(() => showToast(canonical));
+  } else {
+    showToast(canonical);
+  }
+}
+
+// ===== Back-to-Top Button =====
+(function initScrollTop() {
+  const btn = document.getElementById("scrollTopBtn");
+  if (!btn) return;
+  const SHOW_AFTER = 400; // px scrolled before the button appears
+  let ticking = false;
+
+  window.addEventListener(
+    "scroll",
+    () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        btn.classList.toggle("visible", window.scrollY > SHOW_AFTER);
+        ticking = false;
+      });
+    },
+    { passive: true },
+  );
+
+  btn.addEventListener("click", () =>
+    window.scrollTo({ top: 0, behavior: "smooth" }),
+  );
+})();
+
+// ===== Service Worker (PWA: installable + instant repeat loads) =====
+// Registered after `load` so it never competes with the page's critical
+// resources. Only runs over http(s) — silently skipped on file:// previews.
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("sw.js")
+      .catch((err) => console.warn("SW registration failed:", err));
+  });
+}
