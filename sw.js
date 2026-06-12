@@ -1,24 +1,25 @@
 /* ============================================================================
  * EECE Class of 2026 — Service Worker
  *
- * Goals:
- *   • Instant repeat loads (the app shell is served from cache, then refreshed).
- *   • Works offline once visited (countdown + last-seen yearbook/projects shell).
- *   • Never serves a stale HTML document — navigations are network-first.
- *   • Never caches live data — Firebase + Cloudflare R2 are always fetched fresh.
+ * Strategy: ALWAYS-FRESH (network-first).
+ *   Every visit fetches the latest files from the network, so any deploy is
+ *   seen by everyone the moment they open the site — no stale CSS/JS.
+ *   The cache is only an OFFLINE fallback (and a fast first-load shell).
  *
- * Strategy:
- *   • HTML navigations  → network-first  (your edits show up on the next visit).
- *   • Same-origin static (css/js/woff2/img/svg/json) → stale-while-revalidate.
- *   • Cross-origin (Firebase / R2) and audio → bypassed (straight to network).
+ *   • Same-origin HTML + static (css/js/woff2/img) → network-first,
+ *     fall back to cache only when the network is unavailable.
+ *   • Cross-origin (Firebase / Cloudflare R2) and audio → bypassed (network only).
  *
- * Bump CACHE_VERSION whenever you want every client to drop the old cache.
+ * skipWaiting + clients.claim mean a new version takes over immediately, so
+ * one reload is enough to move every visitor onto the newest build.
+ *
+ * Bump CACHE_VERSION on any deploy you want to wipe the offline cache entirely.
  * ========================================================================== */
 
-const CACHE_VERSION = "eece-v1";
+const CACHE_VERSION = "eece-v2";
 const CACHE_NAME = `eece-cache-${CACHE_VERSION}`;
 
-// App shell precached on install so the very first offline load works.
+// App shell precached on install so the very first offline load still works.
 const PRECACHE_URLS = [
   "./",
   "./index.html",
@@ -62,9 +63,6 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// Same-origin static assets we are happy to cache at runtime.
-const CACHEABLE_DEST = new Set(["style", "script", "font", "image"]);
-
 self.addEventListener("fetch", (event) => {
   const { request } = event;
 
@@ -80,37 +78,26 @@ self.addEventListener("fetch", (event) => {
   // Never cache audio — the playlist is ~2 MB and not worth the storage.
   if (request.destination === "audio" || url.pathname.includes("/audio/")) return;
 
-  // HTML documents → network-first (fall back to cache when offline).
-  if (request.mode === "navigate" || request.destination === "document") {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put("./index.html", copy));
-          return response;
-        })
-        .catch(() =>
-          caches.match(request).then((hit) => hit || caches.match("./index.html"))
-        )
-    );
-    return;
-  }
+  const isNavigation =
+    request.mode === "navigate" || request.destination === "document";
 
-  // Static same-origin assets → stale-while-revalidate.
-  if (CACHEABLE_DEST.has(request.destination)) {
-    event.respondWith(
-      caches.match(request).then((cached) => {
-        const network = fetch(request)
-          .then((response) => {
-            if (response && response.status === 200) {
-              const copy = response.clone();
-              caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-            }
-            return response;
-          })
-          .catch(() => cached);
-        return cached || network;
+  // Network-first: always try the live network, fall back to cache offline.
+  event.respondWith(
+    fetch(request)
+      .then((response) => {
+        // Refresh the cached copy whenever the network succeeds.
+        if (response && response.status === 200 && response.type === "basic") {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(isNavigation ? "./index.html" : request, copy);
+          });
+        }
+        return response;
       })
-    );
-  }
+      .catch(() =>
+        caches
+          .match(request)
+          .then((hit) => hit || (isNavigation ? caches.match("./index.html") : undefined))
+      )
+  );
 });
