@@ -2165,11 +2165,30 @@ body.mode-countdown-active #mode-countdown {
     display: flex;
     justify-content: center;
     align-items: center;
-    width: 100%;          /* fill the footer so flex-wrap kicks in at narrow widths */
+    width: 100%;
     gap: 10px;
-    /* Wrap to a second line on narrow screens instead of overflowing
-       (3 buttons don't fit on a ~360-390px phone in a single row). */
     flex-wrap: wrap;
+}
+
+/* Source Code + Contact Developer always stay on the same row.
+   They shrink equally so neither overflows the viewport. */
+.footer-btn-pair {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 10px;
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    justify-content: center;
+}
+
+.footer-btn-pair .footer-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .footer-btn {
