@@ -2171,14 +2171,30 @@ body.mode-countdown-active #mode-countdown {
     flex-wrap: nowrap;
 }
 
-/* All 3 footer buttons share the row equally and shrink together */
+/* All 3 footer buttons stay on ONE row, side by side, at their natural
+   content width — never stretched across the footer, never wrapped:
+     - flex:0 1 auto → size to content, may shrink, NEVER grow/stretch
+     - overflow+ellipsis → ultimate safety so an enlarged system font is
+       clipped INSIDE the pill rather than escaping its rounded border
+   On phones the labels switch to short forms (see the 480px block) so the
+   full row always fits comfortably inside the screen.                     */
 .footer-actions .footer-btn {
-    flex: 1 1 0;
+    flex: 0 1 auto;
     min-width: 0;
     justify-content: center;
     white-space: nowrap;
-    /* Scale font with viewport so text shrinks before anything wraps or overflows */
-    font-size: clamp(10px, 3vw, 13px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* The icon/emoji keeps its size; only the text label may shrink/clip */
+.footer-actions .footer-btn > * {
+    flex-shrink: 0;
+}
+
+/* Full label by default (desktop / tablet); short label hidden */
+.footer-btn .lbl-short {
+    display: none;
 }
 
 .footer-btn {
@@ -2384,7 +2400,7 @@ body.mode-countdown-active #mode-countdown {
     }
 
     .footer-btn {
-        padding: 7px 12px;
+        padding: 7px 11px;
         font-size: 11px;
         gap: 5px;
     }
@@ -2392,6 +2408,20 @@ body.mode-countdown-active #mode-countdown {
     .footer-btn-icon {
         width: 13px;
         height: 13px;
+    }
+
+    /* On phones use the SHORT labels so all 3 pills fit one row, side by
+       side, at a readable size — no clipping, no wrapping, no overflow. */
+    .footer-actions {
+        gap: 8px;
+    }
+
+    .footer-btn .lbl-long {
+        display: none;
+    }
+
+    .footer-btn .lbl-short {
+        display: inline;
     }
 }
 

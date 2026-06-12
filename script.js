@@ -10,7 +10,7 @@ const EVENTS = {
   },
   discussion: {
     label: "Project Discussion",
-    date: new Date("2026-07-01T10:00:00"),
+    date: new Date("2026-07-04T10:00:00"),
   },
   party: {
     label: "Graduation Party",
