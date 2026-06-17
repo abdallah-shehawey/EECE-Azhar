@@ -101,6 +101,22 @@
                         <span class="hint-text">Tap to play music 🎶</span>
                     </div>
                 </div>
+                <div class="auth-area" id="authArea">
+                    <button id="loginBtn" class="auth-btn auth-login" aria-label="Sign in with Google">
+                        <svg class="g-icon" viewBox="0 0 48 48" width="16" height="16" aria-hidden="true">
+                            <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.4 29.3 35 24 35c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 5.1 29.6 3 24 3 12.9 3 4 11.9 4 23s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/>
+                            <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 5.1 29.6 3 24 3 16.3 3 9.7 7.3 6.3 14.7z"/>
+                            <path fill="#4CAF50" d="M24 43c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.3 34.1 26.8 35 24 35c-5.3 0-9.7-2.6-11.3-7l-6.5 5C9.6 38.6 16.2 43 24 43z"/>
+                            <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.1 5.6l6.2 5.2C40.9 35.7 44 30.3 44 23c0-1.3-.1-2.3-.4-3.5z"/>
+                        </svg>
+                        <span>Sign in</span>
+                    </button>
+                    <div id="userChip" class="user-chip" style="display:none;">
+                        <img id="userAvatar" class="user-avatar" alt="" referrerpolicy="no-referrer" />
+                        <span id="userName" class="user-name"></span>
+                        <button id="logoutBtn" class="auth-btn auth-logout" title="Sign out" aria-label="Sign out">Logout</button>
+                    </div>
+                </div>
             </div>
             <div class="logos-wrapper">
                 <div class="logo-container">
@@ -140,6 +156,22 @@
                     </svg>
                 </span>
                 <span class="mode-label">GP Projects</span>
+            </button>
+            <button class="mode-btn" id="modeSubmitBtn" data-mode="submit" onclick="switchMode('submit')" aria-label="Join / Submit your data">
+                <span class="mode-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
+                    </svg>
+                </span>
+                <span class="mode-label">Join / Submit</span>
+            </button>
+            <button class="mode-btn" id="modeAdminBtn" data-mode="admin" onclick="switchMode('admin')" aria-label="Approvals" style="display:none;">
+                <span class="mode-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>
+                    </svg>
+                </span>
+                <span class="mode-label">Approvals</span>
             </button>
         </nav>
 
@@ -318,6 +350,198 @@
             </div>
         </div>
 
+        <!-- ===== MODE: JOIN / SUBMIT ===== -->
+        <div id="mode-submit" class="portal-section" style="display: none;">
+            <div class="portal-header">
+                <h2 class="portal-title">Join the Yearbook</h2>
+                <p class="portal-subtitle">سجّل بياناتك أو مشروعك — هتظهر على الموقع بعد موافقة الأدمن ✅</p>
+            </div>
+
+            <!-- Login gate (shown when signed out) -->
+            <div id="submitLoginGate" class="glass-panel portal-gate">
+                <div class="gate-icon">🔒</div>
+                <h3>سجّل دخول الأول</h3>
+                <p>لازم تسجّل دخول بحساب Google عشان تقدر تبعت بياناتك.</p>
+                <button id="gateLoginBtn" type="button" class="btn-primary portal-google-btn">
+                    <svg class="g-icon" viewBox="0 0 48 48" width="18" height="18" aria-hidden="true">
+                        <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.4 29.3 35 24 35c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 5.1 29.6 3 24 3 12.9 3 4 11.9 4 23s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/>
+                        <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 5.1 29.6 3 24 3 16.3 3 9.7 7.3 6.3 14.7z"/>
+                        <path fill="#4CAF50" d="M24 43c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.3 34.1 26.8 35 24 35c-5.3 0-9.7-2.6-11.3-7l-6.5 5C9.6 38.6 16.2 43 24 43z"/>
+                        <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.1 5.6l6.2 5.2C40.9 35.7 44 30.3 44 23c0-1.3-.1-2.3-.4-3.5z"/>
+                    </svg>
+                    <span class="btn-label">Sign in with Google</span>
+                </button>
+            </div>
+
+            <!-- The submission form (shown when signed in) -->
+            <div id="submitFormWrap" class="glass-panel form-panel" style="display: none;">
+                <p class="submit-as">Signed in as <strong id="submitAsWho"></strong></p>
+                <form id="submissionForm" novalidate>
+                    <!-- Type Toggle -->
+                    <div class="type-toggle-container">
+                        <div class="type-toggle">
+                            <input type="radio" id="typeStudent" name="submissionType" value="student" checked>
+                            <label for="typeStudent">👤 Student</label>
+                            <input type="radio" id="typeProject" name="submissionType" value="project">
+                            <label for="typeProject">🚀 Project Team</label>
+                            <div class="toggle-slider"></div>
+                        </div>
+                    </div>
+
+                    <!-- STUDENT -->
+                    <div id="studentFormContainer" class="form-section active">
+                        <div class="field-group">
+                            <label for="inputName" class="field-label">Full Name <span class="required">*</span></label>
+                            <input type="text" id="inputName" class="field-input" placeholder="e.g. Abdallah Shehawey" autocomplete="name" />
+                            <span class="field-hint">✎ Example: <em>Abdallah Shehawey</em> — as it should appear on the yearbook</span>
+                        </div>
+                        <div class="field-group">
+                            <label for="inputGender" class="field-label">Gender <span class="required">*</span></label>
+                            <select id="inputGender" class="field-input">
+                                <option value="" disabled selected>Select gender...</option>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                            </select>
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label">Photo <span class="field-hint" style="display:inline; margin-left:5px;">(Optional)</span></label>
+                            <div id="dropZone" class="drop-zone" role="button" tabindex="0" aria-label="Upload photo — click or drag and drop">
+                                <div class="drop-zone-idle" id="dropIdle">
+                                    <div class="drop-icon">📷</div>
+                                    <p class="drop-main">Drag &amp; Drop your photo here</p>
+                                    <p class="drop-sub">or click to browse</p>
+                                    <p class="drop-formats">JPG · JPEG · PNG · WEBP — max 5 MB</p>
+                                </div>
+                                <div class="drop-zone-preview hidden" id="dropPreview">
+                                    <img id="photoPreview" src="" alt="Preview" />
+                                    <div class="preview-info">
+                                        <span id="photoFileName" class="preview-filename"></span>
+                                        <button type="button" id="btnRemovePhoto" class="btn-remove" aria-label="Remove photo">✕ Remove</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <input type="file" id="photoInput" accept="image/*" class="hidden-file" aria-hidden="true" tabindex="-1" />
+                            <span class="field-hint" id="photoPathDisplay">Generated path will appear here after upload</span>
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label">Track / Specialization <span class="required">*</span></label>
+                            <div class="track-options" id="trackOptions">
+                                <label class="track-checkbox"><input type="checkbox" value="Network Engineer"> Network Engineer</label>
+                                <label class="track-checkbox"><input type="checkbox" value="Embedded Systems"> Embedded Systems</label>
+                                <label class="track-checkbox"><input type="checkbox" value="Digital Design"> Digital Design</label>
+                                <label class="track-checkbox"><input type="checkbox" value="Digital Design & Verification"> Digital Design & Verification</label>
+                                <label class="track-checkbox"><input type="checkbox" value="Embedded Linux"> Embedded Linux</label>
+                                <label class="track-checkbox"><input type="checkbox" value="DevOps"> DevOps</label>
+                                <label class="track-checkbox"><input type="checkbox" value="AI"> AI</label>
+                                <label class="track-checkbox"><input type="checkbox" id="trackOtherCb" value="other"> Other...</label>
+                            </div>
+                            <input type="text" id="inputTrackOther" class="field-input hidden" style="margin-top: 0.5rem;" placeholder="Type other tracks (comma separated)" />
+                            <span class="field-hint">✎ Example: <em>Cybersecurity, Cloud Computing</em></span>
+                            <div id="trackChips" class="chip-container" aria-label="Track preview"></div>
+                        </div>
+
+                        <div class="divider"><span>Social Links</span></div>
+
+                        <div class="field-group">
+                            <label for="inputLinkedin" class="field-label">LinkedIn</label>
+                            <input type="url" id="inputLinkedin" class="field-input" placeholder="https://linkedin.com/in/username" />
+                        </div>
+                        <div class="field-group">
+                            <label for="inputGithub" class="field-label">GitHub</label>
+                            <input type="url" id="inputGithub" class="field-input" placeholder="https://github.com/username" />
+                        </div>
+                        <div class="field-group">
+                            <label for="inputWhatsapp" class="field-label">WhatsApp</label>
+                            <input type="tel" id="inputWhatsapp" class="field-input" placeholder="+2010XXXXXXXX" />
+                            <span class="field-hint">✎ Example: <em>+201501899476</em> — include country code</span>
+                        </div>
+                        <div class="field-group">
+                            <label for="inputFacebook" class="field-label">Facebook</label>
+                            <input type="url" id="inputFacebook" class="field-input" placeholder="https://facebook.com/profile" />
+                        </div>
+                    </div>
+
+                    <!-- PROJECT -->
+                    <div id="projectFormContainer" class="form-section hidden">
+                        <div class="field-group">
+                            <label for="inputCategory" class="field-label">Project Category <span class="required">*</span></label>
+                            <select id="inputCategory" class="field-input">
+                                <option value="" disabled selected>Select project track...</option>
+                                <option value="Embedded Systems">Embedded Systems</option>
+                                <option value="Digital Design">Digital Design</option>
+                                <option value="Network Engineer">Network Engineer</option>
+                                <option value="other">Other...</option>
+                            </select>
+                            <input type="text" id="inputCategoryOther" class="field-input hidden" style="margin-top: 0.5rem;" placeholder="Type custom track (only one)..." />
+                        </div>
+                        <div class="field-group">
+                            <label for="inputIcon" class="field-label">Project Icon (Emoji) <span class="required">*</span></label>
+                            <input type="text" id="inputIcon" class="field-input" placeholder="e.g. 📡, 🤖, 💻" />
+                            <span class="field-hint">✎ Example: <em>📡</em></span>
+                        </div>
+                        <div class="divider"><span>Team Members</span></div>
+                        <div id="teamMembersList" class="team-list"></div>
+                        <button type="button" id="btnAddMember" class="btn-secondary">+ Add Team Member</button>
+                    </div>
+
+                    <div id="validationErrors" class="validation-box hidden" role="alert" aria-live="polite"></div>
+
+                    <button type="submit" id="btnGenerate" class="btn-primary">
+                        <span class="btn-label">⚡ Submit for Approval</span>
+                        <span class="btn-glow"></span>
+                    </button>
+
+                    <div id="uploadProgress" class="upload-progress hidden" style="margin-top: 1.5rem;">
+                        <div class="upload-steps">
+                            <div class="upload-step" id="step-photo">
+                                <span class="step-icon">📷</span>
+                                <span class="step-label">Uploading photo…</span>
+                                <span class="step-status" id="stepPhotoStatus"></span>
+                            </div>
+                            <div class="upload-step" id="step-code">
+                                <span class="step-icon">💾</span>
+                                <span class="step-label">Submitting…</span>
+                                <span class="step-status" id="stepCodeStatus"></span>
+                            </div>
+                        </div>
+                        <div class="progress-bar-wrap">
+                            <div class="progress-bar" id="progressBar"></div>
+                        </div>
+                    </div>
+
+                    <div id="firebaseSuccess" class="firebase-success hidden" style="margin-top: 1.5rem;">
+                        <div class="fs-icon">🎉</div>
+                        <h3 class="fs-title">تم الإرسال! هيظهر بعد موافقة الأدمن.</h3>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- ===== MODE: APPROVALS (Admin) ===== -->
+        <div id="mode-admin" class="portal-section" style="display: none;">
+            <div class="portal-header">
+                <h2 class="portal-title">Pending Approvals <span class="pending-badge" id="pendingCount">0</span></h2>
+                <p class="portal-subtitle">راجع الطلبات ووافق عليها عشان تظهر على الموقع.</p>
+            </div>
+
+            <div id="adminLoginGate" class="glass-panel portal-gate">
+                <div class="gate-icon">🛡️</div>
+                <h3>Admin only</h3>
+                <p id="adminGateMsg">Sign in with the administrator account to review submissions.</p>
+                <button id="adminGateLoginBtn" type="button" class="btn-primary portal-google-btn">
+                    <span class="btn-label">Sign in with Google</span>
+                </button>
+            </div>
+
+            <div id="adminPanel" style="display: none;">
+                <div class="admin-toolbar">
+                    <button id="adminRefreshBtn" type="button" class="btn-secondary admin-refresh">↻ Refresh</button>
+                </div>
+                <div id="pendingList" class="pending-list"></div>
+                <p id="pendingEmpty" class="pending-empty" style="display:none;">مفيش طلبات منتظرة الموافقة 🎉</p>
+            </div>
+        </div>
+
     </div>
 
     <!-- Footer -->
@@ -347,5 +571,6 @@
     <audio id="bgAudio"></audio>
 
     <script src="script.js"></script>
+    <script type="module" src="portal.js"></script>
 </body>
 </html>

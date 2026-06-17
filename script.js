@@ -1141,31 +1141,37 @@ document.addEventListener("DOMContentLoaded", async () => {
 // ===== Mode Switching (Top-Level) =====
 function switchMode(mode) {
   currentMode = mode;
+  // Expose active mode so the portal module can react (e.g. refresh approvals).
+  document.body.dataset.mode = mode;
 
   // Update mode buttons
   document
     .querySelectorAll(".mode-btn")
     .forEach((btn) => btn.classList.remove("active"));
-  document.querySelector(`[data-mode="${mode}"]`).classList.add("active");
+  const activeBtn = document.querySelector(`[data-mode="${mode}"]`);
+  if (activeBtn) activeBtn.classList.add("active");
 
-  // Show/hide sections
-  const countdownEl = document.getElementById("mode-countdown");
-  const yearbookEl = document.getElementById("mode-yearbook");
-  const projectsEl = document.getElementById("mode-projects");
-
-  countdownEl.style.display = "none";
-  yearbookEl.style.display = "none";
-  projectsEl.style.display = "none";
+  // Show/hide sections (submit & admin are added by portal.js feature)
+  const sections = {
+    countdown: document.getElementById("mode-countdown"),
+    yearbook: document.getElementById("mode-yearbook"),
+    projects: document.getElementById("mode-projects"),
+    submit: document.getElementById("mode-submit"),
+    admin: document.getElementById("mode-admin"),
+  };
+  Object.values(sections).forEach((el) => {
+    if (el) el.style.display = "none";
+  });
 
   if (mode === "countdown") {
     document.body.classList.add("mode-countdown-active");
     window.scrollTo(0, 0);
-    countdownEl.style.display = "flex";
+    sections.countdown.style.display = "flex";
   } else {
     document.body.classList.remove("mode-countdown-active");
     window.scrollTo(0, 0);
     if (mode === "yearbook") {
-      yearbookEl.style.display = "block";
+      sections.yearbook.style.display = "block";
       // Clear search on open
       document.getElementById("yearbookSearch").value = "";
       currentSearchQuery = "";
@@ -1173,8 +1179,12 @@ function switchMode(mode) {
       applyFilters();
       renderStats();
     } else if (mode === "projects") {
-      projectsEl.style.display = "block";
+      sections.projects.style.display = "block";
       renderProjects();
+    } else if (mode === "submit" && sections.submit) {
+      sections.submit.style.display = "block";
+    } else if (mode === "admin" && sections.admin) {
+      sections.admin.style.display = "block";
     }
   }
 }
