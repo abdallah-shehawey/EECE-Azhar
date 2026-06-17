@@ -95,6 +95,27 @@ function logout() {
   signOut(auth).catch((e) => console.error("Sign-out failed:", e));
 }
 
+/* — Account dropdown menu — */
+function openUserMenu() {
+  const chip = $("userChip");
+  const dd = $("userDropdown");
+  if (!chip || !dd) return;
+  dd.classList.add("open");
+  chip.setAttribute("aria-expanded", "true");
+}
+function closeUserMenu() {
+  const chip = $("userChip");
+  const dd = $("userDropdown");
+  if (!chip || !dd) return;
+  dd.classList.remove("open");
+  chip.setAttribute("aria-expanded", "false");
+}
+function toggleUserMenu() {
+  const dd = $("userDropdown");
+  if (!dd) return;
+  dd.classList.contains("open") ? closeUserMenu() : openUserMenu();
+}
+
 onAuthStateChanged(auth, (user) => {
   currentUser = user;
   isAdmin = !!user && user.email === ADMIN_EMAIL;
@@ -103,16 +124,16 @@ onAuthStateChanged(auth, (user) => {
   if (isAdmin && document.body.dataset.mode === "admin") loadPending();
 });
 
-/** Reflect auth state everywhere: header chip, admin nav, gates. */
+/** Reflect auth state everywhere: header menu, admin items, gates. */
 function updateAuthUI() {
   const loginBtn = $("loginBtn");
-  const userChip = $("userChip");
-  const adminBtn = $("modeAdminBtn");
+  const userMenu = $("userMenu");
+  const adminItem = $("menuAdminBtn");
 
   if (currentUser) {
     if (loginBtn) loginBtn.style.display = "none";
-    if (userChip) {
-      userChip.style.display = "flex";
+    if (userMenu) {
+      userMenu.style.display = "flex";
       const av = $("userAvatar");
       const nm = $("userName");
       if (av) {
@@ -127,11 +148,17 @@ function updateAuthUI() {
     }
   } else {
     if (loginBtn) loginBtn.style.display = "";
-    if (userChip) userChip.style.display = "none";
+    if (userMenu) userMenu.style.display = "none";
+    closeUserMenu();
+    // If a signed-out user was sitting on a portal page, send them home.
+    if (typeof window.switchMode === "function" &&
+        (document.body.dataset.mode === "submit" || document.body.dataset.mode === "admin")) {
+      window.switchMode("countdown");
+    }
   }
 
-  // Admin-only nav button
-  if (adminBtn) adminBtn.style.display = isAdmin ? "" : "none";
+  // Admin-only menu item
+  if (adminItem) adminItem.style.display = isAdmin ? "" : "none";
 
   // Submit section: gate vs form
   const submitGate = $("submitLoginGate");
@@ -690,6 +717,13 @@ function renderPending() {
   const ids = Object.keys(pendingCache);
   if (count) count.textContent = String(ids.length);
 
+  // Mirror the count on the account-menu badge (only meaningful for the admin).
+  const menuBadge = $("menuPendingCount");
+  if (menuBadge) {
+    menuBadge.textContent = String(ids.length);
+    menuBadge.style.display = ids.length > 0 ? "" : "none";
+  }
+
   if (ids.length === 0) {
     list.innerHTML = "";
     if (empty) empty.style.display = "block";
@@ -796,17 +830,39 @@ async function reject(id, btn) {
    § 5 — WIRE UP
 ════════════════════════════════════════════ */
 function init() {
-  // Header + gate sign-in / out buttons
+  // Sign-in buttons (header + both page gates)
   ["loginBtn", "gateLoginBtn", "adminGateLoginBtn"].forEach((id) => {
     const el = $(id);
     if (el) el.addEventListener("click", login);
   });
   const logoutBtn = $("logoutBtn");
-  if (logoutBtn) logoutBtn.addEventListener("click", logout);
+  if (logoutBtn) logoutBtn.addEventListener("click", () => { closeUserMenu(); logout(); });
 
-  // Refresh pending list when the admin opens / refreshes the panel
-  const adminBtn = $("modeAdminBtn");
-  if (adminBtn) adminBtn.addEventListener("click", () => isAdmin && loadPending());
+  // Account dropdown: chip toggles it; clicking outside / Esc closes it.
+  const chip = $("userChip");
+  if (chip) {
+    chip.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleUserMenu();
+    });
+  }
+  document.addEventListener("click", (e) => {
+    const menu = $("userMenu");
+    if (menu && !menu.contains(e.target)) closeUserMenu();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeUserMenu();
+  });
+
+  // Menu items navigate to the portal pages, then close the menu.
+  // (switchMode lives in script.js and is global.) Approvals also pulls
+  // the latest pending list. The inline onclick already calls switchMode;
+  // here we just close the menu and refresh on open.
+  const menuSubmit = $("menuSubmitBtn");
+  if (menuSubmit) menuSubmit.addEventListener("click", () => closeUserMenu());
+  const menuAdmin = $("menuAdminBtn");
+  if (menuAdmin) menuAdmin.addEventListener("click", () => { closeUserMenu(); if (isAdmin) loadPending(); });
+
   const refreshBtn = $("adminRefreshBtn");
   if (refreshBtn) refreshBtn.addEventListener("click", loadPending);
 

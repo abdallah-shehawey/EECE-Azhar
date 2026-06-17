@@ -2714,6 +2714,9 @@ body.mode-countdown-active #mode-countdown {
 .auth-logout:hover { background: rgba(239, 68, 68, 0.22); box-shadow: 0 0 12px rgba(239, 68, 68, 0.25); }
 .g-icon { flex-shrink: 0; }
 
+/* ── Account dropdown menu ── */
+.user-menu { position: relative; display: flex; }
+
 .user-chip {
     display: flex;
     align-items: center;
@@ -2721,8 +2724,19 @@ body.mode-countdown-active #mode-countdown {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--border-glass);
     border-radius: 99px;
-    padding: 0.25rem 0.4rem 0.25rem 0.25rem;
+    padding: 0.25rem 0.55rem 0.25rem 0.25rem;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.2s, box-shadow 0.2s;
 }
+.user-chip:hover { background: rgba(139, 92, 246, 0.18); box-shadow: 0 0 12px var(--accent-glow); }
+.user-chip .chevron {
+    color: var(--text-secondary);
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+}
+.user-chip[aria-expanded="true"] .chevron { transform: rotate(180deg); }
+
 .user-avatar {
     width: 28px; height: 28px;
     border-radius: 50%;
@@ -2738,6 +2752,98 @@ body.mode-countdown-active #mode-countdown {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+.user-dropdown {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    right: 0;
+    min-width: 210px;
+    background: rgba(16, 16, 32, 0.96);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--border-glass);
+    border-radius: 14px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+    padding: 0.4rem;
+    z-index: 200;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px);
+    transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+}
+.user-dropdown.open { opacity: 1; visibility: visible; transform: translateY(0); }
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-radius: 9px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.86rem;
+    font-weight: 600;
+    text-align: left;
+    padding: 0.6rem 0.7rem;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.menu-item svg { color: var(--accent-light); flex-shrink: 0; }
+.menu-item:hover { background: rgba(139, 92, 246, 0.16); }
+.menu-item-danger { color: #fca5a5; }
+.menu-item-danger svg { color: #fca5a5; }
+.menu-item-danger:hover { background: rgba(239, 68, 68, 0.16); }
+
+.menu-divider {
+    height: 1px;
+    background: var(--border-glass);
+    margin: 0.35rem 0.4rem;
+}
+.menu-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px; height: 18px;
+    padding: 0 5px;
+    margin-left: 4px;
+    border-radius: 99px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 800;
+}
+
+/* ── Portal pages take over the screen (Submit / Approvals) ── */
+body.portal-active .mode-nav,
+body.portal-active .logos-wrapper,
+body.portal-active .audio-wrapper,
+body.portal-active .footer { display: none !important; }
+body.portal-active .header { margin-bottom: 0.5rem; }
+
+.portal-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-glass);
+    border-radius: 99px;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.45rem 1rem;
+    margin-bottom: 1.25rem;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, transform 0.15s;
+}
+.portal-back:hover {
+    background: rgba(139, 92, 246, 0.18);
+    color: var(--text-primary);
+    transform: translateX(-2px);
+}
+.portal-back svg { flex-shrink: 0; }
 
 /* ── Portal sections (Submit / Admin) ── */
 .portal-section {
@@ -3158,4 +3264,5 @@ select.field-input option { background: var(--bg-deep); color: var(--text-primar
 @media (max-width: 600px) {
     .glass-panel { padding: 1.4rem 1.1rem; border-radius: var(--radius-lg); }
     .user-name { max-width: 80px; }
+    .user-dropdown { min-width: 200px; max-width: calc(100vw - 1.5rem); }
 }

@@ -1090,6 +1090,13 @@ function initKeyboardNav() {
     const modal = document.getElementById("photoModal");
     if (modal && modal.style.display === "flex") return;
 
+    // On a portal page (Submit / Approvals) the nav keys are disabled so they
+    // don't yank the user out mid-form; Esc takes them back home instead.
+    if (PORTAL_MODES.includes(currentMode)) {
+      if (e.key === "Escape") switchMode("countdown");
+      return;
+    }
+
     const idx = MODES.indexOf(currentMode);
     switch (e.key) {
       case "ArrowRight":
@@ -1139,10 +1146,19 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 // ===== Mode Switching (Top-Level) =====
+// Submit/Admin are "portal" pages — they take over the whole screen (no top
+// mode-nav, no header chrome) for a focused, page-like feel. They're reached
+// from the account dropdown, not from the main nav.
+const PORTAL_MODES = ["submit", "admin"];
+
 function switchMode(mode) {
   currentMode = mode;
   // Expose active mode so the portal module can react (e.g. refresh approvals).
   document.body.dataset.mode = mode;
+
+  // Portal pages take over the screen: hide the top nav + header chrome.
+  const isPortal = PORTAL_MODES.includes(mode);
+  document.body.classList.toggle("portal-active", isPortal);
 
   // Update mode buttons
   document
