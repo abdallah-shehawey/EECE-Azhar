@@ -773,6 +773,31 @@
         </svg>
     </button>
 
+    <!-- Contact / complaint modal -->
+    <div id="contactModal" class="contact-modal" style="display:none;" role="dialog" aria-modal="true" aria-label="Contact us">
+        <div class="contact-card glass-panel">
+            <button type="button" class="contact-close" id="contactClose" aria-label="Close">&times;</button>
+            <h3 class="contact-title">✉️ Send us a message</h3>
+            <p class="contact-sub">Questions, complaints, or feedback — it goes straight to the team.</p>
+            <form id="contactForm" novalidate>
+                <div class="field-group">
+                    <label for="cfName" class="field-label">Your name</label>
+                    <input type="text" id="cfName" class="field-input" placeholder="Your name" autocomplete="name" />
+                </div>
+                <div class="field-group">
+                    <label for="cfEmail" class="field-label">Your email</label>
+                    <input type="email" id="cfEmail" class="field-input" placeholder="you@example.com" autocomplete="email" />
+                </div>
+                <div class="field-group">
+                    <label for="cfMessage" class="field-label">Message <span class="required">*</span></label>
+                    <textarea id="cfMessage" class="field-input" rows="4" placeholder="Write your message…"></textarea>
+                </div>
+                <div id="cfStatus" class="contact-status" style="display:none;"></div>
+                <button type="submit" id="cfSubmit" class="btn-primary" style="width:100%;">Send message</button>
+            </form>
+        </div>
+    </div>
+
     <!-- Audio Player -->
     <audio id="bgAudio"></audio>
 

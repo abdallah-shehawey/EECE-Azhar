@@ -464,21 +464,61 @@ function openPhotoModal(student) {
   }
 }
 
+// ===== Contact / complaint modal =====
 function openContactModal() {
-  const devInfo = {
-    name: "Abdallah Shehawey",
-    photo: `${CLOUDFLARE_BASE_URL}/abdallahshehawey${CLOUDFLARE_IMAGE_EXT}`,
-    track: ["Embedded Systems", "Embedded Linux", "DevOps"],
-    color: "linear-gradient(135deg, #8b5cf6, #6d28d9)",
-    social: {
-      linkedin: "https://www.linkedin.com/in/abdallah-shehawey",
-      github: "https://github.com/abdallah-shehawey",
-      whatsapp: "+201501899476",
-      facebook: "https://www.facebook.com/share/1BHxWsiLCE/",
-      email: "shehawey9@gmail.com",
-    },
-  };
-  openPhotoModal(devInfo);
+  const modal = document.getElementById("contactModal");
+  if (!modal) return;
+  modal.style.display = "flex";
+  const status = document.getElementById("cfStatus");
+  if (status) { status.style.display = "none"; status.textContent = ""; }
+  const msg = document.getElementById("cfMessage");
+  if (msg) setTimeout(() => msg.focus(), 50);
+}
+function closeContactModal() {
+  const modal = document.getElementById("contactModal");
+  if (modal) modal.style.display = "none";
+}
+function initContactForm() {
+  const modal = document.getElementById("contactModal");
+  const form = document.getElementById("contactForm");
+  const closeBtn = document.getElementById("contactClose");
+  if (!modal || !form) return;
+  closeBtn?.addEventListener("click", closeContactModal);
+  modal.addEventListener("click", (e) => { if (e.target === modal) closeContactModal(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && modal.style.display === "flex") closeContactModal();
+  });
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const status = document.getElementById("cfStatus");
+    const btn = document.getElementById("cfSubmit");
+    const message = document.getElementById("cfMessage").value.trim();
+    if (!message) {
+      if (status) { status.style.display = "block"; status.className = "contact-status err"; status.textContent = "Please write a message first."; }
+      return;
+    }
+    btn.disabled = true; btn.textContent = "Sending…";
+    try {
+      const res = await fetch("/api/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "contact",
+          name: document.getElementById("cfName").value.trim(),
+          email: document.getElementById("cfEmail").value.trim(),
+          message,
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `Error ${res.status}`);
+      if (status) { status.style.display = "block"; status.className = "contact-status ok"; status.textContent = "✓ Sent! We'll get back to you soon."; }
+      form.reset();
+      setTimeout(closeContactModal, 1600);
+    } catch (err) {
+      if (status) { status.style.display = "block"; status.className = "contact-status err"; status.textContent = "Couldn't send: " + err.message; }
+    } finally {
+      btn.disabled = false; btn.textContent = "Send message";
+    }
+  });
 }
 
 function renderYearbook(list = STUDENTS) {
@@ -1559,6 +1599,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   initKeyboardNav();
   initNavMenu();
   initYearbookFilters();
+  initContactForm();
 
   // Render local fallback data right away so the UI is usable from the start
   await loadDrivePhotos();
