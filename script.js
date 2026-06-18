@@ -48,8 +48,8 @@ function applyHierarchyDefaults(rec) {
  * /students record that shares the same key/owner. Returns a plain array.
  */
 function mergeStudentSources(studentsData, profilesData) {
-  // Start from legacy /students, keyed so profiles can override by name key.
   const byKey = new Map();
+  const nrm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
 
   const legacy = !studentsData
     ? []
@@ -59,13 +59,22 @@ function mergeStudentSources(studentsData, profilesData) {
   legacy.forEach((s) => {
     if (!s || !s.name) return;
     applyHierarchyDefaults(s);
-    byKey.set(s.ownerUid || `name:${s.name.toLowerCase()}`, s);
+    byKey.set(s.ownerUid || `name:${nrm(s.name)}`, s);
   });
 
-  // Overlay live profiles (these win on conflicts).
+  // Overlay live profiles. A profile is the source of truth, so it must REPLACE
+  // any legacy /students card for the same person (matched by ownerUid, the
+  // name key, or the assigned email) — otherwise the person shows up twice.
   if (profilesData) {
     Object.entries(profilesData).forEach(([uid, p]) => {
       if (!p || p.status !== "live" || !p.name) return;
+      // Drop the legacy duplicates this profile supersedes.
+      byKey.delete(`name:${nrm(p.name)}`);
+      if (p.email) {
+        for (const [k, v] of byKey) {
+          if (!v.ownerUid && nrm(v.email) === nrm(p.email)) byKey.delete(k);
+        }
+      }
       byKey.set(uid, applyHierarchyDefaults({
         name: p.name,
         gender: p.gender || "",
@@ -1607,8 +1616,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   applyFilters();
   renderStats();
 
-  // Land on the Home page by default.
-  switchMode("home");
+  // Browser Back/Forward (and backspace) navigate between views in-page.
+  window.addEventListener("popstate", (e) => {
+    const mode = (e.state && e.state.mode) || "home";
+    switchMode(mode, true); // replay without pushing a new entry
+  });
+
+  // Land on the Home page by default (seed the first history entry).
+  const startMode = (location.hash || "").replace("#", "") || "home";
+  history.replaceState({ mode: startMode }, "", `#${startMode}`);
+  switchMode(startMode, true);
 
   // Fetch fresh data from Firebase in the background — no blocking await.
   // On success it calls loadDrivePhotos + renderStats + re-renders active view.
@@ -1657,10 +1674,17 @@ function initNavMenu() {
 // "Join Us" button / account dropdown, not from the section links.
 const PORTAL_MODES = ["submit", "admin"];
 
-function switchMode(mode) {
+function switchMode(mode, fromHistory = false) {
+  const prevMode = currentMode;
   currentMode = mode;
   // Expose active mode so the portal module can react (e.g. refresh approvals).
   document.body.dataset.mode = mode;
+
+  // Push a history entry so the browser Back button / backspace returns to the
+  // previous view instead of leaving the site. popstate replays without pushing.
+  if (!fromHistory && prevMode !== mode) {
+    try { history.pushState({ mode }, "", `#${mode}`); } catch (_) {}
+  }
 
   // Always close the mobile nav drawer when navigating.
   closeNavMenu();

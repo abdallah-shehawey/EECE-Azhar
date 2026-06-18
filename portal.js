@@ -284,6 +284,19 @@ function closeUserMenu() {
   dd.classList.remove("open");
   chip.setAttribute("aria-expanded", "false");
 }
+/** Close every open popup menu except an optional one to keep open. */
+function closeAllPopups(except) {
+  ["trackMenu", "skillMenu"].forEach((id) => {
+    const el = $(id);
+    if (el && el !== except) {
+      el.classList.remove("open");
+      const btn = el.previousElementSibling;
+      if (btn && btn.classList.contains("track-select-btn")) btn.setAttribute("aria-expanded", "false");
+    }
+  });
+  const dd = $("userDropdown");
+  if (dd && dd !== except) closeUserMenu();
+}
 function toggleUserMenu() {
   const dd = $("userDropdown");
   if (!dd) return;
@@ -878,6 +891,7 @@ function initSubmissionForm() {
   if (trackSelectBtn && trackMenu) {
     trackSelectBtn.addEventListener("click", (e) => {
       e.stopPropagation();
+      closeAllPopups(trackMenu); // close the skills menu / account dropdown first
       const open = trackMenu.classList.toggle("open");
       trackSelectBtn.setAttribute("aria-expanded", open ? "true" : "false");
       if (open) renderTrackMenu();
@@ -1002,6 +1016,7 @@ function initSubmissionForm() {
   if (skillSelectBtn && skillMenu) {
     skillSelectBtn.addEventListener("click", (e) => {
       e.stopPropagation();
+      closeAllPopups(skillMenu); // close the tracks menu / account dropdown first
       const open = skillMenu.classList.toggle("open");
       skillSelectBtn.setAttribute("aria-expanded", open ? "true" : "false");
       if (open) { renderSkillMenu(); if (skillSearch) { skillSearch.value = ""; skillSearch.focus(); } }
