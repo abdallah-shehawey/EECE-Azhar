@@ -1130,6 +1130,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   initAudio();
   initSwipeGesture(); // Init immediately — no need to wait for Firebase
   initKeyboardNav();
+  initNavMenu();
 
   // Render local fallback data right away so the UI is usable from the start
   await loadDrivePhotos();
@@ -1145,10 +1146,42 @@ document.addEventListener("DOMContentLoaded", async () => {
   fetchFirebaseData();
 });
 
+// ===== Mobile nav drawer (hamburger) =====
+function openNavMenu() {
+  document.body.classList.add("nav-open");
+  const t = document.getElementById("navToggle");
+  if (t) t.setAttribute("aria-expanded", "true");
+}
+function closeNavMenu() {
+  document.body.classList.remove("nav-open");
+  const t = document.getElementById("navToggle");
+  if (t) t.setAttribute("aria-expanded", "false");
+}
+function toggleNavMenu() {
+  document.body.classList.contains("nav-open") ? closeNavMenu() : openNavMenu();
+}
+function initNavMenu() {
+  const toggle = document.getElementById("navToggle");
+  if (toggle) {
+    toggle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleNavMenu();
+    });
+  }
+  // Click outside the navbar or press Esc closes the drawer.
+  document.addEventListener("click", (e) => {
+    if (!document.body.classList.contains("nav-open")) return;
+    if (!e.target.closest(".navbar")) closeNavMenu();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeNavMenu();
+  });
+}
+
 // ===== Mode Switching (Top-Level) =====
-// Submit/Admin are "portal" pages — they take over the whole screen (no top
-// mode-nav, no header chrome) for a focused, page-like feel. They're reached
-// from the account dropdown, not from the main nav.
+// Submit/Admin are "portal" pages — they take over the whole screen (no header
+// nav links) for a focused, page-like feel. They're reached from the navbar
+// "Join Us" button / account dropdown, not from the section links.
 const PORTAL_MODES = ["submit", "admin"];
 
 function switchMode(mode) {
@@ -1156,15 +1189,18 @@ function switchMode(mode) {
   // Expose active mode so the portal module can react (e.g. refresh approvals).
   document.body.dataset.mode = mode;
 
+  // Always close the mobile nav drawer when navigating.
+  closeNavMenu();
+
   // Portal pages take over the screen: hide the top nav + header chrome.
   const isPortal = PORTAL_MODES.includes(mode);
   document.body.classList.toggle("portal-active", isPortal);
 
-  // Update mode buttons
+  // Highlight the active section link (only the 3 section modes have a link).
   document
-    .querySelectorAll(".mode-btn")
+    .querySelectorAll(".nav-link")
     .forEach((btn) => btn.classList.remove("active"));
-  const activeBtn = document.querySelector(`[data-mode="${mode}"]`);
+  const activeBtn = document.querySelector(`.nav-link[data-mode="${mode}"]`);
   if (activeBtn) activeBtn.classList.add("active");
 
   // Show/hide sections (submit & admin are added by portal.js feature)
@@ -1443,7 +1479,6 @@ function showCelebrationOverlay(tab) {
       <div id="co-title">${msg.title}</div>
       <div id="co-divider"></div>
       <div id="co-en">${msg.en}</div>
-      <div id="co-ar" lang="ar" dir="rtl">${msg.ar}</div>
       <div id="co-progress-wrap">
         <div id="co-progress-bar"></div>
       </div>

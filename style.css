@@ -141,9 +141,9 @@ body {
 .container {
     position: relative;
     z-index: 1;
-    max-width: 1400px;
+    max-width: none;       /* full page width like GitHub / Facebook */
     width: 100%;
-    padding: 20px 40px;
+    padding: 20px 48px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -200,15 +200,166 @@ body.mode-countdown-active #mode-countdown {
     }
 }
 
-/* ===== Header ===== */
-.header {
+/* ===== Header / Top Navbar (full-width, sticky) ===== */
+.navbar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
     width: 100%;
+    background: rgba(8, 9, 20, 0.72);
+    backdrop-filter: blur(16px) saturate(150%);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    border-bottom: 1px solid var(--glass-border);
+    animation: fadeInDown 0.8s ease-out;
+}
+/* Inner wrapper keeps the content aligned with the page on wide screens */
+.navbar-inner {
+    position: relative;     /* anchor for the mobile drawer */
+    max-width: none;        /* span the full page width */
+    margin: 0 auto;
+    padding: 10px 48px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 20px 0;
-    animation: fadeInDown 0.8s ease-out;
+    gap: 16px;
 }
+
+/* ── Brand (left) ── */
+.navbar-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: transparent;
+    border: none;
+    padding: 4px;
+    margin: -4px;
+    cursor: pointer;
+    font-family: inherit;
+    border-radius: 12px;
+    transition: opacity 0.2s, transform 0.15s;
+}
+.navbar-brand:hover { opacity: 0.9; transform: translateY(-1px); }
+.brand-logos { display: inline-flex; align-items: center; gap: 4px; }
+.brand-logo {
+    width: 34px; height: 34px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 6px rgba(139, 92, 246, 0.3));
+}
+.brand-mark {
+    font-size: 22px;
+    line-height: 1;
+    filter: drop-shadow(0 0 10px var(--accent-glow));
+}
+.brand-text { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.brand-title {
+    font-family: var(--font-primary);
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: -0.2px;
+    line-height: 1.05;
+    background: var(--gradient-2);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.brand-sub {
+    font-family: var(--font-secondary);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.2px;
+    line-height: 1.1;
+}
+
+/* ── Actions (right) ── */
+.navbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.nav-submit-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    background: var(--gradient-2);
+    border: none;
+    border-radius: 99px;
+    color: #fff;
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 0.5rem 1.1rem;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(139, 92, 246, 0.35);
+    transition: transform 0.15s, box-shadow 0.2s, filter 0.2s;
+}
+.nav-submit-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 22px rgba(139, 92, 246, 0.5);
+    filter: brightness(1.08);
+}
+.nav-submit-btn svg { flex-shrink: 0; }
+
+/* ── Center: section links ── */
+.navbar-links {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.nav-link {
+    position: relative;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.92rem;
+    font-weight: 600;
+    padding: 0.5rem 0.9rem;
+    cursor: pointer;
+    transition: color 0.2s, background 0.2s;
+}
+.nav-link:hover { color: var(--text-primary); background: rgba(255, 255, 255, 0.05); }
+.nav-link.active { color: var(--text-primary); }
+.nav-link.active::after {
+    content: "";
+    position: absolute;
+    left: 0.9rem;
+    right: 0.9rem;
+    bottom: -2px;
+    height: 2.5px;
+    border-radius: 2px;
+    background: var(--gradient-2);
+    box-shadow: 0 0 10px var(--accent-glow);
+}
+/* "Join Us" link only appears inside the mobile drawer */
+.nav-link-drawer { display: none; }
+
+/* ── Hamburger toggle (mobile only) ── */
+.nav-toggle {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    width: 42px; height: 42px;
+    padding: 0 10px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    cursor: pointer;
+}
+.nav-toggle-bar {
+    display: block;
+    height: 2.5px;
+    width: 100%;
+    border-radius: 2px;
+    background: var(--text-primary);
+    transition: transform 0.25s ease, opacity 0.2s ease;
+}
+body.nav-open .nav-toggle-bar:nth-child(1) { transform: translateY(7.5px) rotate(45deg); }
+body.nav-open .nav-toggle-bar:nth-child(2) { opacity: 0; }
+body.nav-open .nav-toggle-bar:nth-child(3) { transform: translateY(-7.5px) rotate(-45deg); }
 
 @keyframes fadeInDown {
     from {
@@ -219,39 +370,6 @@ body.mode-countdown-active #mode-countdown {
         opacity: 1;
         transform: translateY(0) translateZ(0);
     }
-}
-
-.header-controls {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-}
-
-/* ===== Department Badge ===== */
-.dept-badge {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
-}
-
-.dept-name {
-    font-family: var(--font-secondary);
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text-muted);
-    letter-spacing: 0.3px;
-    line-height: 1.3;
-}
-
-.dept-year {
-    font-family: var(--font-primary);
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--text-primary);
-    letter-spacing: -0.2px;
-    line-height: 1.2;
 }
 
 .audio-btn {
@@ -2298,8 +2416,8 @@ body.mode-countdown-active #mode-countdown {
         gap: 10px;
     }
 
-    .header {
-        padding: 15px 0;
+    .navbar-inner {
+        padding: 10px 16px;
     }
 
     .logo-container {
@@ -2307,17 +2425,50 @@ body.mode-countdown-active #mode-countdown {
         height: 55px;
     }
 
-    .header-controls {
-        align-items: flex-start;
-    }
+    /* Compact the navbar on phones */
+    .brand-sub { display: none; }
+    .audio-hint { display: none; }
 
-    .audio-wrapper {
-        justify-content: flex-start;
-    }
+    /* Show hamburger; the section links collapse into a drawer */
+    .nav-toggle { display: flex; }
+    .nav-submit-btn { display: none; }      /* Join Us moves into the drawer */
+    .audio-wrapper { display: none; }       /* keep the navbar bar clean on mobile */
 
-    .audio-hint {
-        display: none;
+    .navbar-links {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 2px;
+        padding: 8px;
+        background: rgba(10, 11, 24, 0.97);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-bottom: 1px solid var(--glass-border);
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+        /* hidden until the drawer is opened */
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(-8px);
+        transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
     }
+    body.nav-open .navbar-links {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+    }
+    .nav-link {
+        width: 100%;
+        text-align: left;
+        padding: 0.85rem 1rem;
+        font-size: 1rem;
+        border-radius: 10px;
+    }
+    .nav-link.active { background: rgba(139, 92, 246, 0.14); }
+    .nav-link.active::after { display: none; }   /* no underline in the drawer */
+    .nav-link-drawer { display: block; }         /* show "Join Us" in the drawer */
 }
 
 @media (max-width: 480px) {
@@ -2815,12 +2966,12 @@ body.mode-countdown-active #mode-countdown {
     font-weight: 800;
 }
 
-/* ── Portal pages take over the screen (Submit / Approvals) ── */
+/* ── Portal pages (Submit / Approvals): keep the navbar, drop the rest ── */
 body.portal-active .mode-nav,
 body.portal-active .logos-wrapper,
 body.portal-active .audio-wrapper,
+body.portal-active .nav-submit-btn,
 body.portal-active .footer { display: none !important; }
-body.portal-active .header { margin-bottom: 0.5rem; }
 
 .portal-back {
     display: inline-flex;

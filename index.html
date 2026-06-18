@@ -83,23 +83,38 @@
         <div class="orb orb-3"></div>
     </div>
 
-    <!-- Main Content -->
-    <div class="container">
-        <!-- Header -->
-        <header class="header">
-            <div class="header-controls">
-                <div class="dept-badge">
-                    <span class="dept-name">Electronics &amp; Communication Engineering</span>
-                    <span class="dept-year">Class of 2026</span>
-                </div>
+    <!-- Header / Top Navbar (full-width, outside the centered container) -->
+    <header class="navbar">
+      <div class="navbar-inner">
+            <button class="navbar-brand" type="button" onclick="switchMode('countdown')" aria-label="EECE 2026 — home">
+                <span class="brand-logos" aria-hidden="true">
+                    <img src="logo-faculty.webp" alt="" class="brand-logo" width="34" height="34" />
+                    <img src="logo-university.webp" alt="" class="brand-logo" width="34" height="34" />
+                </span>
+                <span class="brand-text">
+                    <span class="brand-title">EECE 2026</span>
+                    <span class="brand-sub">Electronics &amp; Communication</span>
+                </span>
+            </button>
+
+            <!-- Center: section links (also used inside the mobile drawer) -->
+            <nav class="navbar-links" id="navLinks" aria-label="Section navigation">
+                <button class="nav-link active" id="modeCountdownBtn" data-mode="countdown" onclick="switchMode('countdown')">Countdown</button>
+                <button class="nav-link" id="modeYearbookBtn" data-mode="yearbook" onclick="switchMode('yearbook')">Yearbook</button>
+                <button class="nav-link" id="modeProjectsBtn" data-mode="projects" onclick="switchMode('projects')">Projects</button>
+                <!-- These two only show inside the mobile drawer -->
+                <button class="nav-link nav-link-drawer" id="drawerSubmitBtn" type="button" onclick="switchMode('submit')">Join Us</button>
+            </nav>
+
+            <div class="navbar-actions">
+                <button id="navSubmitBtn" class="nav-submit-btn" type="button" onclick="switchMode('submit')" aria-label="Join / Submit your data">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+                    <span class="nav-submit-label">Join Us</span>
+                </button>
                 <div class="audio-wrapper">
                     <button id="audioBtn" class="audio-btn" onclick="toggleAudio()" aria-label="Play background music" aria-pressed="false">
                         <span id="audioBtnText">🔇 Tap to Play</span>
                     </button>
-                    <div class="audio-hint" id="audioHint">
-                        <span class="hint-arrow">◂</span>
-                        <span class="hint-text">Tap to play music 🎶</span>
-                    </div>
                 </div>
                 <div class="auth-area" id="authArea">
                     <button id="loginBtn" class="auth-btn auth-login" aria-label="Sign in with Google">
@@ -134,47 +149,18 @@
                         </div>
                     </div>
                 </div>
+                <button class="nav-toggle" id="navToggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="navLinks">
+                    <span class="nav-toggle-bar"></span>
+                    <span class="nav-toggle-bar"></span>
+                    <span class="nav-toggle-bar"></span>
+                </button>
             </div>
-            <div class="logos-wrapper">
-                <div class="logo-container">
-                    <picture>
-                        <source srcset="logo-faculty.webp" type="image/webp" />
-                        <img src="logo-faculty.webp" alt="Faculty of Engineering Logo" class="university-logo" width="300" height="300" fetchpriority="high" />
-                    </picture>
-                </div>
-                <div class="logo-container">
-                    <picture>
-                        <source srcset="logo-university.webp" type="image/webp" />
-                        <img src="logo-university.webp" alt="Al-Azhar University Logo" class="university-logo" width="300" height="300" fetchpriority="high" />
-                    </picture>
-                </div>
-            </div>
-        </header>
+      </div>
+    </header>
 
-        <!-- ===== Top-Level Mode Navigation ===== -->
-        <nav class="mode-nav" id="modeNav" aria-label="Section navigation">
-            <button class="mode-btn active" id="modeCountdownBtn" data-mode="countdown" onclick="switchMode('countdown')" aria-label="Countdown">
-                <span class="mode-icon" aria-hidden="true">⏱</span>
-                <span class="mode-label">Countdown</span>
-            </button>
-            <button class="mode-btn" id="modeYearbookBtn" data-mode="yearbook" onclick="switchMode('yearbook')" aria-label="Class Yearbook">
-                <span class="mode-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em">
-                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                        <circle cx="12" cy="13" r="4"/>
-                    </svg>
-                </span>
-                <span class="mode-label">Class Yearbook</span>
-            </button>
-            <button class="mode-btn" id="modeProjectsBtn" data-mode="projects" onclick="switchMode('projects')" aria-label="GP Projects">
-                <span class="mode-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em">
-                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                    </svg>
-                </span>
-                <span class="mode-label">GP Projects</span>
-            </button>
-        </nav>
+    <!-- Main Content -->
+    <div class="container">
+
 
         <!-- ===== MODE: COUNTDOWN ===== -->
         <div id="mode-countdown">
@@ -359,14 +345,14 @@
             </button>
             <div class="portal-header">
                 <h2 class="portal-title">Join the Yearbook</h2>
-                <p class="portal-subtitle">سجّل بياناتك أو مشروعك — هتظهر على الموقع بعد موافقة الأدمن ✅</p>
+                <p class="portal-subtitle">Submit your profile or project — it goes live once an admin approves it ✅</p>
             </div>
 
             <!-- Login gate (shown when signed out) -->
             <div id="submitLoginGate" class="glass-panel portal-gate">
                 <div class="gate-icon">🔒</div>
-                <h3>سجّل دخول الأول</h3>
-                <p>لازم تسجّل دخول بحساب Google عشان تقدر تبعت بياناتك.</p>
+                <h3>Sign in first</h3>
+                <p>You need to sign in with your Google account before you can submit your data.</p>
                 <button id="gateLoginBtn" type="button" class="btn-primary portal-google-btn">
                     <svg class="g-icon" viewBox="0 0 48 48" width="18" height="18" aria-hidden="true">
                         <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.4 29.3 35 24 35c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 5.1 29.6 3 24 3 12.9 3 4 11.9 4 23s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/>
@@ -516,7 +502,7 @@
 
                     <div id="firebaseSuccess" class="firebase-success hidden" style="margin-top: 1.5rem;">
                         <div class="fs-icon">🎉</div>
-                        <h3 class="fs-title">تم الإرسال! هيظهر بعد موافقة الأدمن.</h3>
+                        <h3 class="fs-title">Submitted! It will appear once an admin approves it.</h3>
                     </div>
                 </form>
             </div>
@@ -530,7 +516,7 @@
             </button>
             <div class="portal-header">
                 <h2 class="portal-title">Pending Approvals <span class="pending-badge" id="pendingCount">0</span></h2>
-                <p class="portal-subtitle">راجع الطلبات ووافق عليها عشان تظهر على الموقع.</p>
+                <p class="portal-subtitle">Review submissions and approve them to publish on the site.</p>
             </div>
 
             <div id="adminLoginGate" class="glass-panel portal-gate">
@@ -547,7 +533,7 @@
                     <button id="adminRefreshBtn" type="button" class="btn-secondary admin-refresh">↻ Refresh</button>
                 </div>
                 <div id="pendingList" class="pending-list"></div>
-                <p id="pendingEmpty" class="pending-empty" style="display:none;">مفيش طلبات منتظرة الموافقة 🎉</p>
+                <p id="pendingEmpty" class="pending-empty" style="display:none;">No pending submissions 🎉</p>
             </div>
         </div>
 
