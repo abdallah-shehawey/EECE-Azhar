@@ -26,6 +26,66 @@ const FIREBASE_DB_URL = "https://eece-azhar-6f18d-default-rtdb.firebaseio.com/";
 let STUDENTS = [];
 let GRADUATION_PROJECTS = [];
 
+// Defaults for any legacy record that predates the institution/class-year
+// system. Everyone already on the site belongs to this exact group.
+const DEFAULT_CLASS_YEAR = "2026";
+const DEFAULT_UNIVERSITY = "Al-Azhar University";
+const DEFAULT_FACULTY = "Faculty of Engineering";
+const DEFAULT_DEPARTMENT = "Communication & Electronics";
+
+/** Fill any missing hierarchy fields on a student/profile record in place. */
+function applyHierarchyDefaults(rec) {
+  if (!rec.university) rec.university = DEFAULT_UNIVERSITY;
+  if (!rec.faculty) rec.faculty = DEFAULT_FACULTY;
+  if (!rec.department) rec.department = DEFAULT_DEPARTMENT;
+  if (!rec.classYear) rec.classYear = DEFAULT_CLASS_YEAR;
+  return rec;
+}
+
+/**
+ * Merge legacy /students records with live /profiles records.
+ * A profile (status === "live") is the source of truth and overrides any
+ * /students record that shares the same key/owner. Returns a plain array.
+ */
+function mergeStudentSources(studentsData, profilesData) {
+  // Start from legacy /students, keyed so profiles can override by name key.
+  const byKey = new Map();
+
+  const legacy = !studentsData
+    ? []
+    : Array.isArray(studentsData)
+      ? studentsData.filter(Boolean)
+      : Object.values(studentsData);
+  legacy.forEach((s) => {
+    if (!s || !s.name) return;
+    applyHierarchyDefaults(s);
+    byKey.set(s.ownerUid || `name:${s.name.toLowerCase()}`, s);
+  });
+
+  // Overlay live profiles (these win on conflicts).
+  if (profilesData) {
+    Object.entries(profilesData).forEach(([uid, p]) => {
+      if (!p || p.status !== "live" || !p.name) return;
+      byKey.set(uid, applyHierarchyDefaults({
+        name: p.name,
+        gender: p.gender || "",
+        photo: p.photo || "",
+        track: p.tracks || p.track || [],
+        skills: p.skills || [],
+        color: p.color || "",
+        social: p.social || {},
+        university: p.university,
+        faculty: p.faculty,
+        department: p.department,
+        classYear: p.classYear,
+        ownerUid: uid,
+      }));
+    });
+  }
+
+  return Array.from(byKey.values());
+}
+
 async function fetchFirebaseData({ attempt = 1, maxAttempts = 4, baseDelay = 2000 } = {}) {
   if (!FIREBASE_DB_URL || FIREBASE_DB_URL.includes("your-project")) return;
 
@@ -36,9 +96,12 @@ async function fetchFirebaseData({ attempt = 1, maxAttempts = 4, baseDelay = 200
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-    const [resStudents, resProjects] = await Promise.all([
+    const [resStudents, resProjects, resProfiles] = await Promise.all([
       fetch(`${cleanUrl}students.json`, { signal: controller.signal }),
-      fetch(`${cleanUrl}projects.json`, { signal: controller.signal })
+      fetch(`${cleanUrl}projects.json`, { signal: controller.signal }),
+      // Profiles are public-readable? No — guarded by rules. Anonymous read may
+      // 401; treat that as "no profiles" and fall back to legacy students only.
+      fetch(`${cleanUrl}profiles.json`, { signal: controller.signal }).catch(() => null),
     ]);
 
     clearTimeout(timeoutId);
@@ -49,12 +112,14 @@ async function fetchFirebaseData({ attempt = 1, maxAttempts = 4, baseDelay = 200
 
     const studentsData = await resStudents.json();
     const projectsData = await resProjects.json();
-
-    if (studentsData) {
-      STUDENTS = Array.isArray(studentsData)
-        ? studentsData.filter(Boolean)
-        : Object.values(studentsData);
+    let profilesData = null;
+    if (resProfiles && resProfiles.ok) {
+      try { profilesData = await resProfiles.json(); } catch { profilesData = null; }
     }
+
+    STUDENTS = mergeStudentSources(studentsData, profilesData);
+    // Expose for the profile portal module (ES modules can't see top-level lets).
+    window.STUDENTS = STUDENTS;
 
     if (projectsData) {
       GRADUATION_PROJECTS = Array.isArray(projectsData)
@@ -65,6 +130,7 @@ async function fetchFirebaseData({ attempt = 1, maxAttempts = 4, baseDelay = 200
         if (project.team && !Array.isArray(project.team)) {
           project.team = Object.values(project.team);
         }
+        applyHierarchyDefaults(project);
       });
     }
 
@@ -72,6 +138,11 @@ async function fetchFirebaseData({ attempt = 1, maxAttempts = 4, baseDelay = 200
 
     // Patch photo URLs with Cloudflare base URL now that we have fresh student data
     if (typeof loadDrivePhotos === "function") await loadDrivePhotos();
+
+    // Rebuild the cascading filters now that fresh data may add new
+    // universities / faculties / departments / class years.
+    if (typeof buildYearbookFilters === "function") buildYearbookFilters();
+    if (currentMode === "home" && typeof renderHomeStats === "function") renderHomeStats();
 
     // Re-render whichever view is currently active so it reflects live data
     if (typeof currentMode !== "undefined") {
@@ -275,6 +346,23 @@ function openPhotoModal(student) {
     tracksHtml = `<div class="student-track-container">${badges}</div>`;
   }
 
+  // ── Institution meta (department · class year) ──
+  let metaHtml = "";
+  if (student.department || student.classYear) {
+    const bits = [student.department, student.classYear ? `Class of ${student.classYear}` : ""]
+      .filter(Boolean).join(" · ");
+    metaHtml = `<p class="modal-meta">${bits}</p>`;
+  }
+
+  // ── Skills HTML ──
+  let skillsHtml = "";
+  let skills = student.skills;
+  if (skills && skills.length) {
+    if (!Array.isArray(skills)) skills = [skills];
+    const chips = skills.map((s) => `<span class="skill-chip">${s}</span>`).join("");
+    skillsHtml = `<div class="modal-skills"><span class="modal-skills-title">Skills</span><div class="skill-chip-row">${chips}</div></div>`;
+  }
+
   // ── Team Leader Badge HTML ──
   const leaderBadgeHtml = student.teamLeader
     ? `<div class="modal-leader-badge">
@@ -319,7 +407,9 @@ function openPhotoModal(student) {
             ${photoHtml}
             <h3>${student.name}</h3>
             ${leaderBadgeHtml}
+            ${metaHtml}
             ${tracksHtml}
+            ${skillsHtml}
             ${socialHtml}
         </div>
     `;
@@ -528,12 +618,183 @@ function renderYearbook(list = STUDENTS) {
     if (trackContainer.children.length > 0) card.appendChild(trackContainer);
     if (socialRow.children.length > 0) card.appendChild(socialRow);
 
+    // Admin-only delete button (the portal module exposes window.__isAdmin
+    // and window.adminDeleteStudent). Hidden for everyone else.
+    if (window.__isAdmin && typeof window.adminDeleteStudent === "function") {
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "card-delete-btn";
+      del.title = "Delete this student";
+      del.setAttribute("aria-label", `Delete ${student.name}`);
+      del.textContent = "🗑";
+      del.addEventListener("click", (e) => {
+        e.stopPropagation();
+        window.adminDeleteStudent(student);
+      });
+      card.appendChild(del);
+    }
+
     grid.appendChild(card);
   });
 }
 
 let selectedCategories = new Set();
 let currentSearchQuery = "";
+
+// ===== Hierarchical Yearbook filters (University › Faculty › Department › Year) =====
+// "" means "All" at that level. Gender is "all" | "male" | "female".
+const yearbookFilter = {
+  university: "",
+  faculty: "",
+  department: "",
+  classYear: "",
+  gender: "all",
+};
+let _filtersInitialised = false;
+
+// Order class years newest-first ("2027" before "2026"); non-numeric sort last.
+function _sortYearsDesc(years) {
+  return [...years].sort((a, b) => {
+    const na = parseInt(a, 10), nb = parseInt(b, 10);
+    if (isNaN(na) && isNaN(nb)) return a.localeCompare(b);
+    if (isNaN(na)) return 1;
+    if (isNaN(nb)) return -1;
+    return nb - na;
+  });
+}
+
+// Distinct, sorted values for a field among students that match the
+// currently-selected higher levels (so each dropdown only shows real options).
+function _availableValues(field, scope = {}) {
+  const set = new Set();
+  STUDENTS.forEach((s) => {
+    if (scope.university && (s.university || DEFAULT_UNIVERSITY) !== scope.university) return;
+    if (scope.faculty && (s.faculty || DEFAULT_FACULTY) !== scope.faculty) return;
+    if (scope.department && (s.department || DEFAULT_DEPARTMENT) !== scope.department) return;
+    const v = s[field];
+    if (v) set.add(v);
+  });
+  return Array.from(set);
+}
+
+// Build / refresh the cascading <select>s. Called after data loads and whenever
+// a higher level changes. Picks sensible defaults (single option auto-selected,
+// newest class year by default) and only renders levels that have >1 real value.
+function buildYearbookFilters() {
+  const uniSel = document.getElementById("filterUniversity");
+  const facSel = document.getElementById("filterFaculty");
+  const depSel = document.getElementById("filterDepartment");
+  const yrSel = document.getElementById("filterClassYear");
+  if (!uniSel || !facSel || !depSel || !yrSel) return;
+
+  const fill = (sel, values, current, { sort = "asc" } = {}) => {
+    let vals = sort === "yearDesc" ? _sortYearsDesc(values) : [...values].sort((a, b) => a.localeCompare(b));
+    // Reset selection if the current value is no longer valid.
+    if (current && !vals.includes(current)) current = "";
+    const opts = [`<option value="">All</option>`]
+      .concat(vals.map((v) => `<option value="${v}"${v === current ? " selected" : ""}>${v}</option>`));
+    sel.innerHTML = opts.join("");
+    // Hide a level entirely if there's only one real value (nothing to choose).
+    const wrap = sel.closest(".yb-filter");
+    if (wrap) wrap.style.display = vals.length > 1 ? "" : "none";
+    return current;
+  };
+
+  const universities = _availableValues("university");
+  yearbookFilter.university = fill(uniSel, universities, yearbookFilter.university);
+
+  const faculties = _availableValues("faculty", { university: yearbookFilter.university });
+  yearbookFilter.faculty = fill(facSel, faculties, yearbookFilter.faculty);
+
+  const departments = _availableValues("department", {
+    university: yearbookFilter.university,
+    faculty: yearbookFilter.faculty,
+  });
+  yearbookFilter.department = fill(depSel, departments, yearbookFilter.department);
+
+  const years = _availableValues("classYear", {
+    university: yearbookFilter.university,
+    faculty: yearbookFilter.faculty,
+    department: yearbookFilter.department,
+  });
+  // Default to the newest class year that actually has people (only on first build).
+  if (!_filtersInitialised && years.length) {
+    yearbookFilter.classYear = _sortYearsDesc(years)[0];
+  }
+  yearbookFilter.classYear = fill(yrSel, years, yearbookFilter.classYear, { sort: "yearDesc" });
+
+  // Gender toggle only matters when both genders exist in the current scope.
+  refreshGenderToggle();
+
+  _filtersInitialised = true;
+}
+
+// Show the gender toggle only if the current scope has both male and female.
+function refreshGenderToggle() {
+  const toggle = document.getElementById("genderToggle");
+  if (!toggle) return;
+  const genders = new Set();
+  STUDENTS.forEach((s) => {
+    if (yearbookFilter.university && (s.university || DEFAULT_UNIVERSITY) !== yearbookFilter.university) return;
+    if (yearbookFilter.faculty && (s.faculty || DEFAULT_FACULTY) !== yearbookFilter.faculty) return;
+    if (yearbookFilter.department && (s.department || DEFAULT_DEPARTMENT) !== yearbookFilter.department) return;
+    if (yearbookFilter.classYear && (s.classYear || DEFAULT_CLASS_YEAR) !== yearbookFilter.classYear) return;
+    if (s.gender) genders.add(s.gender.toLowerCase());
+  });
+  const bothGenders = genders.has("male") && genders.has("female");
+  toggle.style.display = bothGenders ? "" : "none";
+  if (!bothGenders && yearbookFilter.gender !== "all") {
+    yearbookFilter.gender = "all";
+    toggle.querySelectorAll(".gender-btn").forEach((b) =>
+      b.classList.toggle("active", b.dataset.gender === "all"));
+  }
+}
+
+// Wire the filter controls (called once at init).
+function initYearbookFilters() {
+  const ids = {
+    university: "filterUniversity",
+    faculty: "filterFaculty",
+    department: "filterDepartment",
+    classYear: "filterClassYear",
+  };
+  Object.entries(ids).forEach(([field, id]) => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    sel.addEventListener("change", () => {
+      yearbookFilter[field] = sel.value;
+      // Changing a higher level invalidates lower selections; rebuild cascade.
+      if (field === "university") { yearbookFilter.faculty = ""; yearbookFilter.department = ""; yearbookFilter.classYear = ""; }
+      else if (field === "faculty") { yearbookFilter.department = ""; yearbookFilter.classYear = ""; }
+      else if (field === "department") { yearbookFilter.classYear = ""; }
+      buildYearbookFilters();
+      renderStats();
+      applyFilters();
+    });
+  });
+
+  const toggle = document.getElementById("genderToggle");
+  if (toggle) {
+    toggle.querySelectorAll(".gender-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        yearbookFilter.gender = btn.dataset.gender;
+        toggle.querySelectorAll(".gender-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        applyFilters();
+      });
+    });
+  }
+}
+
+// Does a student pass the current hierarchy + gender filters?
+function matchesYearbookScope(s) {
+  if (yearbookFilter.university && (s.university || DEFAULT_UNIVERSITY) !== yearbookFilter.university) return false;
+  if (yearbookFilter.faculty && (s.faculty || DEFAULT_FACULTY) !== yearbookFilter.faculty) return false;
+  if (yearbookFilter.department && (s.department || DEFAULT_DEPARTMENT) !== yearbookFilter.department) return false;
+  if (yearbookFilter.classYear && (s.classYear || DEFAULT_CLASS_YEAR) !== yearbookFilter.classYear) return false;
+  if (yearbookFilter.gender !== "all" && (s.gender || "").toLowerCase() !== yearbookFilter.gender) return false;
+  return true;
+}
 
 function getStudentCategories(student) {
   let tracks = student.track;
@@ -559,9 +820,12 @@ function renderStats() {
   const statsContainer = document.getElementById("yearbookStats");
   if (!statsContainer) return;
 
-  let trackCounts = {};
+  // Only count students within the active hierarchy/gender scope so the track
+  // tiles reflect the group the visitor is actually looking at.
+  const scoped = STUDENTS.filter(matchesYearbookScope);
 
-  STUDENTS.forEach((s) => {
+  let trackCounts = {};
+  scoped.forEach((s) => {
     const cats = getStudentCategories(s);
     cats.forEach((cat) => {
       trackCounts[cat] = (trackCounts[cat] || 0) + 1;
@@ -569,7 +833,7 @@ function renderStats() {
   });
 
   const statsData = [
-    { category: "All", label: "Students", count: STUDENTS.length },
+    { category: "All", label: "Students", count: scoped.length },
   ];
 
   // Sort tracks by count (descending)
@@ -662,6 +926,9 @@ function filterStudents(query) {
 
 function applyFilters() {
   const filtered = STUDENTS.filter((s) => {
+    // Hierarchy + gender scope (University › Faculty › Department › Year, gender)
+    if (!matchesYearbookScope(s)) return false;
+
     // Text search
     let matchesText = true;
     if (currentSearchQuery) {
@@ -699,12 +966,168 @@ function applyFilters() {
   });
 
   renderYearbook(filtered);
+  updateYearbookHeading();
+}
+
+// Reflect the active scope in the Yearbook heading + subtitle.
+function updateYearbookHeading() {
+  const titleEl = document.querySelector("#mode-yearbook .yearbook-title");
+  const subEl = document.querySelector("#mode-yearbook .yearbook-subtitle");
+  if (titleEl) {
+    // Keep the camera icon, replace only the trailing text node.
+    const yr = yearbookFilter.classYear || "All Years";
+    const label = yearbookFilter.classYear ? `Class of ${yr}` : "All Classes";
+    let textNode = [...titleEl.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim());
+    if (textNode) textNode.textContent = " " + label;
+    else titleEl.appendChild(document.createTextNode(" " + label));
+  }
+  if (subEl) {
+    const parts = [
+      yearbookFilter.university || DEFAULT_UNIVERSITY,
+      yearbookFilter.faculty || DEFAULT_FACULTY,
+      yearbookFilter.department || DEFAULT_DEPARTMENT,
+    ];
+    subEl.textContent = parts.join(" · ");
+  }
+}
+
+// ===== Home page live stats =====
+function renderHomeStats() {
+  const set = (id, n) => {
+    const el = document.getElementById(id);
+    if (el) animateCount(el, n);
+  };
+  const unis = new Set(STUDENTS.map((s) => s.university || DEFAULT_UNIVERSITY));
+  const years = new Set(STUDENTS.map((s) => s.classYear || DEFAULT_CLASS_YEAR));
+  set("statStudents", STUDENTS.length);
+  set("statProjects", GRADUATION_PROJECTS.length);
+  set("statUniversities", unis.size);
+  set("statYears", years.size);
+
+  renderHomeTrackBreakdown();
+}
+
+// Normalise a track name so trivial variants merge into one bucket:
+// case-insensitive, trims, collapses spaces, and singularises a trailing "s"
+// ("Embedded Systems" === "Embedded System", "Network Security" === "Network security").
+// Words that legitimately end in "s" and must NOT be singularised.
+const _NO_SINGULAR = new Set(["devops", "analysis", "physics", "mathematics", "os", "ios", "aws"]);
+
+// Synonym map: many phrasings of the same specialization collapse to one track.
+// Each `match` is a list of normalised substrings (lowercased, "&"/"and"/spaces
+// stripped). Rules are tried TOP-DOWN and MORE-SPECIFIC FIRST, so e.g.
+// "Embedded Linux" is caught before the generic "embedded" rule, and
+// "Network Security" before the generic "network" rule.
+const _TRACK_ALIASES = [
+  { match: ["embeddedlinux"], canonical: "Embedded Linux" },
+  { match: ["networksecurity", "cybersecurity"], canonical: "Network Security" },
+  { match: ["digitaldesign", "digitalverification", "digitalic", "asicverification", "asicdesign", "rtldesign", "digitaldesignverification"], canonical: "Digital Design & Verification" },
+  { match: ["embeddedsystem", "embeddedsw", "embeddedsoftware", "embedded"], canonical: "Embedded Systems" },
+  { match: ["networkengineer", "networking", "ccna", "network"], canonical: "Network Engineer" },
+  { match: ["devops"], canonical: "DevOps" },
+  { match: ["artificialintelligence", "machinelearning", "deeplearning"], canonical: "AI" },
+];
+
+function _normForAlias(s) {
+  return String(s).toLowerCase().replace(/&/g, "").replace(/\band\b/g, "").replace(/[^a-z0-9]/g, "");
+}
+
+function canonicalTrack(raw) {
+  let t = String(raw).trim().replace(/\s+/g, " ");
+  if (!t) return "";
+
+  // 1) Synonym collapse — the strongest rule (handles the Digital Design family,
+  //    ASIC Verification, etc. all mapping to one canonical track).
+  const norm = _normForAlias(t);
+  for (const rule of _TRACK_ALIASES) {
+    if (rule.match.some((m) => norm === m || norm.includes(m))) return rule.canonical;
+  }
+
+  // 2) Otherwise: singularise trailing "s" + title-case (keeps unknown/custom tracks tidy).
+  const words = t.split(" ");
+  const last = words[words.length - 1];
+  if (last.length > 3 && /[a-z]s$/i.test(last) && !/ss$/i.test(last) && !_NO_SINGULAR.has(last.toLowerCase())) {
+    words[words.length - 1] = last.replace(/s$/i, "");
+  }
+  const ACR = new Set(["ai", "ic", "asic", "iot", "rf", "dsp", "os", "ui", "ux", "qa"]);
+  return words
+    .map((w) => {
+      const lw = w.toLowerCase();
+      if (lw === "devops") return "DevOps";
+      if (ACR.has(lw) || w.length <= 3) return w.toUpperCase();
+      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    })
+    .join(" ");
+}
+
+// The canonical built-in tracks shown even before data loads (start at 0).
+const HOME_BASE_TRACKS = [
+  "Embedded Systems", "Digital Design & Verification", "Network Engineer",
+  "Embedded Linux", "DevOps", "AI",
+];
+
+// Count students per track (scalable, merges duplicates) and render on Home.
+// Tiles are always present (built-ins start at 0) and count up with animation
+// once data arrives — matching the headline stats above.
+function renderHomeTrackBreakdown() {
+  const section = document.getElementById("homeTracksSection");
+  const grid = document.getElementById("homeTrackGrid");
+  if (!grid || !section) return;
+  section.style.display = "";
+
+  const counts = {};
+  HOME_BASE_TRACKS.forEach((t) => { counts[t] = 0; }); // baseline so tiles show at 0
+  STUDENTS.forEach((s) => {
+    let tracks = s.track;
+    if (!tracks) return;
+    if (!Array.isArray(tracks)) tracks = [tracks];
+    const seen = new Set(); // de-dupe variants within one student
+    tracks.forEach((t) => {
+      const key = canonicalTrack(t);
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      counts[key] = (counts[key] || 0) + 1;
+    });
+  });
+
+  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+
+  // Reuse existing tiles when the track set is unchanged so we can animate the
+  // number from its current value instead of rebuilding (avoids the flash).
+  const sameSet = grid.childElementCount === entries.length &&
+    entries.every(([t], i) => grid.children[i]?.dataset.track === t);
+
+  if (!sameSet) {
+    grid.innerHTML = entries.map(([track]) => `
+      <div class="home-track-item" data-track="${track}">
+        <span class="home-track-count">0</span>
+        <span class="home-track-name">${track}</span>
+      </div>`).join("");
+  }
+  entries.forEach(([track, n], i) => {
+    const numEl = grid.children[i]?.querySelector(".home-track-count");
+    if (numEl) animateCount(numEl, n);
+  });
+}
+
+// Small count-up animation (reused by home stats).
+function animateCount(el, target) {
+  const duration = 1200;
+  const start = performance.now();
+  function tick(now) {
+    const p = Math.min((now - start) / duration, 1);
+    const eased = 1 - (1 - p) * (1 - p);
+    el.textContent = Math.round(target * eased);
+    if (p < 1) requestAnimationFrame(tick);
+    else el.textContent = target;
+  }
+  requestAnimationFrame(tick);
 }
 
 // ===== Graduation Projects Data =====
 // Loaded from data/projects.js
 
-let currentProjectCat = "Digital";
+let currentProjectCat = "All";
 
 // SVG icons per project category
 const PROJ_ICONS = {
@@ -737,9 +1160,10 @@ function renderProjects() {
   const grid = document.getElementById("projectsGrid");
   if (!grid) return;
 
-  // Sort projects: alphabetically by leader name within the category
+  // "All" shows every project; otherwise filter to the chosen category.
+  // Sort alphabetically by leader name.
   const filtered = GRADUATION_PROJECTS
-    .filter((p) => p.category === currentProjectCat)
+    .filter((p) => currentProjectCat === "All" || p.category === currentProjectCat)
     .sort((a, b) => {
       const aLeader = (a.team || []).find(m => m.leader);
       const bLeader = (b.team || []).find(m => m.leader);
@@ -755,9 +1179,10 @@ function renderProjects() {
   }
 
   grid.innerHTML = "";
-  const catKey = currentProjectCat.toLowerCase();
 
   filtered.forEach((project, idx) => {
+    // Per-project key so "All" view colours each card by its own category.
+    const catKey = (project.category || "").toLowerCase();
     const card = document.createElement("div");
     card.className = `project-card cat-${catKey}`;
     card.style.animationDelay = `${idx * 0.1}s`;
@@ -1023,7 +1448,7 @@ function _watchCardRemoval(el, gridId, onRemoved) {
 }
 
 // ===== Swipe Gesture (Mode Switching) =====
-const MODES = ["countdown", "yearbook", "projects"];
+const MODES = ["home", "countdown", "yearbook", "projects"];
 
 function initSwipeGesture() {
   let touchStartX = 0;
@@ -1123,7 +1548,6 @@ function initKeyboardNav() {
 // ===== Initialize =====
 document.addEventListener("DOMContentLoaded", async () => {
   window.scrollTo(0, 0);
-  document.body.classList.add("mode-countdown-active");
   startCountdown();
   startProjectDiscussionCountdown();
   updateLocalTime();
@@ -1131,11 +1555,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   initSwipeGesture(); // Init immediately — no need to wait for Firebase
   initKeyboardNav();
   initNavMenu();
+  initYearbookFilters();
 
   // Render local fallback data right away so the UI is usable from the start
   await loadDrivePhotos();
+  buildYearbookFilters();
   applyFilters();
   renderStats();
+
+  // Land on the Home page by default.
+  switchMode("home");
 
   // Fetch fresh data from Firebase in the background — no blocking await.
   // On success it calls loadDrivePhotos + renderStats + re-renders active view.
@@ -1205,6 +1634,7 @@ function switchMode(mode) {
 
   // Show/hide sections (submit & admin are added by portal.js feature)
   const sections = {
+    home: document.getElementById("mode-home"),
     countdown: document.getElementById("mode-countdown"),
     yearbook: document.getElementById("mode-yearbook"),
     projects: document.getElementById("mode-projects"),
@@ -1222,7 +1652,10 @@ function switchMode(mode) {
   } else {
     document.body.classList.remove("mode-countdown-active");
     window.scrollTo(0, 0);
-    if (mode === "yearbook") {
+    if (mode === "home" && sections.home) {
+      sections.home.style.display = "block";
+      renderHomeStats();
+    } else if (mode === "yearbook") {
       sections.yearbook.style.display = "block";
       // Clear search on open
       document.getElementById("yearbookSearch").value = "";

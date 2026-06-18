@@ -99,10 +99,11 @@
 
             <!-- Center: section links (also used inside the mobile drawer) -->
             <nav class="navbar-links" id="navLinks" aria-label="Section navigation">
-                <button class="nav-link active" id="modeCountdownBtn" data-mode="countdown" onclick="switchMode('countdown')">Countdown</button>
+                <button class="nav-link active" id="modeHomeBtn" data-mode="home" onclick="switchMode('home')">Home</button>
+                <button class="nav-link" id="modeCountdownBtn" data-mode="countdown" onclick="switchMode('countdown')">Countdown</button>
                 <button class="nav-link" id="modeYearbookBtn" data-mode="yearbook" onclick="switchMode('yearbook')">Yearbook</button>
                 <button class="nav-link" id="modeProjectsBtn" data-mode="projects" onclick="switchMode('projects')">Projects</button>
-                <!-- These two only show inside the mobile drawer -->
+                <!-- This one only shows inside the mobile drawer -->
                 <button class="nav-link nav-link-drawer" id="drawerSubmitBtn" type="button" onclick="switchMode('submit')">Join Us</button>
             </nav>
 
@@ -161,9 +162,78 @@
     <!-- Main Content -->
     <div class="container">
 
+        <!-- ===== MODE: HOME (landing / introduction) ===== -->
+        <div id="mode-home" style="display:none;">
+            <section class="home-hero">
+                <span class="home-badge">🎓 Graduation Yearbook Platform</span>
+                <h1 class="home-title">EECE <span class="home-title-accent">2026</span></h1>
+                <p class="home-tagline">
+                    A home for engineering students to build a profile, showcase their
+                    tracks &amp; skills, share their graduation projects, and count down
+                    to the big day — together.
+                </p>
+                <div class="home-cta">
+                    <button class="home-cta-primary" id="homeProfileCta" type="button" onclick="switchMode('submit')">Create your profile</button>
+                    <button class="home-cta-secondary" type="button" onclick="switchMode('yearbook')">Browse the Yearbook</button>
+                </div>
+            </section>
+
+            <!-- Stats panel (one professional card holding the headline numbers
+                 + the per-track breakdown). Filled by renderHomeStats(). -->
+            <section class="home-stats-panel" aria-label="Site statistics">
+                <div class="home-stats" id="homeStats">
+                    <div class="home-stat"><span class="home-stat-num" id="statStudents">0</span><span class="home-stat-label">Students</span></div>
+                    <div class="home-stat"><span class="home-stat-num" id="statProjects">0</span><span class="home-stat-label">Projects</span></div>
+                    <div class="home-stat"><span class="home-stat-num" id="statUniversities">0</span><span class="home-stat-label">Universities</span></div>
+                    <div class="home-stat"><span class="home-stat-num" id="statYears">0</span><span class="home-stat-label">Class Years</span></div>
+                </div>
+                <div class="home-tracks" id="homeTracksSection" style="display:none;">
+                    <span class="home-tracks-title">Students by track</span>
+                    <div class="home-track-grid" id="homeTrackGrid"></div>
+                </div>
+            </section>
+
+            <!-- What it does -->
+            <section class="home-features">
+                <h2 class="home-section-title">What you can do here</h2>
+                <div class="home-feature-grid">
+                    <article class="home-feature">
+                        <div class="home-feature-icon">👤</div>
+                        <h3>Your profile</h3>
+                        <p>Sign in with Google and create a profile with your photo, tracks, skills and social links. Edit it anytime.</p>
+                    </article>
+                    <article class="home-feature">
+                        <div class="home-feature-icon">📷</div>
+                        <h3>Class Yearbook</h3>
+                        <p>Browse classmates by university, faculty, department, class year and gender — every student on one beautiful page.</p>
+                    </article>
+                    <article class="home-feature">
+                        <div class="home-feature-icon">🚀</div>
+                        <h3>Graduation Projects</h3>
+                        <p>Publish your graduation project and team so juniors and recruiters can discover what your class built.</p>
+                    </article>
+                    <article class="home-feature">
+                        <div class="home-feature-icon">⏱️</div>
+                        <h3>Countdown</h3>
+                        <p>Track the time to the final exam, project discussion and graduation party — never miss a milestone.</p>
+                    </article>
+                </div>
+            </section>
+
+            <!-- How it works -->
+            <section class="home-steps">
+                <h2 class="home-section-title">How it works</h2>
+                <div class="home-step-row">
+                    <div class="home-step"><span class="home-step-n">1</span><p>Sign in with your Google account.</p></div>
+                    <div class="home-step"><span class="home-step-n">2</span><p>Create your profile &amp; submit your data.</p></div>
+                    <div class="home-step"><span class="home-step-n">3</span><p>An admin approves it once — then you're live.</p></div>
+                    <div class="home-step"><span class="home-step-n">4</span><p>Edit anytime; changes appear instantly.</p></div>
+                </div>
+            </section>
+        </div>
 
         <!-- ===== MODE: COUNTDOWN ===== -->
-        <div id="mode-countdown">
+        <div id="mode-countdown" style="display:none;">
             <!-- Tab Navigation -->
             <nav class="tabs" id="tabs">
                 <button class="tab active" data-tab="exam" onclick="switchTab('exam')">
@@ -234,6 +304,32 @@
                 </h2>
                 <p class="yearbook-subtitle">Electronics &amp; Communication · Faculty of Engineering · Al-Azhar University</p>
 
+                <!-- Hierarchical filters: University › Faculty › Department › Year
+                     Each <select> only lists values that actually have students.
+                     Built/managed by buildYearbookFilters() in script.js. -->
+                <div class="yearbook-filters" id="yearbookFilters">
+                    <label class="yb-filter">
+                        <span class="yb-filter-label">University</span>
+                        <select class="yb-select" id="filterUniversity" aria-label="Filter by university"></select>
+                    </label>
+                    <label class="yb-filter">
+                        <span class="yb-filter-label">Faculty</span>
+                        <select class="yb-select" id="filterFaculty" aria-label="Filter by faculty"></select>
+                    </label>
+                    <label class="yb-filter">
+                        <span class="yb-filter-label">Department</span>
+                        <select class="yb-select" id="filterDepartment" aria-label="Filter by department"></select>
+                    </label>
+                    <label class="yb-filter">
+                        <span class="yb-filter-label">Class</span>
+                        <select class="yb-select" id="filterClassYear" aria-label="Filter by class year"></select>
+                    </label>
+                    <div class="gender-toggle" id="genderToggle" role="group" aria-label="Filter by gender">
+                        <button type="button" class="gender-btn active" data-gender="all">All</button>
+                        <button type="button" class="gender-btn" data-gender="male">Male</button>
+                        <button type="button" class="gender-btn" data-gender="female">Female</button>
+                    </div>
+                </div>
 
                 <div class="yearbook-stats" id="yearbookStats">
                     <!-- Rendered by JS -->
@@ -313,7 +409,12 @@
 
                 <!-- Project Category Tabs -->
                 <div class="project-tabs" id="projectTabs">
-                    <button class="project-tab active" data-pcat="Digital" onclick="switchProjectCat('Digital')">
+                    <button class="project-tab active" data-pcat="All" onclick="switchProjectCat('All')">
+                        <span class="ptab-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                        </span> All Projects
+                    </button>
+                    <button class="project-tab" data-pcat="Digital" onclick="switchProjectCat('Digital')">
                         <span class="ptab-icon">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/></svg>
                         </span> Digital Design
@@ -344,8 +445,9 @@
                 <span>Back</span>
             </button>
             <div class="portal-header">
-                <h2 class="portal-title">Join the Yearbook</h2>
-                <p class="portal-subtitle">Submit your profile or project — it goes live once an admin approves it ✅</p>
+                <h2 class="portal-title" id="portalSubmitTitle">Create your profile</h2>
+                <p class="portal-subtitle" id="portalSubmitSubtitle">Fill in your details — your card goes live once an admin approves it ✅</p>
+                <span class="profile-status-badge" id="profileStatusBadge" style="display:none;"></span>
             </div>
 
             <!-- Login gate (shown when signed out) -->
@@ -386,6 +488,38 @@
                             <input type="text" id="inputName" class="field-input" placeholder="e.g. Abdallah Shehawey" autocomplete="name" />
                             <span class="field-hint">✎ Example: <em>Abdallah Shehawey</em> — as it should appear on the yearbook</span>
                         </div>
+
+                        <!-- Institution hierarchy -->
+                        <div class="field-row">
+                            <div class="field-group">
+                                <label for="inputUniversity" class="field-label">University <span class="required">*</span></label>
+                                <select id="inputUniversity" class="field-input" data-other="inputUniversityOther"></select>
+                                <input type="text" id="inputUniversityOther" class="field-input hidden" style="margin-top:0.5rem;" placeholder="Type your university" />
+                            </div>
+                            <div class="field-group">
+                                <label for="inputFaculty" class="field-label">Faculty <span class="required">*</span></label>
+                                <select id="inputFaculty" class="field-input" data-other="inputFacultyOther"></select>
+                                <input type="text" id="inputFacultyOther" class="field-input hidden" style="margin-top:0.5rem;" placeholder="Type your faculty" />
+                            </div>
+                        </div>
+                        <div class="field-row">
+                            <div class="field-group">
+                                <label for="inputDepartment" class="field-label">Department <span class="required">*</span></label>
+                                <select id="inputDepartment" class="field-input" data-other="inputDepartmentOther"></select>
+                                <input type="text" id="inputDepartmentOther" class="field-input hidden" style="margin-top:0.5rem;" placeholder="Type your department" />
+                            </div>
+                            <div class="field-group">
+                                <label for="inputClassYear" class="field-label">Class Year <span class="required">*</span></label>
+                                <select id="inputClassYear" class="field-input">
+                                    <option value="2027">2027</option>
+                                    <option value="2026" selected>2026</option>
+                                    <option value="2025">2025</option>
+                                    <option value="2024">2024</option>
+                                    <option value="2023">2023</option>
+                                </select>
+                            </div>
+                        </div>
+
                         <div class="field-group">
                             <label for="inputGender" class="field-label">Gender <span class="required">*</span></label>
                             <select id="inputGender" class="field-input">
@@ -416,19 +550,48 @@
                         </div>
                         <div class="field-group">
                             <label class="field-label">Track / Specialization <span class="required">*</span></label>
-                            <div class="track-options" id="trackOptions">
-                                <label class="track-checkbox"><input type="checkbox" value="Network Engineer"> Network Engineer</label>
-                                <label class="track-checkbox"><input type="checkbox" value="Embedded Systems"> Embedded Systems</label>
-                                <label class="track-checkbox"><input type="checkbox" value="Digital Design"> Digital Design</label>
-                                <label class="track-checkbox"><input type="checkbox" value="Digital Design & Verification"> Digital Design & Verification</label>
-                                <label class="track-checkbox"><input type="checkbox" value="Embedded Linux"> Embedded Linux</label>
-                                <label class="track-checkbox"><input type="checkbox" value="DevOps"> DevOps</label>
-                                <label class="track-checkbox"><input type="checkbox" value="AI"> AI</label>
-                                <label class="track-checkbox"><input type="checkbox" id="trackOtherCb" value="other"> Other...</label>
+                            <!-- Multi-select dropdown: pick one or more tracks; selected
+                                 ones show as removable chips. Custom tracks added via
+                                 "Other" are remembered and offered to everyone else. -->
+                            <div class="track-select" id="trackSelect">
+                                <button type="button" class="track-select-btn" id="trackSelectBtn" aria-haspopup="true" aria-expanded="false" aria-controls="trackMenu">
+                                    <span class="track-select-placeholder">Select your track(s)…</span>
+                                    <svg class="track-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="track-menu" id="trackMenu" role="listbox" aria-multiselectable="true">
+                                    <!-- Track options rendered by JS (known + custom) -->
+                                    <div class="track-menu-other">
+                                        <input type="text" id="inputTrackOther" class="track-other-input" placeholder="Add another track…" />
+                                        <button type="button" class="track-other-add" id="trackOtherAdd">Add</button>
+                                    </div>
+                                </div>
                             </div>
-                            <input type="text" id="inputTrackOther" class="field-input hidden" style="margin-top: 0.5rem;" placeholder="Type other tracks (comma separated)" />
-                            <span class="field-hint">✎ Example: <em>Cybersecurity, Cloud Computing</em></span>
-                            <div id="trackChips" class="chip-container" aria-label="Track preview"></div>
+                            <div id="trackChips" class="chip-container" aria-label="Selected tracks"></div>
+                            <span class="field-hint">✎ Pick from the list or add your own (e.g. <em>Cybersecurity</em>)</span>
+                        </div>
+
+                        <div class="field-group">
+                            <label class="field-label">Skills <span class="field-hint" style="display:inline; margin-left:5px;">(Optional)</span></label>
+                            <!-- Same multi-select pattern as tracks; a big built-in
+                                 engineering skills list, searchable, plus custom add. -->
+                            <div class="track-select" id="skillSelect">
+                                <button type="button" class="track-select-btn" id="skillSelectBtn" aria-haspopup="true" aria-expanded="false" aria-controls="skillMenu">
+                                    <span class="track-select-placeholder">Add your skills…</span>
+                                    <svg class="track-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="track-menu" id="skillMenu" role="listbox" aria-multiselectable="true">
+                                    <div class="track-menu-search">
+                                        <input type="text" id="skillSearch" class="track-other-input" placeholder="Search skills…" />
+                                    </div>
+                                    <!-- Skill options rendered by JS -->
+                                    <div class="track-menu-other">
+                                        <input type="text" id="inputSkillOther" class="track-other-input" placeholder="Add a custom skill…" />
+                                        <button type="button" class="track-other-add" id="skillOtherAdd">Add</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="skillChips" class="chip-container" aria-label="Selected skills"></div>
+                            <span class="field-hint">✎ e.g. <em>C/C++, Python, Verilog, PCB Design, Linux</em></span>
                         </div>
 
                         <div class="divider"><span>Social Links</span></div>
@@ -454,6 +617,35 @@
 
                     <!-- PROJECT -->
                     <div id="projectFormContainer" class="form-section hidden">
+                        <div class="field-row">
+                            <div class="field-group">
+                                <label for="pjUniversity" class="field-label">University <span class="required">*</span></label>
+                                <select id="pjUniversity" class="field-input" data-other="pjUniversityOther"></select>
+                                <input type="text" id="pjUniversityOther" class="field-input hidden" style="margin-top:0.5rem;" placeholder="Type your university" />
+                            </div>
+                            <div class="field-group">
+                                <label for="pjFaculty" class="field-label">Faculty <span class="required">*</span></label>
+                                <select id="pjFaculty" class="field-input" data-other="pjFacultyOther"></select>
+                                <input type="text" id="pjFacultyOther" class="field-input hidden" style="margin-top:0.5rem;" placeholder="Type your faculty" />
+                            </div>
+                        </div>
+                        <div class="field-row">
+                            <div class="field-group">
+                                <label for="pjDepartment" class="field-label">Department <span class="required">*</span></label>
+                                <select id="pjDepartment" class="field-input" data-other="pjDepartmentOther"></select>
+                                <input type="text" id="pjDepartmentOther" class="field-input hidden" style="margin-top:0.5rem;" placeholder="Type your department" />
+                            </div>
+                            <div class="field-group">
+                                <label for="pjClassYear" class="field-label">Class Year <span class="required">*</span></label>
+                                <select id="pjClassYear" class="field-input">
+                                    <option value="2027">2027</option>
+                                    <option value="2026" selected>2026</option>
+                                    <option value="2025">2025</option>
+                                    <option value="2024">2024</option>
+                                    <option value="2023">2023</option>
+                                </select>
+                            </div>
+                        </div>
                         <div class="field-group">
                             <label for="inputCategory" class="field-label">Project Category <span class="required">*</span></label>
                             <select id="inputCategory" class="field-input">
@@ -530,6 +722,7 @@
 
             <div id="adminPanel" style="display: none;">
                 <div class="admin-toolbar">
+                    <button id="adminAddBtn" type="button" class="btn-primary admin-add">➕ Add a student directly</button>
                     <button id="adminRefreshBtn" type="button" class="btn-secondary admin-refresh">↻ Refresh</button>
                 </div>
                 <div id="pendingList" class="pending-list"></div>

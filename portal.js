@@ -56,11 +56,170 @@ const provider = new GoogleAuthProvider();
 let currentUser = null;
 let isAdmin = false;
 let pendingCache = {}; // id → entry (so Approve/Reject can read the data)
+let myProfile = null;  // the signed-in user's /profiles/{uid} record (or null)
+let adminAddMode = false; // admin is adding someone else directly (not editing self)
+
+/* ════════════════════════════════════════════
+   § 0.1 — INSTITUTION DATA (for the profile form selects)
+   The site is for students across universities. These are common Egyptian
+   universities / faculties / departments; users can always pick "Other…".
+════════════════════════════════════════════ */
+const UNIVERSITIES = [
+  "Al-Azhar University",
+  "Cairo University",
+  "Ain Shams University",
+  "Alexandria University",
+  "Mansoura University",
+  "Helwan University",
+  "Zagazig University",
+  "Assiut University",
+  "Tanta University",
+  "Benha University",
+  "Menoufia University",
+  "Suez Canal University",
+  "South Valley University",
+  "Fayoum University",
+  "Beni-Suef University",
+  "Kafr El-Sheikh University",
+  "Damietta University",
+  "Aswan University",
+  "Minia University",
+  "Sohag University",
+  "Port Said University",
+  "The British University in Egypt (BUE)",
+  "German University in Cairo (GUC)",
+  "American University in Cairo (AUC)",
+  "Nile University",
+  "Misr University for Science & Technology (MUST)",
+  "Future University in Egypt (FUE)",
+  "October 6 University",
+  "Egyptian Russian University",
+];
+// Engineering-only — this site is for engineering students.
+const FACULTIES = [
+  "Faculty of Engineering",
+  "Faculty of Engineering & Technology",
+  "Faculty of Computers & Artificial Intelligence",
+  "Faculty of Computers & Information",
+  "Faculty of Computer Engineering",
+  "Higher Institute of Engineering",
+];
+const DEPARTMENTS = [
+  "Communication & Electronics",
+  "Computer Engineering",
+  "Electrical Power & Machines",
+  "Mechanical Engineering",
+  "Civil Engineering",
+  "Architecture Engineering",
+  "Mechatronics Engineering",
+  "Biomedical Engineering",
+  "Chemical Engineering",
+  "Computer Science",
+  "Information Systems",
+  "Artificial Intelligence",
+  "Software Engineering",
+];
+
+// Broad engineering skills, grouped into categories for an easy-to-scan menu.
+// Users can also add custom skills (they then appear under "Other" for everyone).
+const SKILL_CATEGORIES = {
+  "Programming Languages": [
+    "C", "C++", "Python", "Java", "JavaScript", "TypeScript", "C#", "Go", "Rust",
+    "MATLAB", "Bash/Shell", "Assembly", "SQL",
+  ],
+  "Embedded & Hardware": [
+    "Embedded C", "Microcontrollers (AVR)", "STM32 / ARM Cortex", "ESP32 / ESP8266",
+    "Arduino", "Raspberry Pi", "RTOS / FreeRTOS", "Device Drivers", "AUTOSAR",
+    "CAN / LIN", "I2C / SPI / UART", "PCB Design", "Altium Designer", "KiCad",
+    "Proteus", "Soldering", "Oscilloscope / Logic Analyzer",
+  ],
+  "Digital Design & Verification": [
+    "VHDL", "Verilog", "SystemVerilog", "Digital Design (RTL)", "FPGA",
+    "Xilinx Vivado", "ASIC Design", "UVM", "Static Timing Analysis",
+    "Synthesis", "Cadence", "Synopsys",
+  ],
+  "Networking & Systems": [
+    "Computer Networks", "TCP/IP", "Cisco / CCNA", "Network Security",
+    "Linux", "Linux Kernel", "Docker", "Kubernetes", "CI/CD", "Git", "Ansible",
+    "AWS", "Azure", "Google Cloud", "DevOps",
+  ],
+  "Software & Web": [
+    "Data Structures & Algorithms", "OOP", "Design Patterns", "REST APIs",
+    "React", "Node.js", "Flutter", "Android", "Databases", "MongoDB", "Firebase",
+  ],
+  "AI & Data": [
+    "Machine Learning", "Deep Learning", "Computer Vision", "NLP",
+    "TensorFlow", "PyTorch", "OpenCV", "Data Analysis", "Pandas / NumPy",
+  ],
+  "Signal & Communications": [
+    "Signal Processing (DSP)", "Communication Systems", "RF Engineering",
+    "Antenna Design", "Image Processing", "Control Systems",
+  ],
+  "Power & Mechatronics": [
+    "Power Electronics", "Electrical Machines", "PLC", "SCADA",
+    "Robotics", "ROS", "CAD / SolidWorks", "Simulink",
+  ],
+  "Tools & Soft Skills": [
+    "Project Management", "Technical Writing", "Problem Solving", "Teamwork",
+    "Presentation Skills",
+  ],
+};
 
 /* ════════════════════════════════════════════
    § 1 — SMALL HELPERS
 ════════════════════════════════════════════ */
 const $ = (id) => document.getElementById(id);
+
+/**
+ * Populate a <select> with options + an "Other…" entry that reveals a free-text
+ * input (the element id is read from the select's data-other attribute).
+ * Keeps things DRY across the 6 hierarchy selects (student + project forms).
+ */
+function fillSelectWithOther(selectId, values, { selected = "" } = {}) {
+  const sel = $(selectId);
+  if (!sel) return;
+  const otherId = sel.dataset.other;
+  const known = values.includes(selected);
+  sel.innerHTML =
+    `<option value="" disabled${selected ? "" : " selected"}>Select…</option>` +
+    values.map((v) => `<option value="${v}"${v === selected ? " selected" : ""}>${v}</option>`).join("") +
+    `<option value="__other"${selected && !known ? " selected" : ""}>Other…</option>`;
+  if (otherId) {
+    const other = $(otherId);
+    if (other) {
+      // If the saved value isn't in the list, show it in the "other" box.
+      if (selected && !known) { other.value = selected; other.classList.remove("hidden"); }
+      else { other.value = ""; other.classList.add("hidden"); }
+      // Use onchange (idempotent — re-running this won't stack listeners).
+      sel.onchange = () => {
+        if (sel.value === "__other") { other.classList.remove("hidden"); other.focus(); }
+        else other.classList.add("hidden");
+      };
+    }
+  }
+}
+
+/** Read a hierarchy select that may use the "Other…" free-text fallback. */
+function readSelectWithOther(selectId) {
+  const sel = $(selectId);
+  if (!sel) return "";
+  if (sel.value === "__other") {
+    const other = sel.dataset.other ? $(sel.dataset.other) : null;
+    return other ? other.value.trim() : "";
+  }
+  return sel.value || "";
+}
+
+/** Fill every hierarchy select in both the student and project forms. */
+function populateInstitutionSelects(profile) {
+  const p = profile || {};
+  fillSelectWithOther("inputUniversity", UNIVERSITIES, { selected: p.university || "" });
+  fillSelectWithOther("inputFaculty", FACULTIES, { selected: p.faculty || "" });
+  fillSelectWithOther("inputDepartment", DEPARTMENTS, { selected: p.department || "" });
+  fillSelectWithOther("pjUniversity", UNIVERSITIES, { selected: "" });
+  fillSelectWithOther("pjFaculty", FACULTIES, { selected: "" });
+  fillSelectWithOther("pjDepartment", DEPARTMENTS, { selected: "" });
+}
 
 /** Sanitize a string to be a valid Firebase key (mirrors the old server). */
 function sanitizeKey(str) {
@@ -116,13 +275,116 @@ function toggleUserMenu() {
   dd.classList.contains("open") ? closeUserMenu() : openUserMenu();
 }
 
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, async (user) => {
   currentUser = user;
   isAdmin = !!user && user.email === ADMIN_EMAIL;
+  window.__isAdmin = isAdmin; // so script.js can render admin-only controls
+  myProfile = null;
+  // Re-render the yearbook so admin delete buttons appear/disappear.
+  if (typeof window.applyFilters === "function" && document.body.dataset.mode === "yearbook") {
+    window.applyFilters();
+  }
+  if (user) {
+    // Load this account's profile so the form acts as create vs edit.
+    try {
+      const snap = await get(ref(db, `profiles/${user.uid}`));
+      myProfile = snap.exists() ? snap.val() : null;
+    } catch (e) {
+      console.warn("Could not load profile:", e.message);
+    }
+  }
   updateAuthUI();
+  hydrateProfileForm();
   // If admin is already viewing the Approvals panel, refresh it.
   if (isAdmin && document.body.dataset.mode === "admin") loadPending();
 });
+
+/**
+ * Fill the profile form from myProfile (edit mode) or reset it (create mode),
+ * and update the heading / submit-button copy + any status badge.
+ */
+function hydrateProfileForm() {
+  const form = $("submissionForm");
+  if (!form) return;
+
+  const titleEl = $("portalSubmitTitle");
+  const subEl = $("portalSubmitSubtitle");
+  const btnLabel = $("btnGenerate")?.querySelector(".btn-label");
+  const badge = $("profileStatusBadge");
+  const typeToggle = document.querySelector(".type-toggle-container");
+
+  // Admin "add someone directly" mode — blank form, writes live, no approval.
+  if (adminAddMode) {
+    populateInstitutionSelects(null);
+    if (typeof window._setSelectedTracks === "function") window._setSelectedTracks([]);
+    if (titleEl) titleEl.textContent = "Add a student";
+    if (subEl) subEl.textContent = "Admin: this student goes live on the site immediately.";
+    if (btnLabel) btnLabel.textContent = "➕ Add student (live)";
+    if (badge) badge.style.display = "none";
+    if (typeToggle) typeToggle.style.display = "none"; // students only here
+    const ts = $("typeStudent"); if (ts) ts.checked = true;
+    return;
+  }
+  if (typeToggle) typeToggle.style.display = "";
+
+  populateInstitutionSelects(myProfile);
+
+  if (myProfile) {
+    // Edit mode — prefill student fields.
+    if ($("inputName")) $("inputName").value = myProfile.name || "";
+    if ($("inputGender")) $("inputGender").value = myProfile.gender || "";
+    if ($("inputClassYear") && myProfile.classYear) $("inputClassYear").value = myProfile.classYear;
+    const soc = myProfile.social || {};
+    if ($("inputLinkedin")) $("inputLinkedin").value = soc.linkedin || "";
+    if ($("inputGithub")) $("inputGithub").value = soc.github || "";
+    if ($("inputWhatsapp")) $("inputWhatsapp").value = soc.whatsapp || "";
+    if ($("inputFacebook")) $("inputFacebook").value = soc.facebook || "";
+    // Tracks + skills
+    prefillTracks(myProfile.tracks || myProfile.track || []);
+    if (typeof window._setSelectedSkills === "function") window._setSelectedSkills(myProfile.skills || []);
+    // Existing photo preview
+    if (myProfile.photo) showExistingPhoto(myProfile.photo);
+
+    const live = myProfile.status === "live";
+    if (titleEl) titleEl.textContent = "Your Profile";
+    if (subEl) subEl.textContent = live
+      ? "Edit your details below — changes appear on the site instantly."
+      : "Your profile is awaiting admin approval. You can still edit it.";
+    if (btnLabel) btnLabel.textContent = live ? "💾 Save changes" : "💾 Update submission";
+    if (badge) {
+      badge.style.display = "";
+      badge.textContent = live ? "● Live" : "● Pending approval";
+      badge.className = "profile-status-badge " + (live ? "is-live" : "is-pending");
+    }
+    // Force the Student type for an existing student profile.
+    const ts = $("typeStudent"); if (ts) ts.checked = true;
+  } else {
+    // Create mode — clean slate (keep Google name prefill via updateAuthUI).
+    if (titleEl) titleEl.textContent = "Create your profile";
+    if (subEl) subEl.textContent = "Fill in your details — your card goes live once an admin approves it ✅";
+    if (btnLabel) btnLabel.textContent = "⚡ Create profile";
+    if (badge) badge.style.display = "none";
+  }
+}
+
+/** Load the saved tracks into the multi-select (handled inside the form module). */
+function prefillTracks(tracks) {
+  if (typeof window._setSelectedTracks === "function") window._setSelectedTracks(tracks);
+}
+
+/** Show the user's already-uploaded R2 photo in the drop-zone preview. */
+function showExistingPhoto(photoName) {
+  const preview = $("photoPreview");
+  const idle = $("dropIdle");
+  const prev = $("dropPreview");
+  const fileName = $("photoFileName");
+  if (!preview || !idle || !prev) return;
+  const url = photoName.startsWith("http") ? photoName : `${R2_BASE}/${photoName}`;
+  preview.src = url;
+  if (fileName) fileName.textContent = photoName;
+  idle.classList.add("hidden");
+  prev.classList.remove("hidden");
+}
 
 /** Reflect auth state everywhere: header menu, admin items, gates. */
 function updateAuthUI() {
@@ -153,12 +415,18 @@ function updateAuthUI() {
     // If a signed-out user was sitting on a portal page, send them home.
     if (typeof window.switchMode === "function" &&
         (document.body.dataset.mode === "submit" || document.body.dataset.mode === "admin")) {
-      window.switchMode("countdown");
+      window.switchMode("home");
     }
   }
 
   // Admin-only menu item
   if (adminItem) adminItem.style.display = isAdmin ? "" : "none";
+
+  // Home CTA: "Create your profile" → "Open your profile" once signed in.
+  const homeCta = $("homeProfileCta");
+  if (homeCta) homeCta.textContent = currentUser
+    ? (myProfile ? "Open your profile" : "Create your profile")
+    : "Create your profile";
 
   // Submit section: gate vs form
   const submitGate = $("submitLoginGate");
@@ -193,8 +461,8 @@ function updateAuthUI() {
 }
 
 /* ════════════════════════════════════════════
-   § 3 — SUBMISSION FORM
-   (ported from the standalone Submit_form portal)
+  § 3 — SUBMISSION FORM
+  (ported from the standalone Submit_form portal)
 ════════════════════════════════════════════ */
 let formState = {
   submissionType: "student",
@@ -216,7 +484,6 @@ function initSubmissionForm() {
   const inputCategoryOther = $("inputCategoryOther");
   const teamMembersList = $("teamMembersList");
   const btnAddMember = $("btnAddMember");
-  const trackOtherCb = $("trackOtherCb");
   const inputTrackOther = $("inputTrackOther");
   const trackChips = $("trackChips");
   const validationErrors = $("validationErrors");
@@ -234,9 +501,6 @@ function initSubmissionForm() {
   const stepPhotoStatus = $("stepPhotoStatus");
   const stepCodeStatus = $("stepCodeStatus");
   const firebaseSuccess = $("firebaseSuccess");
-  const trackCheckboxes = document.querySelectorAll(
-    '#trackOptions input[type="checkbox"]',
-  );
 
   /* — Type toggle (student / project) — */
   [typeStudent, typeProject].forEach((radio) => {
@@ -334,40 +598,244 @@ function initSubmissionForm() {
     removePhoto();
   });
 
-  /* — Track chips — */
+  /* — Track multi-select (dropdown + chips + custom tracks) — */
+  // Built-in tracks always offered. Custom tracks discovered from existing
+  // students get merged in (collectKnownTracks) so a track someone added via
+  // "Other" becomes selectable for everyone else.
+  const BUILTIN_TRACKS = [
+    "Embedded Systems", "Embedded Linux", "Digital Design",
+    "Digital Design & Verification", "Network Engineer", "DevOps",
+    "AI", "Software Testing",
+  ];
+  const selectedTracks = new Set();
+  const trackSelectBtn = $("trackSelectBtn");
+  const trackMenu = $("trackMenu");
+  const trackOtherAdd = $("trackOtherAdd");
+
   function getSelectedTracks() {
-    const tracks = [];
-    trackCheckboxes.forEach((cb) => {
-      if (cb.checked && cb.value !== "other") tracks.push(cb.value);
-    });
-    if (trackOtherCb.checked) {
-      inputTrackOther.value
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .forEach((t) => tracks.push(t));
-    }
-    return tracks;
+    return Array.from(selectedTracks);
   }
+
+  // Merge built-ins with any tracks already used by live students on the site.
+  function collectKnownTracks() {
+    const set = new Set(BUILTIN_TRACKS);
+    if (Array.isArray(window.STUDENTS)) {
+      window.STUDENTS.forEach((s) => {
+        const t = Array.isArray(s.track) ? s.track : [s.track];
+        t.forEach((x) => { if (x) set.add(x); });
+      });
+    }
+    // Always include whatever's currently selected (e.g. a just-added custom one).
+    selectedTracks.forEach((x) => set.add(x));
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }
+
+  function renderTrackMenu() {
+    if (!trackMenu) return;
+    const otherRow = trackMenu.querySelector(".track-menu-other");
+    // Clear existing option rows (keep the "other" input row).
+    trackMenu.querySelectorAll(".track-option").forEach((el) => el.remove());
+    const frag = document.createDocumentFragment();
+    collectKnownTracks().forEach((t) => {
+      const row = document.createElement("label");
+      row.className = "track-option";
+      const checked = selectedTracks.has(t) ? "checked" : "";
+      row.innerHTML = `<input type="checkbox" value="${t.replace(/"/g, "&quot;")}" ${checked}> <span>${t}</span>`;
+      row.querySelector("input").addEventListener("change", (e) => {
+        if (e.target.checked) selectedTracks.add(t); else selectedTracks.delete(t);
+        renderTrackChips();
+        updateTrackBtnLabel();
+      });
+      frag.appendChild(row);
+    });
+    trackMenu.insertBefore(frag, otherRow);
+  }
+
+  function updateTrackBtnLabel() {
+    if (!trackSelectBtn) return;
+    const ph = trackSelectBtn.querySelector(".track-select-placeholder");
+    if (!ph) return;
+    const n = selectedTracks.size;
+    ph.textContent = n === 0 ? "Select your track(s)…" : `${n} track${n > 1 ? "s" : ""} selected`;
+    ph.classList.toggle("has-value", n > 0);
+  }
+
   function renderTrackChips() {
+    if (!trackChips) return;
     trackChips.innerHTML = "";
     getSelectedTracks().forEach((t) => {
       const c = document.createElement("span");
-      c.className = "chip";
-      c.textContent = t;
+      c.className = "chip chip-removable";
+      c.innerHTML = `<span>${t}</span><button type="button" class="chip-x" aria-label="Remove ${t}">✕</button>`;
+      c.querySelector(".chip-x").addEventListener("click", () => {
+        selectedTracks.delete(t);
+        renderTrackChips();
+        renderTrackMenu();
+        updateTrackBtnLabel();
+      });
       trackChips.appendChild(c);
     });
   }
-  trackCheckboxes.forEach((cb) => {
-    cb.addEventListener("change", () => {
-      if (cb.id === "trackOtherCb") {
-        inputTrackOther.classList.toggle("hidden", !cb.checked);
-        if (cb.checked) inputTrackOther.focus();
-      }
-      renderTrackChips();
+
+  // Dropdown open/close
+  if (trackSelectBtn && trackMenu) {
+    trackSelectBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const open = trackMenu.classList.toggle("open");
+      trackSelectBtn.setAttribute("aria-expanded", open ? "true" : "false");
+      if (open) renderTrackMenu();
     });
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest("#trackSelect")) {
+        trackMenu.classList.remove("open");
+        trackSelectBtn.setAttribute("aria-expanded", "false");
+      }
+    });
+  }
+
+  // Add a custom track from the "Other" input.
+  function addCustomTrack() {
+    const val = (inputTrackOther.value || "").trim();
+    if (!val) return;
+    val.split(",").map((s) => s.trim()).filter(Boolean).forEach((t) => selectedTracks.add(t));
+    inputTrackOther.value = "";
+    renderTrackMenu();
+    renderTrackChips();
+    updateTrackBtnLabel();
+  }
+  if (trackOtherAdd) trackOtherAdd.addEventListener("click", addCustomTrack);
+  if (inputTrackOther) {
+    inputTrackOther.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); addCustomTrack(); }
+    });
+  }
+
+  // Expose so hydrateProfileForm()/prefillTracks() (outside this closure) can
+  // set the selection programmatically when editing an existing profile.
+  window._setSelectedTracks = (tracks) => {
+    selectedTracks.clear();
+    (Array.isArray(tracks) ? tracks : [tracks]).forEach((t) => { if (t) selectedTracks.add(t); });
+    renderTrackMenu();
+    renderTrackChips();
+    updateTrackBtnLabel();
+  };
+  window._renderTrackChips = renderTrackChips;
+
+  /* — Skills multi-select (grouped by category, searchable, custom add) — */
+  const selectedSkills = new Set();
+  const customSkills = new Set();   // session-added customs to keep them listed
+  const skillSelectBtn = $("skillSelectBtn");
+  const skillMenu = $("skillMenu");
+  const skillSearch = $("skillSearch");
+  const skillChips = $("skillChips");
+  const inputSkillOther = $("inputSkillOther");
+  const skillOtherAdd = $("skillOtherAdd");
+
+  function getSelectedSkills() { return Array.from(selectedSkills); }
+
+  // Merge built-in categories with any custom skills seen on the site + session.
+  function skillCategories() {
+    const cats = {};
+    Object.entries(SKILL_CATEGORIES).forEach(([k, v]) => { cats[k] = [...v]; });
+    const extras = new Set(customSkills);
+    if (Array.isArray(window.STUDENTS)) {
+      window.STUDENTS.forEach((s) => (s.skills || []).forEach((x) => { if (x) extras.add(x); }));
+    }
+    selectedSkills.forEach((x) => extras.add(x));
+    // Anything not already in a built-in category goes under "Other".
+    const builtins = new Set(Object.values(SKILL_CATEGORIES).flat().map((x) => x.toLowerCase()));
+    const otherList = [...extras].filter((x) => !builtins.has(x.toLowerCase()));
+    if (otherList.length) cats["Other"] = otherList.sort((a, b) => a.localeCompare(b));
+    return cats;
+  }
+
+  function renderSkillMenu(filter = "") {
+    if (!skillMenu) return;
+    const search = skillMenu.querySelector(".track-menu-search");
+    const otherRow = skillMenu.querySelector(".track-menu-other");
+    skillMenu.querySelectorAll(".track-group").forEach((el) => el.remove());
+    const q = filter.trim().toLowerCase();
+    const frag = document.createDocumentFragment();
+    Object.entries(skillCategories()).forEach(([cat, list]) => {
+      const matches = list.filter((s) => !q || s.toLowerCase().includes(q));
+      if (!matches.length) return;
+      const group = document.createElement("div");
+      group.className = "track-group";
+      group.innerHTML = `<div class="track-group-title">${cat}</div>`;
+      matches.forEach((s) => {
+        const row = document.createElement("label");
+        row.className = "track-option";
+        row.innerHTML = `<input type="checkbox" value="${s.replace(/"/g, "&quot;")}" ${selectedSkills.has(s) ? "checked" : ""}> <span>${s}</span>`;
+        row.querySelector("input").addEventListener("change", (e) => {
+          if (e.target.checked) selectedSkills.add(s); else selectedSkills.delete(s);
+          renderSkillChips(); updateSkillBtnLabel();
+        });
+        group.appendChild(row);
+      });
+      frag.appendChild(group);
+    });
+    // Insert groups between the search row and the "other" row.
+    skillMenu.insertBefore(frag, otherRow);
+    if (search && !skillMenu.contains(search)) skillMenu.insertBefore(search, skillMenu.firstChild);
+  }
+
+  function updateSkillBtnLabel() {
+    if (!skillSelectBtn) return;
+    const ph = skillSelectBtn.querySelector(".track-select-placeholder");
+    if (!ph) return;
+    const n = selectedSkills.size;
+    ph.textContent = n === 0 ? "Add your skills…" : `${n} skill${n > 1 ? "s" : ""} selected`;
+    ph.classList.toggle("has-value", n > 0);
+  }
+
+  function renderSkillChips() {
+    if (!skillChips) return;
+    skillChips.innerHTML = "";
+    getSelectedSkills().forEach((s) => {
+      const c = document.createElement("span");
+      c.className = "chip chip-removable chip-skill";
+      c.innerHTML = `<span>${s}</span><button type="button" class="chip-x" aria-label="Remove ${s}">✕</button>`;
+      c.querySelector(".chip-x").addEventListener("click", () => {
+        selectedSkills.delete(s); renderSkillChips(); renderSkillMenu(skillSearch ? skillSearch.value : ""); updateSkillBtnLabel();
+      });
+      skillChips.appendChild(c);
+    });
+  }
+
+  if (skillSelectBtn && skillMenu) {
+    skillSelectBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const open = skillMenu.classList.toggle("open");
+      skillSelectBtn.setAttribute("aria-expanded", open ? "true" : "false");
+      if (open) { renderSkillMenu(); if (skillSearch) { skillSearch.value = ""; skillSearch.focus(); } }
+    });
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest("#skillSelect")) {
+        skillMenu.classList.remove("open");
+        skillSelectBtn.setAttribute("aria-expanded", "false");
+      }
+    });
+  }
+  if (skillSearch) skillSearch.addEventListener("input", () => renderSkillMenu(skillSearch.value));
+
+  function addCustomSkill() {
+    const val = (inputSkillOther.value || "").trim();
+    if (!val) return;
+    val.split(",").map((s) => s.trim()).filter(Boolean).forEach((s) => { customSkills.add(s); selectedSkills.add(s); });
+    inputSkillOther.value = "";
+    renderSkillMenu(); renderSkillChips(); updateSkillBtnLabel();
+  }
+  if (skillOtherAdd) skillOtherAdd.addEventListener("click", addCustomSkill);
+  if (inputSkillOther) inputSkillOther.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); addCustomSkill(); }
   });
-  inputTrackOther.addEventListener("input", renderTrackChips);
+
+  window._getSelectedSkills = getSelectedSkills;
+  window._setSelectedSkills = (skills) => {
+    selectedSkills.clear();
+    (Array.isArray(skills) ? skills : [skills]).forEach((s) => { if (s) selectedSkills.add(s); });
+    renderSkillChips(); updateSkillBtnLabel();
+  };
 
   /* — Validation — */
   function isValidUrl(str) {
@@ -394,6 +862,9 @@ function initSubmissionForm() {
     if (formState.submissionType === "student") {
       req(inputName, "Full Name is required.");
       req(inputGender, "Please select a gender.");
+      if (!readSelectWithOther("inputUniversity")) errors.push("Please choose your University.");
+      if (!readSelectWithOther("inputFaculty")) errors.push("Please choose your Faculty.");
+      if (!readSelectWithOther("inputDepartment")) errors.push("Please choose your Department.");
       if (getSelectedTracks().length === 0) errors.push("At least one Track is required.");
       [
         { el: $("inputLinkedin"), l: "LinkedIn" },
@@ -414,6 +885,9 @@ function initSubmissionForm() {
         if (inputCategory.value === "other") req(inputCategoryOther, "Please specify the custom category.");
       }
       req(inputIcon, "Project Icon is required.");
+      if (!readSelectWithOther("pjUniversity")) errors.push("Please choose the University.");
+      if (!readSelectWithOther("pjFaculty")) errors.push("Please choose the Faculty.");
+      if (!readSelectWithOther("pjDepartment")) errors.push("Please choose the Department.");
       let hasLeader = false;
       let emptyName = false;
       const rows = teamMembersList.querySelectorAll(".team-member-row");
@@ -485,6 +959,87 @@ function initSubmissionForm() {
     await set(pendingRef, entry);
   }
 
+  /* — Shape the form data into a /profiles/{uid} object — */
+  function buildProfileObject(data) {
+    return {
+      uid: currentUser.uid,
+      email: currentUser.email || "",
+      name: data.name,
+      gender: data.gender,
+      photo: data.photo || "",
+      tracks: data.tracks || [],
+      skills: data.skills || [],
+      color: data.color || formState.selectedColor,
+      university: data.university,
+      faculty: data.faculty,
+      department: data.department,
+      classYear: data.classYear,
+      social: {
+        linkedin: data.linkedin || "",
+        github: data.github || "",
+        whatsapp: data.whatsapp || "",
+        facebook: data.facebook || "",
+      },
+    };
+  }
+
+  /*
+   * Save the student's profile to /profiles/{uid}.
+   *  • New profile (or still pending) → status "pending" + a /pending entry
+   *    so the admin can approve it the first time.
+   *  • Already-approved profile (status "live") → write straight to /profiles
+   *    (and let the merge in fetchFirebaseData surface it). No re-approval.
+   * Returns true if the save is live, false if it went to the approval queue.
+   */
+  async function saveStudentProfile(data) {
+    if (!currentUser) throw new Error("You must sign in first.");
+
+    // Admin adding someone else directly → write a live, name-keyed /students
+    // record (no profile, no approval). Returns live=true.
+    if (adminAddMode && isAdmin) {
+      const rec = buildLiveRecord({ ...data, type: "student" });
+      await set(ref(db, `${rec.node}/${rec.key}`), rec.payload);
+      return true;
+    }
+
+    const uid = currentUser.uid;
+    const wasLive = myProfile && myProfile.status === "live";
+    const base = buildProfileObject(data);
+    const now = Date.now();
+
+    if (wasLive) {
+      await set(ref(db, `profiles/${uid}`), {
+        ...base,
+        status: "live",
+        createdAt: myProfile.createdAt || now,
+        updatedAt: now,
+      });
+      return true;
+    }
+
+    // New or pending: store the profile as pending + queue it for approval.
+    await set(ref(db, `profiles/${uid}`), {
+      ...base,
+      status: "pending",
+      createdAt: (myProfile && myProfile.createdAt) || now,
+      updatedAt: now,
+    });
+    // Upsert a single pending entry keyed by uid so repeated edits don't pile up.
+    await set(ref(db, `pending/profile_${uid}`), {
+      type: "student",
+      status: "pending",
+      submittedByUid: uid,
+      submittedByEmail: currentUser.email || "",
+      submittedByName: currentUser.displayName || "",
+      createdAt: now,
+      payload: { ...data, ownerUid: uid },
+    });
+    return false;
+  }
+
+  // Expose for hydrateProfileForm() (defined outside this closure).
+  window._buildProfileObject = buildProfileObject;
+
   /* — Main submit handler — */
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -505,9 +1060,12 @@ function initSubmissionForm() {
     let data;
     if (formState.submissionType === "student") {
       const inputName = $("inputName");
+      // Keep the existing photo if the user didn't pick a new one (edit mode).
       if (formState.photoFile) {
         const firstName = inputName.value.trim().split(/\s+/)[0];
         formState.photoPath = sanitiseFileName(`${firstName}.webp`);
+      } else if (myProfile && myProfile.photo) {
+        formState.photoPath = myProfile.photo;
       }
       data = {
         type: "student",
@@ -515,7 +1073,12 @@ function initSubmissionForm() {
         gender: $("inputGender").value,
         photo: formState.photoPath,
         tracks: getSelectedTracks(),
+        skills: getSelectedSkills(),
         color: formState.selectedColor,
+        university: readSelectWithOther("inputUniversity"),
+        faculty: readSelectWithOther("inputFaculty"),
+        department: readSelectWithOther("inputDepartment"),
+        classYear: $("inputClassYear").value,
         linkedin: $("inputLinkedin").value.trim(),
         github: $("inputGithub").value.trim(),
         whatsapp: $("inputWhatsapp").value.trim(),
@@ -531,7 +1094,16 @@ function initSubmissionForm() {
       });
       const finalCategory =
         inputCategory.value === "other" ? inputCategoryOther.value.trim() : inputCategory.value;
-      data = { type: "project", category: finalCategory, icon: $("inputIcon").value.trim(), team };
+      data = {
+        type: "project",
+        category: finalCategory,
+        icon: $("inputIcon").value.trim(),
+        team,
+        university: readSelectWithOther("pjUniversity"),
+        faculty: readSelectWithOther("pjFaculty"),
+        department: readSelectWithOther("pjDepartment"),
+        classYear: $("pjClassYear").value,
+      };
     }
 
     // Start
@@ -565,28 +1137,61 @@ function initSubmissionForm() {
       }
       markStep($("step-photo"), stepPhotoStatus, true);
 
-      // B — Save to /pending
-      btnGenerate.querySelector(".btn-label").textContent = "⏳ Submitting…";
-      await submitToPending(data);
+      // B — Save. Students = profile (create→pending / edit→live-direct);
+      //         Projects = pending queue (admin approves).
+      btnGenerate.querySelector(".btn-label").textContent = "⏳ Saving…";
+      let savedLive = false;
+      if (data.type === "student") {
+        savedLive = await saveStudentProfile(data);
+      } else {
+        await submitToPending(data);
+      }
       markStep($("step-code"), stepCodeStatus, true);
       setProgress(100);
 
+      // Success copy depends on whether it went live or to the queue.
+      const fsTitle = firebaseSuccess.querySelector(".fs-title");
+      if (fsTitle) {
+        fsTitle.textContent = adminAddMode
+          ? "Student added — now live on the site."
+          : savedLive
+            ? "Saved! Your changes are now live on the site."
+            : "Submitted! It will appear once an admin approves it.";
+      }
       firebaseSuccess.classList.remove("hidden");
-      form.reset();
-      removePhoto();
-      renderTrackChips();
-      // Re-prefill name after reset
-      if ($("inputName") && currentUser) $("inputName").value = currentUser.displayName || "";
+
+      if (adminAddMode) {
+        // Admin added someone else: clear the form for the next add.
+        form.reset();
+        removePhoto();
+        renderTrackChips();
+        if (typeof window._setSelectedTracks === "function") window._setSelectedTracks([]);
+        if (typeof window.fetchFirebaseData === "function") window.fetchFirebaseData();
+      } else if (data.type === "project") {
+        // Projects: clear the form for another submission.
+        form.reset();
+        removePhoto();
+        renderTrackChips();
+        if ($("inputName") && currentUser) $("inputName").value = currentUser.displayName || "";
+      } else {
+        // Students: keep the form populated (it's their profile now).
+        myProfile = { ...(myProfile || {}), ...buildProfileObject(data), status: savedLive ? "live" : "pending" };
+        // (buildProfileObject is in this closure; hydrate reads myProfile.)
+        hydrateProfileForm();
+        // Refresh the live site so an edit shows immediately.
+        if (savedLive && typeof window.fetchFirebaseData === "function") window.fetchFirebaseData();
+      }
       setTimeout(() => uploadProgress.classList.add("hidden"), 1600);
     } catch (err) {
       console.error("Submit error:", err);
-      showValidation([`❌ Submission failed: ${err.message}`]);
+      showValidation([`❌ Save failed: ${err.message}`]);
       validationErrors.scrollIntoView({ behavior: "smooth", block: "center" });
       markStep($("step-photo"), stepPhotoStatus, false);
     } finally {
       formState.isUploading = false;
       btnGenerate.disabled = false;
-      btnGenerate.querySelector(".btn-label").textContent = "⚡ Submit for Approval";
+      // Restore the contextual button label.
+      hydrateProfileForm();
     }
   });
 
@@ -595,6 +1200,10 @@ function initSubmissionForm() {
     const el = $(id);
     if (el) el.addEventListener("input", () => el.classList.remove("invalid"));
   });
+
+  // Populate the institution selects up-front so they're ready before sign-in.
+  populateInstitutionSelects(null);
+  renderTrackMenu();
 }
 
 /* — Image compression (Canvas → WebP) — */
@@ -646,15 +1255,23 @@ function fileToBase64(file) {
 /** Build the live record (key + node + payload) from a submission's data. */
 function buildLiveRecord(data) {
   if (data.type === "student") {
+    // Key by ownerUid when available so two students with the same name don't
+    // collide; fall back to the sanitized name for legacy/admin-added records.
     return {
       node: "students",
-      key: sanitizeKey(data.name),
+      key: data.ownerUid || sanitizeKey(data.name),
       payload: {
         name: data.name,
         photo: data.photo || "",
         track: data.tracks || [],
+        skills: data.skills || [],
         color: data.color,
         gender: data.gender,
+        university: data.university || "",
+        faculty: data.faculty || "",
+        department: data.department || "",
+        classYear: data.classYear || "",
+        ownerUid: data.ownerUid || "",
         social: {
           linkedin: data.linkedin || "",
           github: data.github || "",
@@ -681,7 +1298,15 @@ function buildLiveRecord(data) {
   return {
     node: "projects",
     key: `${catKey}_${leaderKey}`,
-    payload: { category: data.category, icon: data.icon, team: teamObj },
+    payload: {
+      category: data.category,
+      icon: data.icon,
+      team: teamObj,
+      university: data.university || "",
+      faculty: data.faculty || "",
+      department: data.department || "",
+      classYear: data.classYear || "",
+    },
   };
 }
 
@@ -799,6 +1424,15 @@ async function approve(id, btn) {
   try {
     const rec = buildLiveRecord(entry.payload);
     await set(ref(db, `${rec.node}/${rec.key}`), rec.payload);
+    // If this came from a Google-linked student profile, flip it to "live"
+    // so future self-edits show instantly without re-approval.
+    const ownerUid = entry.payload.ownerUid || entry.submittedByUid;
+    if (entry.payload.type === "student" && ownerUid) {
+      const snap = await get(ref(db, `profiles/${ownerUid}`));
+      if (snap.exists()) {
+        await set(ref(db, `profiles/${ownerUid}/status`), "live");
+      }
+    }
     await remove(ref(db, `pending/${id}`));
     delete pendingCache[id];
     renderPending();
@@ -825,6 +1459,31 @@ async function reject(id, btn) {
     btn.disabled = false;
   }
 }
+
+/*
+ * Admin-only: permanently remove a student from the yearbook.
+ * Deletes both the live /profiles/{uid} (if any) and the /students/{key}
+ * mirror, then refreshes the site. Exposed on window for script.js cards.
+ */
+async function adminDeleteStudent(student) {
+  if (!isAdmin) return;
+  if (!confirm(`Permanently delete "${student.name}" from the yearbook?`)) return;
+  try {
+    const ops = [];
+    if (student.ownerUid) {
+      ops.push(remove(ref(db, `profiles/${student.ownerUid}`)));
+      ops.push(remove(ref(db, `students/${student.ownerUid}`)));
+    }
+    // Also clear any name-keyed legacy record.
+    ops.push(remove(ref(db, `students/${sanitizeKey(student.name)}`)));
+    await Promise.all(ops);
+    if (typeof window.fetchFirebaseData === "function") window.fetchFirebaseData();
+  } catch (err) {
+    console.error("Delete failed:", err);
+    alert("Delete failed: " + err.message);
+  }
+}
+window.adminDeleteStudent = adminDeleteStudent;
 
 /* ════════════════════════════════════════════
    § 5 — WIRE UP
@@ -859,12 +1518,29 @@ function init() {
   // the latest pending list. The inline onclick already calls switchMode;
   // here we just close the menu and refresh on open.
   const menuSubmit = $("menuSubmitBtn");
-  if (menuSubmit) menuSubmit.addEventListener("click", () => closeUserMenu());
+  if (menuSubmit) menuSubmit.addEventListener("click", () => {
+    closeUserMenu();
+    adminAddMode = false;     // editing my own profile, not admin-adding
+    hydrateProfileForm();
+  });
   const menuAdmin = $("menuAdminBtn");
   if (menuAdmin) menuAdmin.addEventListener("click", () => { closeUserMenu(); if (isAdmin) loadPending(); });
 
   const refreshBtn = $("adminRefreshBtn");
   if (refreshBtn) refreshBtn.addEventListener("click", loadPending);
+
+  // Admin: "Add a student directly" opens the form in admin-add mode.
+  const adminAddBtn = $("adminAddBtn");
+  if (adminAddBtn) adminAddBtn.addEventListener("click", () => {
+    if (!isAdmin) return;
+    adminAddMode = true;
+    if (typeof window.switchMode === "function") window.switchMode("submit");
+    // Make sure the gate is bypassed (admin is signed in) and form is blank.
+    const gate = $("submitLoginGate"); if (gate) gate.style.display = "none";
+    const wrap = $("submitFormWrap"); if (wrap) wrap.style.display = "block";
+    const f = $("submissionForm"); if (f) f.reset();
+    hydrateProfileForm();
+  });
 
   initSubmissionForm();
   updateAuthUI();
