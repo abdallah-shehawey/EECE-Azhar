@@ -9,3 +9,6 @@ scripts/set-student-emails.mjs
 # OS / editor cruft
 .DS_Store
 node_modules/
+
+# Throwaway local preview/screenshot scaffolds (generated from index.html)
+_*.html
