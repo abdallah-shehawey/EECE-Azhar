@@ -130,7 +130,7 @@
                             <svg class="chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
                         </button>
                         <div id="userDropdown" class="user-dropdown" role="menu" aria-label="Account menu">
-                            <button id="menuSubmitBtn" class="menu-item" type="button" role="menuitem" onclick="switchMode('submit')">
+                            <button id="menuSubmitBtn" class="menu-item" type="button" role="menuitem">
                                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
                                 <span>Submit my data</span>
                             </button>
@@ -169,7 +169,7 @@
                     to the big day — together.
                 </p>
                 <div class="home-cta">
-                    <button class="home-cta-primary" id="homeProfileCta" type="button" onclick="switchMode('submit')">Create your profile</button>
+                    <button class="home-cta-primary" id="homeProfileCta" type="button">Create your profile</button>
                     <button class="home-cta-secondary" type="button" onclick="switchMode('yearbook')">Browse the Yearbook</button>
                 </div>
             </section>
@@ -300,49 +300,46 @@
                 </h2>
                 <p class="yearbook-subtitle">Electronics &amp; Communication · Faculty of Engineering · Al-Azhar University</p>
 
-                <!-- Hierarchical filters: University › Faculty › Department › Year
-                     Each <select> only lists values that actually have students.
-                     Built/managed by buildYearbookFilters() in script.js. -->
-                <div class="yearbook-filters" id="yearbookFilters">
-                    <label class="yb-filter">
-                        <span class="yb-filter-label">University</span>
-                        <select class="yb-select" id="filterUniversity" aria-label="Filter by university"></select>
-                    </label>
-                    <label class="yb-filter">
-                        <span class="yb-filter-label">Faculty</span>
-                        <select class="yb-select" id="filterFaculty" aria-label="Filter by faculty"></select>
-                    </label>
-                    <label class="yb-filter">
-                        <span class="yb-filter-label">Department</span>
-                        <select class="yb-select" id="filterDepartment" aria-label="Filter by department"></select>
-                    </label>
-                    <label class="yb-filter">
-                        <span class="yb-filter-label">Class</span>
-                        <select class="yb-select" id="filterClassYear" aria-label="Filter by class year"></select>
-                    </label>
-                    <div class="gender-toggle" id="genderToggle" role="group" aria-label="Filter by gender">
-                        <button type="button" class="gender-btn active" data-gender="all">All</button>
-                        <button type="button" class="gender-btn" data-gender="male">Male</button>
-                        <button type="button" class="gender-btn" data-gender="female">Female</button>
+                <!-- Search row: text search + a Filter button on the far right.
+                     The button opens a popover where you choose what to filter on
+                     (University / Faculty / Department / Track). Each option only
+                     appears if real people match it, with a live count beside it.
+                     Built/managed by buildFilterPanel() in script.js. -->
+                <div class="yearbook-search-row">
+                    <div class="yearbook-search-wrapper">
+                        <span class="search-icon" aria-hidden="true">🔍</span>
+                        <input
+                            type="search"
+                            id="yearbookSearch"
+                            class="yearbook-search"
+                            placeholder="Search by name or track..."
+                            aria-label="Search students by name or track"
+                            autocomplete="off"
+                            oninput="filterStudents(this.value)"
+                        />
+                    </div>
+                    <div class="yb-filter-wrap">
+                        <button type="button" class="yb-filter-btn" id="filterToggleBtn"
+                                aria-haspopup="dialog" aria-expanded="false" aria-controls="filterPanel">
+                            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+                            <span>Filter</span>
+                            <span class="yb-filter-count" id="filterCount" style="display:none;">0</span>
+                        </button>
+
+                        <!-- Filter popover -->
+                        <div class="filter-panel" id="filterPanel" role="dialog" aria-label="Filter students" style="display:none;">
+                            <div class="filter-panel-head">
+                                <span class="filter-panel-title">Filter by</span>
+                                <button type="button" class="filter-clear" id="filterClearBtn">Clear all</button>
+                            </div>
+                            <!-- Filter groups rendered by buildFilterPanel() -->
+                            <div class="filter-groups" id="filterGroups"></div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="yearbook-stats" id="yearbookStats">
-                    <!-- Rendered by JS -->
-                </div>
-
-                <div class="yearbook-search-wrapper">
-                    <span class="search-icon" aria-hidden="true">🔍</span>
-                    <input
-                        type="search"
-                        id="yearbookSearch"
-                        class="yearbook-search"
-                        placeholder="Search by name or track..."
-                        aria-label="Search students by name or track"
-                        autocomplete="off"
-                        oninput="filterStudents(this.value)"
-                    />
-                </div>
+                <!-- Active filter chips (rendered by renderActiveFilterChips) -->
+                <div class="active-filters" id="activeFilters"></div>
             </div>
 
             <div class="students-grid" id="studentsGrid">
@@ -495,6 +492,24 @@
 
                     <!-- STUDENT -->
                     <div id="studentFormContainer" class="form-section active">
+                        <!-- Profile-style header: editable cover + avatar. Click
+                             either to upload. Wired in portal.js (initSubmissionForm). -->
+                        <div class="edit-profile-head">
+                            <button type="button" class="edit-cover" id="editCover" aria-label="Change cover photo">
+                                <span class="edit-cover-hint">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                                    Edit cover photo
+                                </span>
+                            </button>
+                            <button type="button" class="edit-avatar" id="editAvatar" aria-label="Change profile photo">
+                                <span class="edit-avatar-initials" id="editAvatarInitials"></span>
+                                <span class="edit-avatar-cam" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                                </span>
+                            </button>
+                        </div>
+                        <input type="file" id="coverInput" accept="image/*" class="hidden-file" aria-hidden="true" tabindex="-1" />
+
                         <div class="field-group">
                             <label for="inputName" class="field-label">Full Name <span class="required">*</span></label>
                             <input type="text" id="inputName" class="field-input" placeholder="e.g. Abdallah Shehawey" autocomplete="name" />
@@ -540,7 +555,10 @@
                                 <option value="female">Female</option>
                             </select>
                         </div>
-                        <div class="field-group">
+                        <!-- Legacy photo uploader — hidden now that the avatar at
+                             the top handles photo upload. Kept in the DOM because
+                             initSubmissionForm() still wires these elements. -->
+                        <div class="field-group" id="legacyPhotoField" style="display:none;">
                             <label class="field-label">Photo <span class="field-hint" style="display:inline; margin-left:5px;">(Optional)</span></label>
                             <div id="dropZone" class="drop-zone" role="button" tabindex="0" aria-label="Upload photo — click or drag and drop">
                                 <div class="drop-zone-idle" id="dropIdle">
@@ -782,7 +800,7 @@
             </button>
 
             <!-- Cover + header -->
-            <div class="fp-cover"></div>
+            <div class="fp-cover" id="fpCover"></div>
             <div class="fp-header">
                 <div class="fp-avatar" id="fpAvatar"></div>
                 <div class="fp-headtext">

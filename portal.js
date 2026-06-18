@@ -424,13 +424,21 @@ function hydrateProfileForm() {
   }
   if (typeToggle) typeToggle.style.display = "";
 
-  // Existing profile + not actively editing → show the read-only view card.
+  // Existing profile + not actively editing → show the Facebook-style full
+  // profile page (same layout used when opening someone's card), instead of the
+  // old read-only form card. The owner's Edit button on that page comes back here.
   const profileView = $("profileView");
   const formWrap = $("submitFormWrap");
   if (myProfile && !editMode) {
-    renderProfileView();
-    if (profileView) profileView.style.display = "block";
+    if (profileView) profileView.style.display = "none";
     if (formWrap) formWrap.style.display = "none";
+    if (typeof window.openFullProfile === "function") {
+      window.openFullProfile(profileToStudent(myProfile), { returnMode: "home" });
+    } else {
+      // Fallback to the legacy view card if the full-profile module isn't ready.
+      renderProfileView();
+      if (profileView) profileView.style.display = "block";
+    }
     return;
   }
   if (profileView) profileView.style.display = "none";
@@ -453,6 +461,14 @@ function hydrateProfileForm() {
     if (typeof window._setSelectedSkills === "function") window._setSelectedSkills(myProfile.skills || []);
     // Existing photo preview
     if (myProfile.photo) showExistingPhoto(myProfile.photo);
+    // Carry the existing cover path so an edit that doesn't change the cover
+    // keeps it; paint the profile-style header (avatar + cover) for editing.
+    formState.coverFile = null;
+    formState.coverPath = myProfile.cover || "";
+    if (typeof window._setEditHeader === "function") {
+      const toUrl = (p) => p ? (String(p).startsWith("http") ? p : `${R2_BASE}/${p}`) : "";
+      window._setEditHeader(toUrl(myProfile.photo), toUrl(myProfile.cover));
+    }
 
     const live = myProfile.status === "live";
     if (titleEl) titleEl.textContent = "Your Profile";
@@ -473,6 +489,9 @@ function hydrateProfileForm() {
     if (subEl) subEl.textContent = "Fill in your details — your card goes live once an admin approves it ✅";
     if (btnLabel) btnLabel.textContent = "⚡ Create profile";
     if (badge) badge.style.display = "none";
+    formState.coverFile = null;
+    formState.coverPath = "";
+    if (typeof window._resetEditHeader === "function") window._resetEditHeader();
   }
 
   renderMyProjects();
@@ -502,6 +521,22 @@ function renderMyProjects() {
       <div class="my-project-team">${mates}</div>
     </div>`;
   }).join("");
+}
+
+/**
+ * Map the signed-in user's /profiles record to the student shape that
+ * openFullProfile() expects (it reads `track`, not `tracks`, and needs
+ * ownerUid so the owner's Edit button appears).
+ */
+function profileToStudent(p) {
+  if (!p) return null;
+  return {
+    ...p,
+    track: p.tracks || p.track || [],
+    skills: p.skills || [],
+    social: p.social || {},
+    ownerUid: p.ownerUid || p.uid || (currentUser && currentUser.uid) || "",
+  };
 }
 
 /** Render the read-only profile view card (photo → name → meta → tracks → skills → links). */
@@ -666,6 +701,8 @@ let formState = {
   submissionType: "student",
   photoFile: null,
   photoPath: "",
+  coverFile: null,      // pending cover-photo upload (edit-page header)
+  coverPath: "",        // R2 path of the current/new cover photo
   selectedColor: "linear-gradient(135deg, #ef4444, #b91c1c)",
   isUploading: false,
 };
@@ -693,6 +730,10 @@ function initSubmissionForm() {
   const photoFileName = $("photoFileName");
   const photoPathDisplay = $("photoPathDisplay");
   const btnRemovePhoto = $("btnRemovePhoto");
+  const editAvatar = $("editAvatar");
+  const editAvatarInitials = $("editAvatarInitials");
+  const editCover = $("editCover");
+  const coverInput = $("coverInput");
   const btnGenerate = $("btnGenerate");
   const uploadProgress = $("uploadProgress");
   const progressBar = $("progressBar");
@@ -764,6 +805,25 @@ function initSubmissionForm() {
   );
 
   /* — Photo drag / drop / preview — */
+  // Mirror the chosen/loaded photo onto the profile-style avatar at the top of
+  // the form (the avatar is what users click now; the old drop-zone is hidden).
+  function setEditAvatarImage(src) {
+    if (!editAvatar) return;
+    if (src) {
+      editAvatar.style.backgroundImage = `url("${src}")`;
+      editAvatar.classList.add("has-photo");
+      if (editAvatarInitials) editAvatarInitials.textContent = "";
+    } else {
+      editAvatar.style.backgroundImage = "";
+      editAvatar.classList.remove("has-photo");
+      if (editAvatarInitials) editAvatarInitials.textContent = currentInitials();
+    }
+  }
+  function currentInitials() {
+    const nm = ($("inputName") && $("inputName").value) || (currentUser && currentUser.displayName) || "";
+    return nm.split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
+  }
+
   function applyPhoto(file) {
     if (!file || !file.type.startsWith("image/")) return;
     if (file.size > 5 * 1024 * 1024) {
@@ -778,6 +838,7 @@ function initSubmissionForm() {
       photoPathDisplay.textContent = "📂 Path will be generated using your first name";
       dropIdle.classList.add("hidden");
       dropPreview.classList.remove("hidden");
+      setEditAvatarImage(e.target.result);
     };
     reader.readAsDataURL(file);
   }
@@ -789,7 +850,32 @@ function initSubmissionForm() {
     photoPathDisplay.textContent = "Generated path will appear here after upload";
     dropIdle.classList.remove("hidden");
     dropPreview.classList.add("hidden");
+    setEditAvatarImage("");
   }
+
+  /* — Cover photo (edit-page header banner) — */
+  function setEditCoverImage(src) {
+    if (!editCover) return;
+    if (src) {
+      editCover.style.backgroundImage = `url("${src}")`;
+      editCover.classList.add("has-cover");
+    } else {
+      editCover.style.backgroundImage = "";
+      editCover.classList.remove("has-cover");
+    }
+  }
+  function applyCover(file) {
+    if (!file || !file.type.startsWith("image/")) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showValidation(["Cover photo must be under 5 MB."]);
+      return;
+    }
+    formState.coverFile = file;
+    const reader = new FileReader();
+    reader.onload = (e) => setEditCoverImage(e.target.result);
+    reader.readAsDataURL(file);
+  }
+
   dropZone.addEventListener("click", () => photoInput.click());
   dropZone.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === " ") photoInput.click();
@@ -811,6 +897,26 @@ function initSubmissionForm() {
     e.stopPropagation();
     removePhoto();
   });
+
+  // Profile-style header: clicking the avatar uploads a photo, clicking the
+  // cover uploads a cover banner. Both feed the existing upload pipeline.
+  if (editAvatar) editAvatar.addEventListener("click", () => photoInput.click());
+  if (editCover) editCover.addEventListener("click", () => coverInput && coverInput.click());
+  if (coverInput) coverInput.addEventListener("change", () => {
+    if (coverInput.files.length) applyCover(coverInput.files[0]);
+  });
+  // Keep avatar initials current as the name is typed (before a photo is set).
+  if ($("inputName")) $("inputName").addEventListener("input", () => {
+    if (editAvatar && !editAvatar.classList.contains("has-photo")) setEditAvatarImage("");
+  });
+
+  // Expose so hydrateProfileForm() (outside this closure) can paint the header
+  // for the existing profile when the edit form opens.
+  window._setEditHeader = (photoUrl, coverUrl) => {
+    setEditAvatarImage(photoUrl || "");
+    setEditCoverImage(coverUrl || "");
+  };
+  window._resetEditHeader = () => { setEditAvatarImage(""); setEditCoverImage(""); };
 
   /* — Track multi-select (dropdown + chips + custom tracks) — */
   // Built-in tracks always offered. Custom tracks discovered from existing
@@ -1184,6 +1290,7 @@ function initSubmissionForm() {
       name: data.name,
       gender: data.gender,
       photo: data.photo || "",
+      cover: data.cover || "",
       tracks: data.tracks || [],
       skills: data.skills || [],
       color: data.color || formState.selectedColor,
@@ -1286,11 +1393,19 @@ function initSubmissionForm() {
       } else if (myProfile && myProfile.photo) {
         formState.photoPath = myProfile.photo;
       }
+      // Cover photo: new upload → fresh path; otherwise keep whatever we had.
+      if (formState.coverFile) {
+        const firstName = inputName.value.trim().split(/\s+/)[0];
+        formState.coverPath = sanitiseFileName(`${firstName}-cover.webp`);
+      } else if (myProfile && myProfile.cover) {
+        formState.coverPath = formState.coverPath || myProfile.cover;
+      }
       data = {
         type: "student",
         name: inputName.value.trim(),
         gender: $("inputGender").value,
         photo: formState.photoPath,
+        cover: formState.coverPath || "",
         tracks: getSelectedTracks(),
         skills: getSelectedSkills(),
         color: formState.selectedColor,
@@ -1347,12 +1462,18 @@ function initSubmissionForm() {
     btnGenerate.querySelector(".btn-label").textContent = "⏳ Working…";
 
     try {
-      // A — Upload image (students only)
+      // A — Upload image(s) (students only): profile photo + optional cover.
       if (formState.submissionType === "student" && formState.photoFile) {
         btnGenerate.querySelector(".btn-label").textContent = "⏳ Compressing…";
         const compressed = await compressImage(formState.photoFile);
         btnGenerate.querySelector(".btn-label").textContent = "⏳ Uploading…";
         await uploadPhoto(compressed, formState.photoPath);
+      }
+      if (formState.submissionType === "student" && formState.coverFile) {
+        btnGenerate.querySelector(".btn-label").textContent = "⏳ Uploading cover…";
+        // Covers are wide banners — keep more width than the square avatar.
+        const compressedCover = await compressImage(formState.coverFile, 1600, 0.82);
+        await uploadPhoto(compressedCover, formState.coverPath);
       }
       markStep($("step-photo"), stepPhotoStatus, true);
 
@@ -1393,9 +1514,15 @@ function initSubmissionForm() {
         renderTrackChips();
         if ($("inputName") && currentUser) $("inputName").value = currentUser.displayName || "";
       } else {
-        // Students: profile saved — drop back to the read-only view card.
+        // Students: profile saved — return home and show the full profile view
+        // (so Back/close from the profile lands on a real page, not the now-empty
+        // submit form).
         myProfile = { ...(myProfile || {}), ...buildProfileObject(data), status: savedLive ? "live" : "pending" };
         editMode = false;
+        // Cover is now persisted on the profile — clear the pending upload so a
+        // later edit doesn't needlessly re-upload it.
+        formState.coverFile = null;
+        if (typeof window.switchMode === "function") window.switchMode("home");
         hydrateProfileForm();
         // Refresh the live site so an edit shows immediately.
         if (savedLive && typeof window.fetchFirebaseData === "function") window.fetchFirebaseData();
@@ -1734,13 +1861,38 @@ function init() {
   // (switchMode lives in script.js and is global.) Approvals also pulls
   // the latest pending list. The inline onclick already calls switchMode;
   // here we just close the menu and refresh on open.
-  const menuSubmit = $("menuSubmitBtn");
-  if (menuSubmit) menuSubmit.addEventListener("click", () => {
+  // "My profile" / "Create profile" entry points (account menu + home CTA).
+  // With an existing profile → open the Facebook-style full profile over the
+  // current page. Without one → go to the submit page's create form.
+  function openProfileEntry() {
     closeUserMenu();
-    adminAddMode = false;     // editing my own profile, not admin-adding
-    editMode = false;         // open in read-only view first (if a profile exists)
-    hydrateProfileForm();
+    adminAddMode = false;
+    editMode = false;
+    if (myProfile) {
+      openMyProfileView();
+    } else {
+      if (typeof window.switchMode === "function") window.switchMode("submit");
+      hydrateProfileForm();
+    }
+  }
+  const menuSubmit = $("menuSubmitBtn");
+  if (menuSubmit) menuSubmit.addEventListener("click", openProfileEntry);
+  const homeCtaBtn = $("homeProfileCta");
+  if (homeCtaBtn) homeCtaBtn.addEventListener("click", () => {
+    if (!currentUser) { if (typeof window.switchMode === "function") window.switchMode("submit"); return; }
+    openProfileEntry();
   });
+
+  // Open the owner's profile as the read-only full-profile overlay over the
+  // current page; Back/close returns home (the page underneath stays usable).
+  function openMyProfileView() {
+    if (!myProfile || typeof window.openFullProfile !== "function") {
+      hydrateProfileForm();
+      return;
+    }
+    window.openFullProfile(profileToStudent(myProfile), { returnMode: "home" });
+  }
+  window.openMyProfileView = openMyProfileView;
   const menuAdmin = $("menuAdminBtn");
   if (menuAdmin) menuAdmin.addEventListener("click", () => { closeUserMenu(); if (isAdmin) loadPending(); });
 

@@ -621,13 +621,31 @@ function findStudentByKey(key) {
   return (STUDENTS || []).find((s) => studentKey(s) === key) || null;
 }
 
-function openFullProfile(student) {
+function openFullProfile(student, opts = {}) {
   const page = document.getElementById("fullProfile");
   if (!page || !student) return;
-  _fpReturnMode = currentMode || "yearbook";
+  // The owner's "My profile" is hosted on the submit page (which is otherwise
+  // blank behind the overlay) — return them to home on Back/close instead of a
+  // dead-end submit page. Everyone else returns to the section they came from.
+  _fpReturnMode = opts.returnMode || currentMode || "yearbook";
 
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const initials = (student.name || "?").split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+
+  // Cover photo (falls back to the gradient banner when none is set).
+  const cover = document.getElementById("fpCover");
+  if (cover) {
+    if (student.cover) {
+      const curl = String(student.cover).startsWith("http") ? student.cover : `${CLOUDFLARE_BASE_URL}/${student.cover}`;
+      cover.style.backgroundImage = `url("${curl}")`;
+      cover.style.backgroundSize = "cover";
+      cover.style.backgroundPosition = "center";
+      cover.classList.add("has-cover");
+    } else {
+      cover.style.backgroundImage = "";
+      cover.classList.remove("has-cover");
+    }
+  }
 
   // Avatar
   const av = document.getElementById("fpAvatar");
@@ -699,8 +717,15 @@ function openFullProfile(student) {
       const members = team.map(memberTile).join("");
       const repo = p.repo ? `<a class="fp-repo" href="${esc(p.repo)}" target="_blank" rel="noopener noreferrer">🔗 GitHub Repository</a>` : "";
       const desc = p.description ? `<p class="fp-proj-desc">${esc(p.description)}</p>` : `<p class="fp-proj-desc fp-muted">No description yet.</p>`;
+      // Use the same SVG category icon as the Projects tab (falls back to any
+      // emoji icon stored on the record, then a default rocket).
+      const catKey = (p.category || "").toLowerCase();
+      const icon = PROJ_ICONS[p.category]
+        ? `<span class="fp-proj-icon cat-${catKey}">${PROJ_ICONS[p.category]}</span>`
+        : esc(p.icon || "🚀");
+      const catLabel = CAT_LABELS[p.category] || p.category || "Project";
       return `<div class="fp-proj-card">
-        <div class="fp-proj-head">${esc(p.icon || "🚀")} <strong>${esc(p.category || "Project")}</strong> <span class="fp-proj-year">${esc(p.classYear || "")}</span></div>
+        <div class="fp-proj-head">${icon} <strong>${esc(catLabel)}</strong> <span class="fp-proj-year">${esc(p.classYear || "")}</span></div>
         ${desc}${repo}
         <h4 class="fp-proj-team-title">Team</h4>
         <div class="fp-member-grid">${members}</div>
@@ -950,163 +975,215 @@ function renderYearbook(list = STUDENTS, animate = true) {
   });
 }
 
-let selectedCategories = new Set();
 let currentSearchQuery = "";
 
-// ===== Hierarchical Yearbook filters (University › Faculty › Department › Year) =====
-// "" means "All" at that level. Gender is "all" | "male" | "female".
+// ===== Yearbook filters (popover: University / Faculty / Department / Track) =====
+// Each dimension is an independent multi-select. A student matches a dimension
+// if it has NO selections, or its value is one of the selected ones (OR within
+// a dimension). Dimensions combine with AND. So you can filter by track only,
+// university only, or any mix — none depends on the others.
+const FILTER_DIMENSIONS = [
+  { key: "university", label: "University", field: "university", fallback: () => DEFAULT_UNIVERSITY },
+  { key: "faculty", label: "Faculty", field: "faculty", fallback: () => DEFAULT_FACULTY },
+  { key: "department", label: "Department", field: "department", fallback: () => DEFAULT_DEPARTMENT },
+  { key: "classYear", label: "Class", field: "classYear", fallback: () => DEFAULT_CLASS_YEAR },
+  { key: "track", label: "Track", field: "track", multi: true, fallback: () => "" },
+];
 const yearbookFilter = {
-  university: "",
-  faculty: "",
-  department: "",
-  classYear: "",
-  gender: "all",
+  university: new Set(),
+  faculty: new Set(),
+  department: new Set(),
+  classYear: new Set(),
+  track: new Set(),
 };
-let _filtersInitialised = false;
 
-// Order class years newest-first ("2027" before "2026"); non-numeric sort last.
-function _sortYearsDesc(years) {
-  return [...years].sort((a, b) => {
-    const na = parseInt(a, 10), nb = parseInt(b, 10);
-    if (isNaN(na) && isNaN(nb)) return a.localeCompare(b);
-    if (isNaN(na)) return 1;
-    if (isNaN(nb)) return -1;
-    return nb - na;
-  });
-}
-
-// Distinct, sorted values for a field among students that match the
-// currently-selected higher levels (so each dropdown only shows real options).
-function _availableValues(field, scope = {}) {
-  const set = new Set();
-  STUDENTS.forEach((s) => {
-    if (scope.university && (s.university || DEFAULT_UNIVERSITY) !== scope.university) return;
-    if (scope.faculty && (s.faculty || DEFAULT_FACULTY) !== scope.faculty) return;
-    if (scope.department && (s.department || DEFAULT_DEPARTMENT) !== scope.department) return;
-    const v = s[field];
-    if (v) set.add(v);
-  });
-  return Array.from(set);
-}
-
-// Build / refresh the cascading <select>s. Called after data loads and whenever
-// a higher level changes. Picks sensible defaults (single option auto-selected,
-// newest class year by default) and only renders levels that have >1 real value.
-function buildYearbookFilters() {
-  const uniSel = document.getElementById("filterUniversity");
-  const facSel = document.getElementById("filterFaculty");
-  const depSel = document.getElementById("filterDepartment");
-  const yrSel = document.getElementById("filterClassYear");
-  if (!uniSel || !facSel || !depSel || !yrSel) return;
-
-  const fill = (sel, values, current, { sort = "asc" } = {}) => {
-    let vals = sort === "yearDesc" ? _sortYearsDesc(values) : [...values].sort((a, b) => a.localeCompare(b));
-    // Reset selection if the current value is no longer valid.
-    if (current && !vals.includes(current)) current = "";
-    const opts = [`<option value="">All</option>`]
-      .concat(vals.map((v) => `<option value="${v}"${v === current ? " selected" : ""}>${v}</option>`));
-    sel.innerHTML = opts.join("");
-    // Hide a level entirely if there's only one real value (nothing to choose).
-    const wrap = sel.closest(".yb-filter");
-    if (wrap) wrap.style.display = vals.length > 1 ? "" : "none";
-    return current;
-  };
-
-  const universities = _availableValues("university");
-  yearbookFilter.university = fill(uniSel, universities, yearbookFilter.university);
-
-  const faculties = _availableValues("faculty", { university: yearbookFilter.university });
-  yearbookFilter.faculty = fill(facSel, faculties, yearbookFilter.faculty);
-
-  const departments = _availableValues("department", {
-    university: yearbookFilter.university,
-    faculty: yearbookFilter.faculty,
-  });
-  yearbookFilter.department = fill(depSel, departments, yearbookFilter.department);
-
-  const years = _availableValues("classYear", {
-    university: yearbookFilter.university,
-    faculty: yearbookFilter.faculty,
-    department: yearbookFilter.department,
-  });
-  // Default to the newest class year that actually has people (only on first build).
-  if (!_filtersInitialised && years.length) {
-    yearbookFilter.classYear = _sortYearsDesc(years)[0];
+// All values a student contributes to a dimension (tracks can be an array).
+function _studentValues(s, dim) {
+  if (dim.multi) {
+    let v = s[dim.field];
+    if (!v) return [];
+    return (Array.isArray(v) ? v : [v]).filter(Boolean);
   }
-  yearbookFilter.classYear = fill(yrSel, years, yearbookFilter.classYear, { sort: "yearDesc" });
-
-  // Gender toggle only matters when both genders exist in the current scope.
-  refreshGenderToggle();
-
-  _filtersInitialised = true;
+  return [s[dim.field] || dim.fallback()].filter(Boolean);
 }
 
-// Show the gender toggle only if the current scope has both male and female.
-function refreshGenderToggle() {
-  const toggle = document.getElementById("genderToggle");
-  if (!toggle) return;
-  const genders = new Set();
+// Count how many students fall under each value of a dimension, honouring the
+// OTHER active dimensions (so counts reflect what you'd actually get). This is
+// what lets us hide options nobody matches and show a live count beside each.
+function _countsForDimension(dim) {
+  const counts = new Map();
   STUDENTS.forEach((s) => {
-    if (yearbookFilter.university && (s.university || DEFAULT_UNIVERSITY) !== yearbookFilter.university) return;
-    if (yearbookFilter.faculty && (s.faculty || DEFAULT_FACULTY) !== yearbookFilter.faculty) return;
-    if (yearbookFilter.department && (s.department || DEFAULT_DEPARTMENT) !== yearbookFilter.department) return;
-    if (yearbookFilter.classYear && (s.classYear || DEFAULT_CLASS_YEAR) !== yearbookFilter.classYear) return;
-    if (s.gender) genders.add(s.gender.toLowerCase());
+    // A value's count should reflect every other active filter except this one.
+    if (!matchesYearbookScope(s, dim.key)) return;
+    _studentValues(s, dim).forEach((v) => counts.set(v, (counts.get(v) || 0) + 1));
   });
-  const bothGenders = genders.has("male") && genders.has("female");
-  toggle.style.display = bothGenders ? "" : "none";
-  if (!bothGenders && yearbookFilter.gender !== "all") {
-    yearbookFilter.gender = "all";
-    toggle.querySelectorAll(".gender-btn").forEach((b) =>
-      b.classList.toggle("active", b.dataset.gender === "all"));
-  }
+  return counts;
 }
 
-// Wire the filter controls (called once at init).
+// Order class years newest-first; otherwise alphabetical.
+function _sortFilterValues(key, values) {
+  if (key === "classYear") {
+    return [...values].sort((a, b) => {
+      const na = parseInt(a, 10), nb = parseInt(b, 10);
+      if (isNaN(na) && isNaN(nb)) return a.localeCompare(b);
+      if (isNaN(na)) return 1;
+      if (isNaN(nb)) return -1;
+      return nb - na;
+    });
+  }
+  return [...values].sort((a, b) => a.localeCompare(b));
+}
+
+// Build / refresh the filter popover. Only renders an option when at least one
+// person matches it (given the other active filters), with a count beside it.
+// A whole group is hidden when it has fewer than two real options to pick from.
+function buildFilterPanel() {
+  const groupsWrap = document.getElementById("filterGroups");
+  if (!groupsWrap) return;
+
+  // Drop any active selections that no longer exist in the data (e.g. after a
+  // refresh removed a student) so stale chips don't linger.
+  FILTER_DIMENSIONS.forEach((dim) => {
+    const present = new Set();
+    STUDENTS.forEach((s) => _studentValues(s, dim).forEach((v) => present.add(v)));
+    yearbookFilter[dim.key].forEach((v) => { if (!present.has(v)) yearbookFilter[dim.key].delete(v); });
+  });
+
+  const html = FILTER_DIMENSIONS.map((dim) => {
+    const counts = _countsForDimension(dim);
+    const selected = yearbookFilter[dim.key];
+    // Include selected values even if currently zero-count so the user can untick them.
+    const values = _sortFilterValues(dim.key, new Set([...counts.keys(), ...selected]));
+    // Hide a group that offers nothing useful (0 or 1 option and not in use).
+    if (values.length < 2 && selected.size === 0) return "";
+
+    const opts = values.map((v) => {
+      const n = counts.get(v) || 0;
+      const isOn = selected.has(v);
+      const esc = (x) => String(x).replace(/"/g, "&quot;");
+      return `<button type="button" class="filter-opt${isOn ? " is-on" : ""}" role="checkbox" aria-checked="${isOn}"
+        data-dim="${dim.key}" data-val="${esc(v)}">
+        <span class="filter-opt-check" aria-hidden="true"></span>
+        <span class="filter-opt-label">${esc(v)}</span>
+        <span class="filter-opt-count">${n}</span>
+      </button>`;
+    }).join("");
+
+    return `<div class="filter-group" data-dim="${dim.key}">
+      <div class="filter-group-title">${dim.label}</div>
+      <div class="filter-opts">${opts}</div>
+    </div>`;
+  }).join("");
+
+  groupsWrap.innerHTML = html || `<p class="filter-empty">No filters available yet.</p>`;
+  updateFilterButtonCount();
+  renderActiveFilterChips();
+}
+
+// Total number of active selections across all dimensions.
+function _activeFilterCount() {
+  return FILTER_DIMENSIONS.reduce((n, dim) => n + yearbookFilter[dim.key].size, 0);
+}
+
+// Reflect the active-filter count on the Filter button's badge.
+function updateFilterButtonCount() {
+  const badge = document.getElementById("filterCount");
+  if (!badge) return;
+  const n = _activeFilterCount();
+  badge.textContent = n;
+  badge.style.display = n ? "" : "none";
+  const btn = document.getElementById("filterToggleBtn");
+  if (btn) btn.classList.toggle("has-active", n > 0);
+}
+
+// Removable chips under the search row, one per active selection.
+function renderActiveFilterChips() {
+  const wrap = document.getElementById("activeFilters");
+  if (!wrap) return;
+  const chips = [];
+  FILTER_DIMENSIONS.forEach((dim) => {
+    yearbookFilter[dim.key].forEach((v) => {
+      const esc = (x) => String(x).replace(/"/g, "&quot;");
+      chips.push(`<button type="button" class="active-filter-chip" data-dim="${dim.key}" data-val="${esc(v)}">
+        ${esc(v)} <span class="active-filter-x" aria-hidden="true">×</span>
+      </button>`);
+    });
+  });
+  wrap.innerHTML = chips.join("");
+  wrap.style.display = chips.length ? "" : "none";
+}
+
+// Toggle a single value in a dimension, then re-filter + rebuild counts.
+function toggleFilterValue(dimKey, val) {
+  const set = yearbookFilter[dimKey];
+  if (set.has(val)) set.delete(val); else set.add(val);
+  buildFilterPanel();
+  applyFilters();
+}
+
+function clearAllFilters() {
+  FILTER_DIMENSIONS.forEach((dim) => yearbookFilter[dim.key].clear());
+  buildFilterPanel();
+  applyFilters();
+}
+
+// Wire the filter button, popover and option/chip clicks (called once at init).
 function initYearbookFilters() {
-  const ids = {
-    university: "filterUniversity",
-    faculty: "filterFaculty",
-    department: "filterDepartment",
-    classYear: "filterClassYear",
-  };
-  Object.entries(ids).forEach(([field, id]) => {
-    const sel = document.getElementById(id);
-    if (!sel) return;
-    sel.addEventListener("change", () => {
-      yearbookFilter[field] = sel.value;
-      // Changing a higher level invalidates lower selections; rebuild cascade.
-      if (field === "university") { yearbookFilter.faculty = ""; yearbookFilter.department = ""; yearbookFilter.classYear = ""; }
-      else if (field === "faculty") { yearbookFilter.department = ""; yearbookFilter.classYear = ""; }
-      else if (field === "department") { yearbookFilter.classYear = ""; }
-      buildYearbookFilters();
-      renderStats();
-      applyFilters();
-    });
+  const btn = document.getElementById("filterToggleBtn");
+  const panel = document.getElementById("filterPanel");
+  const groups = document.getElementById("filterGroups");
+  const clearBtn = document.getElementById("filterClearBtn");
+  const chipsWrap = document.getElementById("activeFilters");
+
+  const openPanel = () => { if (panel) { panel.style.display = ""; btn.setAttribute("aria-expanded", "true"); } };
+  const closePanel = () => { if (panel) { panel.style.display = "none"; btn.setAttribute("aria-expanded", "false"); } };
+
+  if (btn) btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    (panel && panel.style.display === "none") ? openPanel() : closePanel();
   });
 
-  const toggle = document.getElementById("genderToggle");
-  if (toggle) {
-    toggle.querySelectorAll(".gender-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        yearbookFilter.gender = btn.dataset.gender;
-        toggle.querySelectorAll(".gender-btn").forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
-        applyFilters();
-      });
-    });
-  }
+  // Option toggles inside the popover.
+  if (groups) groups.addEventListener("click", (e) => {
+    const opt = e.target.closest(".filter-opt");
+    if (!opt) return;
+    toggleFilterValue(opt.dataset.dim, opt.dataset.val);
+  });
+
+  if (clearBtn) clearBtn.addEventListener("click", () => clearAllFilters());
+
+  // Removing a chip clears that one selection.
+  if (chipsWrap) chipsWrap.addEventListener("click", (e) => {
+    const chip = e.target.closest(".active-filter-chip");
+    if (!chip) return;
+    toggleFilterValue(chip.dataset.dim, chip.dataset.val);
+  });
+
+  // Click outside / Escape closes the popover.
+  document.addEventListener("click", (e) => {
+    if (!panel || panel.style.display === "none") return;
+    if (panel.contains(e.target) || (btn && btn.contains(e.target))) return;
+    closePanel();
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePanel(); });
 }
 
-// Does a student pass the current hierarchy + gender filters?
-function matchesYearbookScope(s) {
-  if (yearbookFilter.university && (s.university || DEFAULT_UNIVERSITY) !== yearbookFilter.university) return false;
-  if (yearbookFilter.faculty && (s.faculty || DEFAULT_FACULTY) !== yearbookFilter.faculty) return false;
-  if (yearbookFilter.department && (s.department || DEFAULT_DEPARTMENT) !== yearbookFilter.department) return false;
-  if (yearbookFilter.classYear && (s.classYear || DEFAULT_CLASS_YEAR) !== yearbookFilter.classYear) return false;
-  if (yearbookFilter.gender !== "all" && (s.gender || "").toLowerCase() !== yearbookFilter.gender) return false;
+// Does a student pass the active filters? `exceptKey` lets count-building ignore
+// the dimension it's currently counting (so options aren't hidden by themselves).
+function matchesYearbookScope(s, exceptKey) {
+  for (const dim of FILTER_DIMENSIONS) {
+    if (dim.key === exceptKey) continue;
+    const sel = yearbookFilter[dim.key];
+    if (sel.size === 0) continue;
+    const vals = _studentValues(s, dim);
+    if (!vals.some((v) => sel.has(v))) return false;
+  }
   return true;
 }
+
+// Back-compat shim: the old cascading builder name is still called after data
+// loads / on yearbook entry. Route it to the new popover builder.
+function buildYearbookFilters() { buildFilterPanel(); }
 
 function getStudentCategories(student) {
   let tracks = student.track;
@@ -1128,109 +1205,10 @@ function getStudentCategories(student) {
   return categories;
 }
 
-function renderStats() {
-  const statsContainer = document.getElementById("yearbookStats");
-  if (!statsContainer) return;
-
-  // Only count students within the active hierarchy/gender scope so the track
-  // tiles reflect the group the visitor is actually looking at.
-  const scoped = STUDENTS.filter(matchesYearbookScope);
-
-  let trackCounts = {};
-  scoped.forEach((s) => {
-    const cats = getStudentCategories(s);
-    cats.forEach((cat) => {
-      trackCounts[cat] = (trackCounts[cat] || 0) + 1;
-    });
-  });
-
-  const statsData = [
-    { category: "All", label: "Students", count: scoped.length },
-  ];
-
-  // Sort tracks by count (descending)
-  const sortedCategories = Object.entries(trackCounts).sort(
-    (a, b) => b[1] - a[1],
-  );
-
-  sortedCategories.forEach(([cat, count]) => {
-    let label = cat;
-    if (
-      cat === "Embedded" ||
-      cat === "AI" ||
-      cat === "Network" ||
-      cat === "DevOps"
-    ) {
-      label += " Engineers";
-    } else if (cat === "Digital Design") {
-      label = "Digital Designers";
-    }
-    statsData.push({ category: cat, label: label, count: count });
-  });
-
-  statsContainer.innerHTML = statsData
-    .map((stat) => {
-      const isActive =
-        stat.category === "All"
-          ? selectedCategories.size === 0
-          : selectedCategories.has(stat.category);
-      return `
-        <button type="button" class="stat-item ${isActive ? "active-filter" : ""}" data-category="${stat.category}" aria-pressed="${isActive}" onclick="toggleCategoryFilter('${stat.category}')">
-            <span class="stat-label">${stat.label}</span>
-            <span class="stat-number" data-target="${stat.count}">0</span>
-        </button>
-        `;
-    })
-    .join("");
-
-  // Animate counters
-  const statNumbers = document.querySelectorAll(".stat-number");
-  statNumbers.forEach((el) => {
-    const target = +el.getAttribute("data-target");
-    const duration = 1500; // ms
-    const frameDuration = 1000 / 60;
-    const totalFrames = Math.round(duration / frameDuration);
-    let frame = 0;
-
-    const counter = setInterval(() => {
-      frame++;
-      const progress = frame / totalFrames;
-      const easeOut = 1 - (1 - progress) * (1 - progress);
-      const currentCount = Math.round(target * easeOut);
-
-      el.textContent = currentCount;
-      if (frame >= totalFrames) {
-        el.textContent = target;
-        clearInterval(counter);
-      }
-    }, frameDuration);
-  });
-}
-
-function toggleCategoryFilter(cat) {
-  if (cat === "All") {
-    selectedCategories.clear();
-  } else {
-    if (selectedCategories.has(cat)) {
-      selectedCategories.delete(cat);
-    } else {
-      selectedCategories.add(cat);
-    }
-  }
-
-  const statItems = document.querySelectorAll(".stat-item");
-  statItems.forEach((item) => {
-    const itemCat = item.getAttribute("data-category");
-    const on =
-      itemCat === "All"
-        ? selectedCategories.size === 0
-        : selectedCategories.has(itemCat);
-    item.classList.toggle("active-filter", on);
-    item.setAttribute("aria-pressed", String(on));
-  });
-
-  applyFilters();
-}
+// The old track-stats row was replaced by the Filter popover. Kept as a no-op
+// so existing callers (applyDbPayload, switchMode, etc.) stay valid; the popover
+// is rebuilt via buildFilterPanel() instead.
+function renderStats() {}
 
 function filterStudents(query) {
   currentSearchQuery = query.trim().toLowerCase();
@@ -1239,33 +1217,21 @@ function filterStudents(query) {
 
 function applyFilters(animate = true) {
   const filtered = STUDENTS.filter((s) => {
-    // Hierarchy + gender scope (University › Faculty › Department › Year, gender)
+    // Active popover filters (University / Faculty / Department / Class / Track)
     if (!matchesYearbookScope(s)) return false;
 
-    // Text search
-    let matchesText = true;
+    // Text search (name or track)
     if (currentSearchQuery) {
       const inName = s.name.toLowerCase().includes(currentSearchQuery);
       let inTrack = false;
       if (s.track) {
         const tracks = Array.isArray(s.track) ? s.track : [s.track];
-        inTrack = tracks.some((t) =>
-          t.toLowerCase().includes(currentSearchQuery),
-        );
+        inTrack = tracks.some((t) => t.toLowerCase().includes(currentSearchQuery));
       }
-      matchesText = inName || inTrack;
+      if (!inName && !inTrack) return false;
     }
 
-    // Category search (OR logic if multiple selected)
-    let matchesCategory = true;
-    if (selectedCategories.size > 0) {
-      const sCats = getStudentCategories(s);
-      matchesCategory = Array.from(selectedCategories).some((c) =>
-        sCats.has(c),
-      );
-    }
-
-    return matchesText && matchesCategory;
+    return true;
   });
 
   // Sort alphabetically, but always keep Abdallah Shehawey first
@@ -1282,23 +1248,34 @@ function applyFilters(animate = true) {
   updateYearbookHeading();
 }
 
-// Reflect the active scope in the Yearbook heading + subtitle.
+// Reflect the active scope in the Yearbook heading + subtitle. Each dimension
+// is now a multi-select Set: show the single chosen value, "N selected" for
+// several, or a sensible default when nothing is picked.
 function updateYearbookHeading() {
   const titleEl = document.querySelector("#mode-yearbook .yearbook-title");
   const subEl = document.querySelector("#mode-yearbook .yearbook-subtitle");
+  const pick = (key, fallback, singular) => {
+    const set = yearbookFilter[key];
+    if (!set || set.size === 0) return fallback;
+    if (set.size === 1) return [...set][0];
+    return `${set.size} ${singular}`;
+  };
   if (titleEl) {
     // Keep the camera icon, replace only the trailing text node.
-    const yr = yearbookFilter.classYear || "All Years";
-    const label = yearbookFilter.classYear ? `Class of ${yr}` : "All Classes";
+    const yrSet = yearbookFilter.classYear;
+    let label;
+    if (!yrSet || yrSet.size === 0) label = "All Classes";
+    else if (yrSet.size === 1) label = `Class of ${[...yrSet][0]}`;
+    else label = `${yrSet.size} Classes`;
     let textNode = [...titleEl.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim());
     if (textNode) textNode.textContent = " " + label;
     else titleEl.appendChild(document.createTextNode(" " + label));
   }
   if (subEl) {
     const parts = [
-      yearbookFilter.university || DEFAULT_UNIVERSITY,
-      yearbookFilter.faculty || DEFAULT_FACULTY,
-      yearbookFilter.department || DEFAULT_DEPARTMENT,
+      pick("university", DEFAULT_UNIVERSITY, "universities"),
+      pick("faculty", DEFAULT_FACULTY, "faculties"),
+      pick("department", DEFAULT_DEPARTMENT, "departments"),
     ];
     subEl.textContent = parts.join(" · ");
   }
@@ -1643,7 +1620,7 @@ function renderProjects() {
       }
 
       const nameSpan = document.createElement("span");
-      nameSpan.textContent = member.name.split(" ").slice(0, 2).join(" ");
+      nameSpan.textContent = member.name;
       pill.appendChild(nameSpan);
 
       // Click → open student modal (pass teamLeader flag for leaders)
@@ -2038,6 +2015,14 @@ function switchMode(mode, fromHistory = false) {
   // Expose active mode so the portal module can react (e.g. refresh approvals).
   document.body.dataset.mode = mode;
 
+  // The full-profile overlay (also used as the owner's "My profile") sits on top
+  // of a section. A fresh navigation to another section must tear it down so it
+  // doesn't linger over the new page. (History replays manage it via popstate.)
+  if (!fromHistory && document.body.classList.contains("fp-open") &&
+      typeof closeFullProfile === "function") {
+    closeFullProfile();
+  }
+
   // Push a history entry so the browser Back button / backspace returns to the
   // previous view instead of leaving the site. popstate replays without pushing.
   // Clean path-based URLs (e.g. /yearbook); Home lives at the root "/".
@@ -2091,12 +2076,12 @@ function switchMode(mode, fromHistory = false) {
       if (!fromHistory && prevMode !== "yearbook") {
         document.getElementById("yearbookSearch").value = "";
         currentSearchQuery = "";
-        selectedCategories.clear();
+        FILTER_DIMENSIONS.forEach((dim) => yearbookFilter[dim.key].clear());
+        buildFilterPanel();
       }
       // Returning via Back/Forward (from a card or profile) → no entrance
       // animation. Fresh entry from another section → animate the grid in.
       applyFilters(!fromHistory);
-      renderStats();
     } else if (mode === "projects") {
       sections.projects.style.display = "block";
       renderProjects();

@@ -2,6 +2,10 @@
   "name": "eece-azhar",
   "version": "1.0.0",
   "private": true,
+  "scripts": {
+    "dev": "python3 scripts/dev-server.py",
+    "serve": "python3 scripts/dev-server.py"
+  },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1051.0",
     "googleapis": "^140.0.0"
