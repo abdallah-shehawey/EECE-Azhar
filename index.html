@@ -108,10 +108,6 @@
             </nav>
 
             <div class="navbar-actions">
-                <button id="navSubmitBtn" class="nav-submit-btn" type="button" onclick="switchMode('submit')" aria-label="Join / Submit your data">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
-                    <span class="nav-submit-label">Join Us</span>
-                </button>
                 <div class="audio-wrapper">
                     <button id="audioBtn" class="audio-btn" onclick="toggleAudio()" aria-label="Play background music" aria-pressed="false">
                         <span id="audioBtnText">🔇 Tap to Play</span>
@@ -466,7 +462,23 @@
                 </button>
             </div>
 
-            <!-- The submission form (shown when signed in) -->
+            <!-- Profile VIEW (shown when the user already has a profile; read-only
+                 until they choose to edit). Filled by renderProfileView(). -->
+            <div id="profileView" class="glass-panel" style="display:none;">
+                <div class="pv-head">
+                    <div class="pv-avatar" id="pvAvatar"></div>
+                    <div class="pv-id">
+                        <h3 class="pv-name" id="pvName"></h3>
+                        <p class="pv-meta" id="pvMeta"></p>
+                    </div>
+                    <button type="button" class="btn-primary pv-edit-btn" id="pvEditBtn">✎ Edit profile</button>
+                </div>
+                <div class="pv-section" id="pvTracksWrap"><span class="pv-label">Tracks</span><div class="chip-container" id="pvTracks"></div></div>
+                <div class="pv-section" id="pvSkillsWrap"><span class="pv-label">Skills</span><div class="chip-container" id="pvSkills"></div></div>
+                <div class="pv-section" id="pvSocialWrap"><span class="pv-label">Links</span><div class="pv-social" id="pvSocial"></div></div>
+            </div>
+
+            <!-- The submission / edit form (shown when creating or editing) -->
             <div id="submitFormWrap" class="glass-panel form-panel" style="display: none;">
                 <p class="submit-as">Signed in as <strong id="submitAsWho"></strong></p>
                 <form id="submissionForm" novalidate>

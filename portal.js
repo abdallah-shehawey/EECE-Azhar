@@ -58,6 +58,7 @@ let isAdmin = false;
 let pendingCache = {}; // id → entry (so Approve/Reject can read the data)
 let myProfile = null;  // the signed-in user's /profiles/{uid} record (or null)
 let adminAddMode = false; // admin is adding someone else directly (not editing self)
+let editMode = false;     // user explicitly chose to edit their existing profile
 
 /* ════════════════════════════════════════════
    § 0.1 — INSTITUTION DATA (for the profile form selects)
@@ -406,6 +407,18 @@ function hydrateProfileForm() {
   }
   if (typeToggle) typeToggle.style.display = "";
 
+  // Existing profile + not actively editing → show the read-only view card.
+  const profileView = $("profileView");
+  const formWrap = $("submitFormWrap");
+  if (myProfile && !editMode) {
+    renderProfileView();
+    if (profileView) profileView.style.display = "block";
+    if (formWrap) formWrap.style.display = "none";
+    return;
+  }
+  if (profileView) profileView.style.display = "none";
+  if (formWrap && currentUser) formWrap.style.display = "block";
+
   populateInstitutionSelects(myProfile);
 
   if (myProfile) {
@@ -474,6 +487,63 @@ function renderMyProjects() {
   }).join("");
 }
 
+/** Render the read-only profile view card (photo → name → meta → tracks → skills → links). */
+function renderProfileView() {
+  const p = myProfile;
+  if (!p) return;
+  const initials = (p.name || "?").split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+  const av = $("pvAvatar");
+  if (av) {
+    if (p.photo) {
+      const url = String(p.photo).startsWith("http") ? p.photo : `${R2_BASE}/${p.photo}`;
+      av.style.backgroundImage = `url("${url}")`;
+      av.style.background = `center/cover no-repeat url("${url}")`;
+      av.textContent = "";
+    } else {
+      av.style.background = p.color || "var(--gradient-2)";
+      av.textContent = initials;
+    }
+  }
+  setText("pvName", p.name || "");
+  const metaBits = [p.department, p.university, p.classYear ? `Class of ${p.classYear}` : ""].filter(Boolean);
+  setText("pvMeta", metaBits.join(" · "));
+
+  // Status pill in the name row
+  const nameEl = $("pvName");
+  if (nameEl && !nameEl.querySelector(".pv-status")) {
+    const pill = document.createElement("span");
+    pill.className = "pv-status";
+    nameEl.appendChild(pill);
+  }
+  const pill = nameEl && nameEl.querySelector(".pv-status");
+  if (pill) {
+    const live = p.status === "live";
+    pill.textContent = live ? "● Live" : "● Pending";
+    pill.className = "pv-status " + (live ? "is-live" : "is-pending");
+  }
+
+  const chips = (arr, cls = "chip") => (arr || []).map((x) => `<span class="${cls}">${esc(x)}</span>`).join("");
+  const tracks = p.tracks || p.track || [];
+  const skills = p.skills || [];
+  fillBlock("pvTracksWrap", "pvTracks", chips(tracks));
+  fillBlock("pvSkillsWrap", "pvSkills", chips(skills, "chip chip-skill"));
+
+  // Social links
+  const soc = p.social || {};
+  const order = [["linkedin", "LinkedIn"], ["github", "GitHub"], ["whatsapp", "WhatsApp"], ["facebook", "Facebook"]];
+  const links = order
+    .filter(([k]) => soc[k])
+    .map(([k, label]) => `<span class="pv-link">${label}</span>`)
+    .join("");
+  fillBlock("pvSocialWrap", "pvSocial", links);
+}
+function setText(id, t) { const el = $(id); if (el) el.textContent = t; }
+function fillBlock(wrapId, innerId, html) {
+  const wrap = $(wrapId), inner = $(innerId);
+  if (inner) inner.innerHTML = html;
+  if (wrap) wrap.style.display = html ? "" : "none";
+}
+
 /** Load the saved tracks into the multi-select (handled inside the form module). */
 function prefillTracks(tracks) {
   if (typeof window._setSelectedTracks === "function") window._setSelectedTracks(tracks);
@@ -528,11 +598,6 @@ function updateAuthUI() {
 
   // Admin-only menu item
   if (adminItem) adminItem.style.display = isAdmin ? "" : "none";
-
-  // The navbar "Join Us" button is only for signed-out visitors. Once signed
-  // in, profile actions live inside the account dropdown instead.
-  const navSubmit = $("navSubmitBtn");
-  if (navSubmit) navSubmit.style.display = currentUser ? "none" : "";
 
   // Dropdown profile item: "Create profile" (no profile yet) → "My profile".
   const menuSubmitLabel = document.querySelector("#menuSubmitBtn span");
@@ -1309,9 +1374,9 @@ function initSubmissionForm() {
         renderTrackChips();
         if ($("inputName") && currentUser) $("inputName").value = currentUser.displayName || "";
       } else {
-        // Students: keep the form populated (it's their profile now).
+        // Students: profile saved — drop back to the read-only view card.
         myProfile = { ...(myProfile || {}), ...buildProfileObject(data), status: savedLive ? "live" : "pending" };
-        // (buildProfileObject is in this closure; hydrate reads myProfile.)
+        editMode = false;
         hydrateProfileForm();
         // Refresh the live site so an edit shows immediately.
         if (savedLive && typeof window.fetchFirebaseData === "function") window.fetchFirebaseData();
@@ -1325,8 +1390,6 @@ function initSubmissionForm() {
     } finally {
       formState.isUploading = false;
       btnGenerate.disabled = false;
-      // Restore the contextual button label.
-      hydrateProfileForm();
     }
   });
 
@@ -1656,10 +1719,15 @@ function init() {
   if (menuSubmit) menuSubmit.addEventListener("click", () => {
     closeUserMenu();
     adminAddMode = false;     // editing my own profile, not admin-adding
+    editMode = false;         // open in read-only view first (if a profile exists)
     hydrateProfileForm();
   });
   const menuAdmin = $("menuAdminBtn");
   if (menuAdmin) menuAdmin.addEventListener("click", () => { closeUserMenu(); if (isAdmin) loadPending(); });
+
+  // "Edit profile" on the view card flips into the editable form.
+  const pvEdit = $("pvEditBtn");
+  if (pvEdit) pvEdit.addEventListener("click", () => { editMode = true; hydrateProfileForm(); });
 
   const refreshBtn = $("adminRefreshBtn");
   if (refreshBtn) refreshBtn.addEventListener("click", loadPending);
@@ -1669,6 +1737,7 @@ function init() {
   if (adminAddBtn) adminAddBtn.addEventListener("click", () => {
     if (!isAdmin) return;
     adminAddMode = true;
+    editMode = true;
     if (typeof window.switchMode === "function") window.switchMode("submit");
     // Make sure the gate is bypassed (admin is signed in) and form is blank.
     const gate = $("submitLoginGate"); if (gate) gate.style.display = "none";
