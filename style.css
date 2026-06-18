@@ -4015,3 +4015,244 @@ textarea.field-input { resize: vertical; min-height: 90px; font-family: inherit;
     .user-name { max-width: 80px; }
     .user-dropdown { min-width: 200px; max-width: calc(100vw - 1.5rem); }
 }
+
+/* ════════════════════════════════════════════
+   Yearbook card — university line + "View profile"
+════════════════════════════════════════════ */
+.student-uni {
+    margin: -6px 0 0;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    letter-spacing: 0.01em;
+}
+
+/* "View full profile" button inside the quick student modal */
+.modal-view-profile {
+    margin-top: 1.1rem;
+    padding: 0.6rem 1.4rem;
+    border-radius: 99px;
+    border: 1px solid rgba(139, 92, 246, 0.45);
+    background: rgba(139, 92, 246, 0.16);
+    color: var(--accent-light);
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+}
+.modal-view-profile:hover {
+    background: rgba(139, 92, 246, 0.3);
+    box-shadow: 0 0 18px rgba(139, 92, 246, 0.3);
+    transform: translateY(-1px);
+}
+
+/* ════════════════════════════════════════════
+   Full profile page (Facebook-style) — full width
+════════════════════════════════════════════ */
+body.fp-open { overflow: hidden; }
+
+.full-profile {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    overflow-y: auto;
+    background:
+        radial-gradient(1100px 600px at 50% -10%, rgba(139, 92, 246, 0.18), transparent 60%),
+        var(--bg-deep, #04050d);
+    -webkit-overflow-scrolling: touch;
+}
+
+.fp-inner {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 0 1rem 4rem;
+}
+
+.fp-back {
+    margin: 1.1rem 0 0.4rem;
+}
+
+/* Cover banner + overlapping avatar */
+.fp-cover {
+    height: 130px;
+    border-radius: var(--radius-lg, 22px);
+    background: var(--gradient-2);
+    position: relative;
+    overflow: hidden;
+}
+.fp-cover::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(600px 200px at 30% 0%, rgba(255, 255, 255, 0.18), transparent 70%);
+}
+
+.fp-header {
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+    margin: -62px 0 0;
+    padding: 0 1.4rem 0;
+    flex-wrap: wrap;
+}
+.fp-avatar {
+    width: 124px;
+    height: 124px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 4px solid var(--bg-deep, #04050d);
+    background: var(--gradient-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.4rem;
+    font-weight: 700;
+    color: #fff;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+.fp-headtext { flex: 1 1 200px; align-self: flex-end; padding-bottom: 0.4rem; }
+.fp-name {
+    margin: 0;
+    font-size: 1.9rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+.fp-sub { margin: 0.2rem 0 0; color: var(--text-secondary); font-size: 0.95rem; }
+.fp-edit { align-self: flex-end; margin-bottom: 0.4rem; }
+
+/* Tabs */
+.fp-tabs {
+    display: flex;
+    gap: 0.4rem;
+    margin: 1.6rem 0 0;
+    border-bottom: 1px solid var(--card-border);
+    padding: 0 0.4rem;
+}
+.fp-tab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 0.7rem 1.1rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: color 0.2s ease, border-color 0.2s ease;
+}
+.fp-tab:hover { color: var(--text-primary); }
+.fp-tab.active { color: var(--accent-light); border-bottom-color: var(--accent); }
+
+/* Panels */
+.fp-panel { padding: 1.6rem 0.4rem 0; }
+
+.fp-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.9rem;
+    margin-bottom: 1.6rem;
+}
+.fp-info-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-md, 14px);
+    padding: 0.9rem 1.1rem;
+}
+.fp-info-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+.fp-info-val { font-size: 1rem; font-weight: 600; color: var(--text-primary); }
+
+.fp-section { margin-bottom: 1.5rem; }
+.fp-section-title {
+    margin: 0 0 0.6rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* Graduation project card on the profile */
+.fp-proj-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-lg, 22px);
+    padding: 1.2rem 1.3rem;
+    margin-bottom: 1rem;
+}
+.fp-proj-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.1rem;
+    color: var(--text-primary);
+}
+.fp-proj-year { margin-left: auto; color: var(--text-muted); font-size: 0.85rem; }
+.fp-proj-desc { margin: 0.7rem 0; color: var(--text-secondary); line-height: 1.6; }
+.fp-muted { color: var(--text-muted); font-style: italic; }
+.fp-repo {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--accent-light);
+    font-weight: 600;
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+.fp-repo:hover { text-decoration: underline; }
+.fp-proj-team-title { margin: 1rem 0 0.6rem; font-size: 0.95rem; color: var(--text-primary); }
+
+/* Clickable team members (avatar + name) */
+.fp-member-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+}
+.fp-member {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.35rem 0.85rem 0.35rem 0.4rem;
+    border-radius: 99px;
+    border: 1px solid var(--card-border);
+    background: var(--card-bg);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease, transform 0.15s ease;
+}
+.fp-member:hover:not(:disabled) {
+    border-color: var(--border-accent, rgba(139, 92, 246, 0.55));
+    background: var(--bg-panel-hover, rgba(255, 255, 255, 0.07));
+    transform: translateY(-1px);
+}
+.fp-member.is-leader { border-color: rgba(245, 158, 11, 0.5); color: #fbbf24; }
+.fp-member-static { cursor: default; opacity: 0.75; }
+.fp-member-av {
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #fff;
+    background: var(--gradient-2);
+}
+.fp-member-name { white-space: nowrap; }
+
+@media (max-width: 600px) {
+    .fp-cover { height: 140px; }
+    .fp-header { margin-top: -46px; gap: 0.9rem; }
+    .fp-avatar { width: 96px; height: 96px; font-size: 1.9rem; }
+    .fp-name { font-size: 1.45rem; }
+    .fp-edit { width: 100%; margin-top: 0.6rem; }
+    .fp-grid { grid-template-columns: 1fr 1fr; }
+}

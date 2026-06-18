@@ -773,6 +773,70 @@
         </svg>
     </button>
 
+    <!-- Full profile page (opens as its own view; Facebook-style) -->
+    <div id="fullProfile" class="full-profile" style="display:none;">
+        <div class="fp-inner">
+            <button type="button" class="portal-back fp-back" id="fpBack" aria-label="Back">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                <span>Back</span>
+            </button>
+
+            <!-- Cover + header -->
+            <div class="fp-cover"></div>
+            <div class="fp-header">
+                <div class="fp-avatar" id="fpAvatar"></div>
+                <div class="fp-headtext">
+                    <h2 class="fp-name" id="fpName"></h2>
+                    <p class="fp-sub" id="fpSub"></p>
+                </div>
+                <button type="button" class="btn-primary fp-edit" id="fpEditBtn" style="display:none;">✎ Edit profile</button>
+            </div>
+
+            <!-- Tabs -->
+            <div class="fp-tabs" id="fpTabs">
+                <button class="fp-tab active" data-fptab="about">About</button>
+                <button class="fp-tab" data-fptab="project" id="fpProjectTabBtn" style="display:none;">Graduation Project</button>
+            </div>
+
+            <!-- About panel -->
+            <div class="fp-panel" id="fpAbout">
+                <div class="fp-grid">
+                    <div class="fp-info-card">
+                        <span class="fp-info-label">University</span>
+                        <span class="fp-info-val" id="fpUniversity"></span>
+                    </div>
+                    <div class="fp-info-card">
+                        <span class="fp-info-label">Faculty</span>
+                        <span class="fp-info-val" id="fpFaculty"></span>
+                    </div>
+                    <div class="fp-info-card">
+                        <span class="fp-info-label">Department</span>
+                        <span class="fp-info-val" id="fpDepartment"></span>
+                    </div>
+                    <div class="fp-info-card">
+                        <span class="fp-info-label">Class Year</span>
+                        <span class="fp-info-val" id="fpClassYear"></span>
+                    </div>
+                </div>
+                <div class="fp-section" id="fpTracksWrap">
+                    <h3 class="fp-section-title">Tracks</h3>
+                    <div class="chip-container" id="fpTracks"></div>
+                </div>
+                <div class="fp-section" id="fpSkillsWrap">
+                    <h3 class="fp-section-title">Skills</h3>
+                    <div class="chip-container" id="fpSkills"></div>
+                </div>
+                <div class="fp-section" id="fpSocialWrap">
+                    <h3 class="fp-section-title">Connect</h3>
+                    <div class="social-links" id="fpSocial"></div>
+                </div>
+            </div>
+
+            <!-- Graduation project panel -->
+            <div class="fp-panel" id="fpProject" style="display:none;"></div>
+        </div>
+    </div>
+
     <!-- Contact / complaint modal -->
     <div id="contactModal" class="contact-modal" style="display:none;" role="dialog" aria-modal="true" aria-label="Contact us">
         <div class="contact-card glass-panel">

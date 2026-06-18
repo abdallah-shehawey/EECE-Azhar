@@ -307,10 +307,12 @@ onAuthStateChanged(auth, async (user) => {
   currentUser = user;
   isAdmin = !!user && user.email === ADMIN_EMAIL;
   window.__isAdmin = isAdmin; // so script.js can render admin-only controls
+  window.__myUid = user ? user.uid : null; // so script.js can show the owner's Edit on the full profile
   myProfile = null;
   // Re-render the yearbook so admin delete buttons appear/disappear.
+  // No entrance animation — this is a silent in-place refresh, not a navigation.
   if (typeof window.applyFilters === "function" && document.body.dataset.mode === "yearbook") {
-    window.applyFilters();
+    window.applyFilters(false);
   }
   if (user) {
     // Load this account's profile so the form acts as create vs edit.
@@ -1745,6 +1747,17 @@ function init() {
   // "Edit profile" on the view card flips into the editable form.
   const pvEdit = $("pvEditBtn");
   if (pvEdit) pvEdit.addEventListener("click", () => { editMode = true; hydrateProfileForm(); });
+
+  // Called by the full-profile page's Edit button (script.js) — owner only.
+  // Take the owner to the Submit page straight into the editable form.
+  window.openMyProfileEdit = () => {
+    if (!currentUser) return;
+    adminAddMode = false;
+    editMode = true;
+    if (typeof window.switchMode === "function") window.switchMode("submit");
+    const gate = $("submitLoginGate"); if (gate) gate.style.display = "none";
+    hydrateProfileForm();
+  };
 
   const refreshBtn = $("adminRefreshBtn");
   if (refreshBtn) refreshBtn.addEventListener("click", loadPending);

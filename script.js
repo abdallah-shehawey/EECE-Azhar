@@ -362,22 +362,17 @@ function openPhotoModal(student) {
     tracksHtml = `<div class="student-track-container">${badges}</div>`;
   }
 
-  // ── Institution meta (department · class year) ──
+  // ── Institution meta (university · department · class year) ──
   let metaHtml = "";
-  if (student.department || student.classYear) {
-    const bits = [student.department, student.classYear ? `Class of ${student.classYear}` : ""]
-      .filter(Boolean).join(" · ");
-    metaHtml = `<p class="modal-meta">${bits}</p>`;
-  }
+  const metaBits = [
+    student.university || "Al-Azhar University",
+    student.department,
+    student.classYear ? `Class of ${student.classYear}` : "",
+  ].filter(Boolean);
+  if (metaBits.length) metaHtml = `<p class="modal-meta">${metaBits.join(" · ")}</p>`;
 
-  // ── Skills HTML ──
-  let skillsHtml = "";
-  let skills = student.skills;
-  if (skills && skills.length) {
-    if (!Array.isArray(skills)) skills = [skills];
-    const chips = skills.map((s) => `<span class="skill-chip">${s}</span>`).join("");
-    skillsHtml = `<div class="modal-skills"><span class="modal-skills-title">Skills</span><div class="skill-chip-row">${chips}</div></div>`;
-  }
+  // Skills are NOT shown in the quick card modal — they live on the full profile.
+  const skillsHtml = "";
 
   // ── Team Leader Badge HTML ──
   const leaderBadgeHtml = student.teamLeader
@@ -427,8 +422,17 @@ function openPhotoModal(student) {
             ${tracksHtml}
             ${skillsHtml}
             ${socialHtml}
+            <button type="button" class="modal-view-profile" id="_modalViewProfile">View full profile →</button>
         </div>
     `;
+  // "View full profile" → close this quick modal, open the full profile page.
+  const vpBtn = modal.querySelector("#_modalViewProfile");
+  if (vpBtn) vpBtn.addEventListener("click", () => {
+    // Close the quick modal WITHOUT triggering its own history.back() — we
+    // replace the lingering #student entry with #profile inside openFullProfile.
+    modal.closeModal(true);
+    if (typeof openFullProfile === "function") openFullProfile(student);
+  });
 
   // Retry logic for modal image
   if (!isAvatar) {
@@ -534,7 +538,153 @@ function initContactForm() {
   });
 }
 
-function renderYearbook(list = STUDENTS) {
+// ===== Full profile page (Facebook-style, About / Graduation Project tabs) =====
+let _fpReturnMode = "yearbook";
+function openFullProfile(student) {
+  const page = document.getElementById("fullProfile");
+  if (!page || !student) return;
+  _fpReturnMode = currentMode || "yearbook";
+
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const initials = (student.name || "?").split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+
+  // Avatar
+  const av = document.getElementById("fpAvatar");
+  if (av) {
+    if (student.photo) {
+      const url = String(student.photo).startsWith("http") ? student.photo : `${CLOUDFLARE_BASE_URL}/${student.photo}`;
+      av.style.background = `center/cover no-repeat url("${url}")`;
+      av.textContent = "";
+    } else {
+      av.style.background = student.color || "var(--gradient-2)";
+      av.textContent = initials;
+    }
+  }
+  setEl("fpName", student.name || "");
+  setEl("fpSub", [student.department, student.classYear ? `Class of ${student.classYear}` : ""].filter(Boolean).join(" · "));
+  setEl("fpUniversity", student.university || "Al-Azhar University");
+  setEl("fpFaculty", student.faculty || "Faculty of Engineering");
+  setEl("fpDepartment", student.department || "Communication & Electronics");
+  setEl("fpClassYear", student.classYear || "2026");
+
+  const chips = (arr, cls) => {
+    let a = arr; if (!Array.isArray(a)) a = a ? [a] : [];
+    return a.map((x) => `<span class="${cls}">${esc(x)}</span>`).join("");
+  };
+  fpBlock("fpTracksWrap", "fpTracks", chips(student.track, "chip"));
+  fpBlock("fpSkillsWrap", "fpSkills", chips(student.skills, "chip chip-skill"));
+
+  // Social
+  const soc = student.social || {};
+  const socialHtml = Object.entries(soc).map(([platform, value]) => {
+    if (!value) return "";
+    const cfg = SOCIAL_CONFIG[platform];
+    if (!cfg) return "";
+    return `<a class="social-btn social-${platform}" href="${cfg.buildUrl(value)}" target="_blank" rel="noopener noreferrer" title="${cfg.title}"><img src="${cfg.icon}" alt="${cfg.title}" class="social-icon" /></a>`;
+  }).join("");
+  fpBlock("fpSocialWrap", "fpSocial", socialHtml);
+
+  // Graduation project tab (only if this person is on a team)
+  const projTabBtn = document.getElementById("fpProjectTabBtn");
+  const projPanel = document.getElementById("fpProject");
+  const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+  const mine = norm(student.name);
+  const projects = (GRADUATION_PROJECTS || []).filter((p) => {
+    const team = Array.isArray(p.team) ? p.team : Object.values(p.team || {});
+    return team.some((m) => norm(m.name) === mine);
+  });
+  if (projects.length && projTabBtn && projPanel) {
+    projTabBtn.style.display = "";
+    // Look up each member's full yearbook record so we can show their photo and
+    // open their card on click. Matched by normalised name.
+    const studentByName = new Map((STUDENTS || []).map((s) => [norm(s.name), s]));
+    const memberTile = (m) => {
+      const rec = studentByName.get(norm(m.name));
+      const ini = (m.name || "?").split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+      let avatar;
+      if (rec && rec.photo) {
+        const url = String(rec.photo).startsWith("http") ? rec.photo : `${CLOUDFLARE_BASE_URL}/${rec.photo}`;
+        avatar = `<span class="fp-member-av" style='background:center/cover no-repeat url("${url}")'></span>`;
+      } else {
+        avatar = `<span class="fp-member-av" style="background:${(rec && rec.color) || "var(--gradient-2)"}">${ini}</span>`;
+      }
+      // data-name lets the click handler find the student record to open.
+      return `<button type="button" class="fp-member${m.leader ? " is-leader" : ""}" data-name="${esc(m.name)}">
+        ${avatar}<span class="fp-member-name">${m.leader ? "★ " : ""}${esc(m.name)}</span>
+      </button>`;
+    };
+    projPanel.innerHTML = projects.map((p) => {
+      const team = Array.isArray(p.team) ? p.team : Object.values(p.team || {});
+      const members = team.map(memberTile).join("");
+      const repo = p.repo ? `<a class="fp-repo" href="${esc(p.repo)}" target="_blank" rel="noopener noreferrer">🔗 GitHub Repository</a>` : "";
+      const desc = p.description ? `<p class="fp-proj-desc">${esc(p.description)}</p>` : `<p class="fp-proj-desc fp-muted">No description yet.</p>`;
+      return `<div class="fp-proj-card">
+        <div class="fp-proj-head">${esc(p.icon || "🚀")} <strong>${esc(p.category || "Project")}</strong> <span class="fp-proj-year">${esc(p.classYear || "")}</span></div>
+        ${desc}${repo}
+        <h4 class="fp-proj-team-title">Team</h4>
+        <div class="fp-member-grid">${members}</div>
+      </div>`;
+    }).join("");
+    // Clicking a registered member swaps this profile for theirs (their full
+    // profile page). Non-registered names aren't clickable.
+    projPanel.querySelectorAll(".fp-member").forEach((btn) => {
+      const rec = studentByName.get(norm(btn.dataset.name));
+      if (!rec) { btn.classList.add("fp-member-static"); btn.disabled = true; return; }
+      btn.addEventListener("click", () => openFullProfile(rec));
+    });
+  } else if (projTabBtn && projPanel) {
+    projTabBtn.style.display = "none";
+    projPanel.innerHTML = "";
+  }
+
+  // Edit button only for the profile owner (portal exposes the current uid).
+  const editBtn = document.getElementById("fpEditBtn");
+  if (editBtn) {
+    const isOwner = window.__myUid && student.ownerUid && window.__myUid === student.ownerUid;
+    editBtn.style.display = isOwner ? "" : "none";
+    editBtn.onclick = () => { closeFullProfile(); if (typeof window.openMyProfileEdit === "function") window.openMyProfileEdit(); };
+  }
+
+  fpShowTab("about");
+  page.style.display = "block";
+  document.body.classList.add("fp-open");
+  window.scrollTo(0, 0);
+  // History: if we came from the quick modal it left a #student entry behind —
+  // replace it (so Back lands on the section, not a closed modal). Otherwise
+  // push a fresh entry on top of the current section.
+  if (window.location.hash === "#student") {
+    history.replaceState({ mode: "profile-view", from: _fpReturnMode }, "", "#profile");
+  } else {
+    history.pushState({ mode: "profile-view", from: _fpReturnMode }, "", "#profile");
+  }
+}
+function closeFullProfile() {
+  const page = document.getElementById("fullProfile");
+  if (page) page.style.display = "none";
+  document.body.classList.remove("fp-open");
+}
+function fpShowTab(tab) {
+  document.querySelectorAll(".fp-tab").forEach((b) => b.classList.toggle("active", b.dataset.fptab === tab));
+  const about = document.getElementById("fpAbout");
+  const proj = document.getElementById("fpProject");
+  if (about) about.style.display = tab === "about" ? "" : "none";
+  if (proj) proj.style.display = tab === "project" ? "" : "none";
+}
+function initFullProfile() {
+  const back = document.getElementById("fpBack");
+  if (back) back.addEventListener("click", () => { closeFullProfile(); history.back(); });
+  document.querySelectorAll(".fp-tab").forEach((b) => {
+    b.addEventListener("click", () => fpShowTab(b.dataset.fptab));
+  });
+}
+function setEl(id, t) { const el = document.getElementById(id); if (el) el.textContent = t; }
+function fpBlock(wrapId, innerId, html) {
+  const wrap = document.getElementById(wrapId), inner = document.getElementById(innerId);
+  if (inner) inner.innerHTML = html;
+  if (wrap) wrap.style.display = html ? "" : "none";
+}
+
+function renderYearbook(list = STUDENTS, animate = true) {
   const grid = document.getElementById("studentsGrid");
   const noResults = document.getElementById("noResults");
   if (!grid) return;
@@ -549,8 +699,13 @@ function renderYearbook(list = STUDENTS) {
   list.forEach((student, i) => {
     const card = document.createElement("div");
     card.className = "student-card";
-    card.style.animation = "fadeInUp 0.5s ease-out both";
-    card.style.animationDelay = `${(i % 10) * 0.06}s`; // cycle delay so it doesn't get too long
+    // Entrance animation plays on fresh entry + every filter/search change
+    // (the user WANTS the grid to "re-open" then). It's skipped only when
+    // returning from a card/profile so the grid stays put on the way back.
+    if (animate) {
+      card.style.animation = "fadeInUp 0.5s ease-out both";
+      card.style.animationDelay = `${(i % 10) * 0.06}s`; // cycle delay so it doesn't get too long
+    }
 
     const photoWrap = document.createElement("div");
     photoWrap.className = "student-photo-wrap";
@@ -629,6 +784,11 @@ function renderYearbook(list = STUDENTS) {
     nameEl.className = "student-name";
     nameEl.textContent = student.name;
 
+    // University (small meta line under the name).
+    const uniEl = document.createElement("p");
+    uniEl.className = "student-uni";
+    uniEl.textContent = student.university || "Al-Azhar University";
+
     const trackContainer = document.createElement("div");
     trackContainer.className = "student-track-container";
 
@@ -671,6 +831,7 @@ function renderYearbook(list = STUDENTS) {
 
     card.appendChild(photoWrap);
     card.appendChild(nameEl);
+    card.appendChild(uniEl);
     if (trackContainer.children.length > 0) card.appendChild(trackContainer);
     if (socialRow.children.length > 0) card.appendChild(socialRow);
 
@@ -980,7 +1141,7 @@ function filterStudents(query) {
   applyFilters();
 }
 
-function applyFilters() {
+function applyFilters(animate = true) {
   const filtered = STUDENTS.filter((s) => {
     // Hierarchy + gender scope (University › Faculty › Department › Year, gender)
     if (!matchesYearbookScope(s)) return false;
@@ -1021,7 +1182,7 @@ function applyFilters() {
     return a.name.localeCompare(b.name);
   });
 
-  renderYearbook(filtered);
+  renderYearbook(filtered, animate);
   updateYearbookHeading();
 }
 
@@ -1613,6 +1774,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   initNavMenu();
   initYearbookFilters();
   initContactForm();
+  initFullProfile();
 
   // Render local fallback data right away so the UI is usable from the start
   await loadDrivePhotos();
@@ -1623,6 +1785,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Browser Back/Forward (and backspace) navigate between views in-page.
   window.addEventListener("popstate", (e) => {
     const mode = (e.state && e.state.mode) || "home";
+    // The full-profile overlay sits on top of a section. If we're leaving it
+    // (hash no longer #profile), tear it down first so the section underneath
+    // shows through — without refetching the yearbook.
+    if (mode !== "profile-view" && typeof closeFullProfile === "function") {
+      closeFullProfile();
+    }
+    // "profile-view" isn't a real section; the overlay is shown by openFullProfile.
+    // Restore the section that was under it instead so Back/Forward stays sane.
+    if (mode === "profile-view") return;
     switchMode(mode, true); // replay without pushing a new entry
   });
 
@@ -1729,11 +1900,18 @@ function switchMode(mode, fromHistory = false) {
       renderHomeStats();
     } else if (mode === "yearbook") {
       sections.yearbook.style.display = "block";
-      // Clear search on open
-      document.getElementById("yearbookSearch").value = "";
-      currentSearchQuery = "";
-      selectedCategories.clear();
-      applyFilters();
+      // Fresh entry from another section (nav link / swipe) → start clean.
+      // A history replay (Back/Forward, e.g. returning from a profile) keeps
+      // the previous search + filters so the user lands where they left off.
+      // Either way we only re-render from the in-memory cache — never refetch.
+      if (!fromHistory && prevMode !== "yearbook") {
+        document.getElementById("yearbookSearch").value = "";
+        currentSearchQuery = "";
+        selectedCategories.clear();
+      }
+      // Returning via Back/Forward (from a card or profile) → no entrance
+      // animation. Fresh entry from another section → animate the grid in.
+      applyFilters(!fromHistory);
       renderStats();
     } else if (mode === "projects") {
       sections.projects.style.display = "block";
