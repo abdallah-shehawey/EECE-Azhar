@@ -22,6 +22,86 @@ const EVENTS = {
 // Replace this with your exact Firebase Realtime Database URL
 const FIREBASE_DB_URL = "https://eece-azhar-6f18d-default-rtdb.firebaseio.com/";
 
+// Offline cache — the service worker bypasses cross-origin (Firebase) requests,
+// so the live DB never lands in the HTTP cache. We persist the last successful
+// raw payload in localStorage and replay it when the network is unavailable, so
+// the yearbook/projects still render fully offline.
+const OFFLINE_CACHE_KEY = "eece-db-cache-v1";
+
+function saveOfflineCache(payload) {
+  try {
+    localStorage.setItem(
+      OFFLINE_CACHE_KEY,
+      JSON.stringify({ ts: Date.now(), ...payload })
+    );
+  } catch (_) {
+    // Quota / private-mode failures are non-fatal — we just skip the cache.
+  }
+}
+
+function readOfflineCache() {
+  try {
+    const raw = localStorage.getItem(OFFLINE_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// Hydrate the in-memory STUDENTS / GRADUATION_PROJECTS from a raw payload
+// (either fresh from the network or replayed from the offline cache) and run
+// every dependent re-render. Returns true when usable data was applied.
+function applyDbPayload({ studentsData, projectsData, profilesData }) {
+  if (studentsData == null && projectsData == null) return false;
+
+  STUDENTS = mergeStudentSources(studentsData, profilesData);
+  // Expose for the profile portal module (ES modules can't see top-level lets).
+  window.STUDENTS = STUDENTS;
+
+  if (projectsData) {
+    GRADUATION_PROJECTS = Array.isArray(projectsData)
+      ? projectsData.filter(Boolean)
+      : Object.values(projectsData);
+
+    GRADUATION_PROJECTS.forEach((project) => {
+      if (project.team && !Array.isArray(project.team)) {
+        project.team = Object.values(project.team);
+      }
+      applyHierarchyDefaults(project);
+    });
+  }
+  // Expose for the portal module (ES module can't see top-level lets).
+  window.GRADUATION_PROJECTS = GRADUATION_PROJECTS;
+
+  // Patch photo URLs with the Cloudflare base URL now that we have data.
+  if (typeof loadDrivePhotos === "function") loadDrivePhotos();
+
+  // Rebuild cascading filters (fresh data may add new universities/years…).
+  if (typeof buildYearbookFilters === "function") buildYearbookFilters();
+  if (currentMode === "home" && typeof renderHomeStats === "function") renderHomeStats();
+
+  // Re-render whichever view is currently active so it reflects the new data.
+  if (typeof currentMode !== "undefined") {
+    if (currentMode === "projects" && typeof renderProjects === "function") {
+      renderProjects();
+    } else if (currentMode === "yearbook" && typeof applyFilters === "function") {
+      applyFilters(false);
+    }
+  }
+  if (typeof renderStats === "function") renderStats();
+
+  // A refresh landed on /profile before the data was ready — reopen it now.
+  if (_pendingProfileKey && typeof openFullProfile === "function") {
+    const s = (STUDENTS || []).find((st) => studentKey(st) === _pendingProfileKey);
+    if (s) {
+      openFullProfile(s);
+      _pendingProfileKey = null;
+    }
+  }
+
+  return true;
+}
+
 // Students and projects — populated by fetchFirebaseData()
 let STUDENTS = [];
 let GRADUATION_PROJECTS = [];
@@ -131,47 +211,12 @@ async function fetchFirebaseData({ attempt = 1, maxAttempts = 4, baseDelay = 200
       try { profilesData = await resProfiles.json(); } catch { profilesData = null; }
     }
 
-    STUDENTS = mergeStudentSources(studentsData, profilesData);
-    // Expose for the profile portal module (ES modules can't see top-level lets).
-    window.STUDENTS = STUDENTS;
+    applyDbPayload({ studentsData, projectsData, profilesData });
 
-    if (projectsData) {
-      GRADUATION_PROJECTS = Array.isArray(projectsData)
-        ? projectsData.filter(Boolean)
-        : Object.values(projectsData);
-
-      GRADUATION_PROJECTS.forEach(project => {
-        if (project.team && !Array.isArray(project.team)) {
-          project.team = Object.values(project.team);
-        }
-        applyHierarchyDefaults(project);
-      });
-    }
-    // Expose for the portal module (ES module can't see top-level lets).
-    window.GRADUATION_PROJECTS = GRADUATION_PROJECTS;
+    // Persist the raw payload so the site renders fully offline next time.
+    saveOfflineCache({ studentsData, projectsData, profilesData });
 
     console.log(`Firebase data loaded successfully! (attempt ${attempt})`);
-
-    // Patch photo URLs with Cloudflare base URL now that we have fresh student data
-    if (typeof loadDrivePhotos === "function") await loadDrivePhotos();
-
-    // Rebuild the cascading filters now that fresh data may add new
-    // universities / faculties / departments / class years.
-    if (typeof buildYearbookFilters === "function") buildYearbookFilters();
-    if (currentMode === "home" && typeof renderHomeStats === "function") renderHomeStats();
-
-    // Re-render whichever view is currently active so it reflects live data
-    if (typeof currentMode !== "undefined") {
-      if (currentMode === "projects" && typeof renderProjects === "function") {
-        renderProjects();
-      } else if (currentMode === "yearbook" && typeof applyFilters === "function") {
-        applyFilters();
-      }
-    }
-    // Always refresh student count badges regardless of active tab
-    if (typeof renderStats === "function") {
-      renderStats();
-    }
 
     // Now that Firebase data + critical re-renders are done, start caching
     // yearbook photos in the background. The prefetch function already uses
@@ -185,7 +230,15 @@ async function fetchFirebaseData({ attempt = 1, maxAttempts = 4, baseDelay = 200
       console.warn(`Firebase fetch failed (attempt ${attempt}/${maxAttempts}), retrying in ${delay / 1000}s…`, error.message);
       setTimeout(() => fetchFirebaseData({ attempt: attempt + 1, maxAttempts, baseDelay }), delay);
     } else {
-      console.warn(`Firebase fetch failed after ${maxAttempts} attempts, using offline fallback data:`, error.message);
+      // All network attempts failed (likely offline). Replay the last good
+      // payload from localStorage so the yearbook/projects still render.
+      const cached = readOfflineCache();
+      if (cached && applyDbPayload(cached)) {
+        console.info("Offline — rendered yearbook/projects from the local cache.");
+        prefetchStudentPhotos();
+      } else {
+        console.warn(`Firebase fetch failed after ${maxAttempts} attempts and no offline cache was available:`, error.message);
+      }
     }
   }
 }
@@ -299,6 +352,11 @@ const SOCIAL_CONFIG = {
 function _isOverlayPath(name) {
   return location.pathname.replace(/^\/+|\/+$/g, "") === name;
 }
+
+// Scroll position of the underlying section, saved when an overlay (quick card
+// / full profile) opens so we can land back on the SAME card after closing,
+// instead of being thrown to the top of the grid.
+let _overlayReturnScroll = null;
 
 function openPhotoModal(student) {
   let modal = document.getElementById("photoModal");
@@ -481,6 +539,9 @@ function openPhotoModal(student) {
 
   // Add state to browser history for mobile back button
   if (!_isOverlayPath("student")) {
+    // Remember where the user was in the grid so closing returns to the same
+    // card rather than scrolling back to the very first one.
+    if (!_isOverlayPath("profile")) _overlayReturnScroll = window.scrollY;
     history.pushState({ overlay: "student" }, "", "/student");
   }
 }
@@ -544,6 +605,22 @@ function initContactForm() {
 
 // ===== Full profile page (Facebook-style, About / Graduation Project tabs) =====
 let _fpReturnMode = "yearbook";
+// Set when a refresh landed on /profile but the student data isn't loaded yet;
+// the next applyDbPayload() reopens that profile once the data arrives.
+let _pendingProfileKey = null;
+
+// A stable key for a student so a profile survives a page refresh. Prefer the
+// auth uid (unique); fall back to the normalised name (unique in practice).
+function studentKey(student) {
+  if (!student) return "";
+  if (student.ownerUid) return `uid:${student.ownerUid}`;
+  return `name:${String(student.name || "").trim().toLowerCase().replace(/\s+/g, " ")}`;
+}
+function findStudentByKey(key) {
+  if (!key) return null;
+  return (STUDENTS || []).find((s) => studentKey(s) === key) || null;
+}
+
 function openFullProfile(student) {
   const page = document.getElementById("fullProfile");
   if (!page || !student) return;
@@ -653,20 +730,33 @@ function openFullProfile(student) {
   fpShowTab("about");
   page.style.display = "block";
   document.body.classList.add("fp-open");
+  // Remember the grid scroll position before the profile takes over the screen,
+  // so closing the profile lands back on the same card. (When we arrived via the
+  // quick card, openPhotoModal already captured it — don't clobber that.)
+  if (!_isOverlayPath("student") && !_isOverlayPath("profile")) {
+    _overlayReturnScroll = window.scrollY;
+  }
   window.scrollTo(0, 0);
+  // Remember which profile is open + which section it sits on, so a page
+  // refresh on /profile can reopen the same profile instead of dumping the
+  // user back on the yearbook. (sessionStorage survives reloads; history.state
+  // alone can be dropped by some browsers on a hard refresh.)
+  const profileState = { mode: "profile-view", from: _fpReturnMode, student: studentKey(student) };
+  try { sessionStorage.setItem("eece-open-profile", JSON.stringify(profileState)); } catch (_) {}
   // History: if we came from the quick modal it left a /student entry behind —
   // replace it (so Back lands on the section, not a closed modal). Otherwise
   // push a fresh entry on top of the current section.
   if (_isOverlayPath("student")) {
-    history.replaceState({ mode: "profile-view", from: _fpReturnMode }, "", "/profile");
+    history.replaceState(profileState, "", "/profile");
   } else {
-    history.pushState({ mode: "profile-view", from: _fpReturnMode }, "", "/profile");
+    history.pushState(profileState, "", "/profile");
   }
 }
 function closeFullProfile() {
   const page = document.getElementById("fullProfile");
   if (page) page.style.display = "none";
   document.body.classList.remove("fp-open");
+  try { sessionStorage.removeItem("eece-open-profile"); } catch (_) {}
 }
 function fpShowTab(tab) {
   document.querySelectorAll(".fp-tab").forEach((b) => b.classList.toggle("active", b.dataset.fptab === tab));
@@ -1283,23 +1373,35 @@ function canonicalTrack(raw) {
     .join(" ");
 }
 
-// The canonical built-in tracks shown even before data loads (start at 0).
-const HOME_BASE_TRACKS = [
-  "Embedded Systems", "Digital Design & Verification", "Network Engineer",
-  "Embedded Linux", "DevOps", "AI",
-];
+// How many placeholder tiles to shimmer while we wait for the data.
+const HOME_TRACK_SKELETON_COUNT = 6;
 
 // Count students per track (scalable, merges duplicates) and render on Home.
-// Tiles are always present (built-ins start at 0) and count up with animation
-// once data arrives — matching the headline stats above.
+// Until the data loads we show a shimmer skeleton (no fake fixed tracks). The
+// moment students arrive we render EVERY real track found in the data, in full,
+// with the counts animating up — so the section reflects reality, not a guess.
 function renderHomeTrackBreakdown() {
   const section = document.getElementById("homeTracksSection");
   const grid = document.getElementById("homeTrackGrid");
   if (!grid || !section) return;
   section.style.display = "";
 
+  // ── No data yet → loading skeleton ──
+  if (!STUDENTS || STUDENTS.length === 0) {
+    if (!grid.classList.contains("is-loading")) {
+      grid.classList.add("is-loading");
+      grid.innerHTML = Array.from({ length: HOME_TRACK_SKELETON_COUNT })
+        .map(() => `
+          <div class="home-track-item home-track-skeleton" aria-hidden="true">
+            <span class="home-track-count skeleton-box"></span>
+            <span class="home-track-name skeleton-box"></span>
+          </div>`).join("");
+    }
+    return;
+  }
+
+  // ── Data loaded → real, full track breakdown ──
   const counts = {};
-  HOME_BASE_TRACKS.forEach((t) => { counts[t] = 0; }); // baseline so tiles show at 0
   STUDENTS.forEach((s) => {
     let tracks = s.track;
     if (!tracks) return;
@@ -1314,10 +1416,12 @@ function renderHomeTrackBreakdown() {
   });
 
   const entries = Object.entries(counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  if (!entries.length) { section.style.display = "none"; return; }
 
-  // Reuse existing tiles when the track set is unchanged so we can animate the
-  // number from its current value instead of rebuilding (avoids the flash).
-  const sameSet = grid.childElementCount === entries.length &&
+  // Leaving the skeleton state (or the track set changed) → rebuild tiles.
+  const wasLoading = grid.classList.contains("is-loading");
+  grid.classList.remove("is-loading");
+  const sameSet = !wasLoading && grid.childElementCount === entries.length &&
     entries.every(([t], i) => grid.children[i]?.dataset.track === t);
 
   if (!sameSet) {
@@ -1788,6 +1892,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   applyFilters();
   renderStats();
 
+  // If we have a cached Firebase payload from a previous online visit, replay
+  // it immediately. This makes the full yearbook/projects appear instantly on
+  // offline loads instead of waiting for ~30s of network retries to time out.
+  const _cachedDb = readOfflineCache();
+  if (_cachedDb) applyDbPayload(_cachedDb);
+
   // Browser Back/Forward (and backspace) navigate between views in-page.
   window.addEventListener("popstate", (e) => {
     const mode = (e.state && e.state.mode) || "home";
@@ -1800,18 +1910,61 @@ document.addEventListener("DOMContentLoaded", async () => {
     // "profile-view" isn't a real section; the overlay is shown by openFullProfile.
     // Restore the section that was under it instead so Back/Forward stays sane.
     if (mode === "profile-view") return;
+
+    // Closing an overlay (quick card / full profile) → we have a saved scroll
+    // position to restore so the user lands back on the same card. switchMode
+    // re-renders the grid and forces scroll to the top, so re-apply our saved
+    // position right after (and after layout settles).
+    const restoreScroll = _overlayReturnScroll;
     switchMode(mode, true); // replay without pushing a new entry
+    if (restoreScroll != null) {
+      window.scrollTo(0, restoreScroll);
+      requestAnimationFrame(() => window.scrollTo(0, restoreScroll));
+      _overlayReturnScroll = null;
+    }
   });
 
   // Land on the right view for the current URL (seed the first history entry).
-  // /profile and /student are transient overlays (full profile / quick card)
-  // that need a student object we don't have on a cold load — refreshing there
-  // would leave a blank page, so fall back to a real base section instead.
+  // /student is a transient quick-card overlay that needs a student object we
+  // don't have on a cold load, so it falls back to the yearbook. /profile is
+  // restored: we remembered which student was open (sessionStorage), so we land
+  // on the section it sat on and reopen the same profile once data is ready.
   const firstSeg = (location.pathname || "/").replace(/^\/+|\/+$/g, "");
   const OVERLAY_PATHS = ["profile", "profile-view", "student"];
-  let startMode = OVERLAY_PATHS.includes(firstSeg) ? "yearbook" : pathToMode();
+
+  let savedProfile = null;
+  if (firstSeg === "profile" || firstSeg === "profile-view") {
+    try { savedProfile = JSON.parse(sessionStorage.getItem("eece-open-profile") || "null"); } catch (_) {}
+  }
+
+  let startMode;
+  if (savedProfile && savedProfile.student) {
+    // The section the profile sat on (yearbook/projects/home) is the base view.
+    startMode = VALID_MODES.includes(savedProfile.from) ? savedProfile.from : "yearbook";
+  } else if (OVERLAY_PATHS.includes(firstSeg)) {
+    startMode = "yearbook";
+  } else {
+    startMode = pathToMode();
+  }
   history.replaceState({ mode: startMode }, "", modeToPath(startMode));
   switchMode(startMode, true);
+
+  // If a profile was open before the refresh, reopen it. Try now (data may
+  // already be in the offline cache); if the student isn't loaded yet, stash
+  // the key so fetchFirebaseData reopens it the moment fresh data arrives.
+  if (savedProfile && savedProfile.student) {
+    const reopen = () => {
+      const s = findStudentByKey(savedProfile.student);
+      if (s && typeof openFullProfile === "function") {
+        // Push a fresh /profile entry on top of the base section so Back works.
+        openFullProfile(s);
+        _pendingProfileKey = null;
+        return true;
+      }
+      return false;
+    };
+    if (!reopen()) _pendingProfileKey = savedProfile.student;
+  }
 
   // Fetch fresh data from Firebase in the background — no blocking await.
   // On success it calls loadDrivePhotos + renderStats + re-renders active view.

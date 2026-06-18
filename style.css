@@ -3291,6 +3291,43 @@ body.portal-active .footer { display: none !important; }
     max-width: 9em;
 }
 
+/* ── Loading skeleton for the track breakdown (shown until data arrives) ── */
+.home-track-skeleton {
+    pointer-events: none;
+}
+.home-track-skeleton:hover {
+    border-color: var(--glass-border);
+    background: rgba(255, 255, 255, 0.03);
+    transform: none;
+}
+.skeleton-box {
+    display: inline-block;
+    border-radius: 8px;
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.05) 25%,
+        rgba(255, 255, 255, 0.12) 37%,
+        rgba(255, 255, 255, 0.05) 63%
+    );
+    background-size: 400% 100%;
+    animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+.home-track-skeleton .home-track-count {
+    width: 1.6em;
+    height: 1.8rem;
+}
+.home-track-skeleton .home-track-name {
+    width: 6em;
+    height: 1rem;
+}
+@keyframes skeleton-shimmer {
+    0% { background-position: 100% 0; }
+    100% { background-position: 0 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .skeleton-box { animation: none; }
+}
+
 /* Sections */
 .home-section-title {
     text-align: center;
