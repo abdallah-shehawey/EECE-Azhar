@@ -1049,62 +1049,93 @@ body.nav-open .nav-toggle-bar:nth-child(3) { transform: translateY(-7.5px) rotat
 }
 
 /* ===== Yearbook Stats ===== */
+/* Segmented pill bar — track filter for the yearbook.
+   A single cohesive rail of horizontal pills; each pill shows its label
+   inline with a count badge. Wired to toggleCategoryFilter() in script.js. */
 .yearbook-stats {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 15px;
-    margin-bottom: 30px;
-    padding: 0 10px;
+    gap: 8px;
+    margin: 0 auto 30px;
+    padding: 7px;
+    max-width: max-content;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(139, 92, 246, 0.16);
+    border-radius: 999px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04),
+        0 8px 24px rgba(0, 0, 0, 0.22);
 }
 
 .stat-item {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(139, 92, 246, 0.2);
-    border-radius: 12px;
-    padding: 10px 18px;
-    display: flex;
-    flex-direction: column;
+    font-family: inherit;
+    appearance: none;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    padding: 8px 16px;
+    display: inline-flex;
     align-items: center;
-    min-width: 110px;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-    transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease, border-color 0.3s ease;
+    gap: 9px;
     cursor: pointer;
+    color: var(--text-secondary);
+    transition: color 0.2s ease, background 0.25s ease,
+        border-color 0.25s ease, box-shadow 0.25s ease, transform 0.15s ease;
 }
 
 .stat-item:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 20px rgba(139, 92, 246, 0.25);
-    border-color: rgba(139, 92, 246, 0.5);
+    color: #fff;
+    background: rgba(139, 92, 246, 0.12);
+    border-color: rgba(139, 92, 246, 0.35);
+}
+
+.stat-item:active {
+    transform: scale(0.97);
+}
+
+.stat-item:focus-visible {
+    outline: 2px solid var(--accent-light);
+    outline-offset: 2px;
 }
 
 .stat-item.active-filter {
-    background: rgba(139, 92, 246, 0.25);
-    border-color: var(--accent);
-    box-shadow: 0 6px 25px rgba(139, 92, 246, 0.45);
-    transform: translateY(-3px);
-}
-
-.stat-number {
-    font-size: 1.5rem;
-    font-weight: 800;
-    background: linear-gradient(135deg, #fff 0%, #c4b5fd 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    line-height: 1.2;
-    margin-bottom: 2px;
+    color: #fff;
+    background: linear-gradient(135deg, var(--accent), #ec4899);
+    border-color: transparent;
+    box-shadow: 0 6px 18px var(--accent-glow);
 }
 
 .stat-label {
     font-family: var(--font-secondary);
-    font-size: 0.75rem;
-    color: var(--text-secondary);
+    font-size: 0.8rem;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
+    line-height: 1;
+}
+
+.stat-number {
+    font-size: 0.72rem;
+    font-weight: 800;
+    line-height: 1;
+    min-width: 1.5em;
+    padding: 3px 7px;
+    border-radius: 999px;
+    text-align: center;
+    color: var(--accent-light);
+    background: rgba(139, 92, 246, 0.16);
+    transition: color 0.25s ease, background 0.25s ease;
+}
+
+.stat-item:hover .stat-number {
+    color: #fff;
+}
+
+.stat-item.active-filter .stat-number {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.22);
 }
 
 .gender-tabs {
@@ -2573,31 +2604,38 @@ body.nav-open .nav-toggle-bar:nth-child(3) { transform: translateY(-7.5px) rotat
         font-size: clamp(0.8rem, 3.5vw, 0.95rem);
     }
 
+    /* On phones the pill bar becomes a single scrollable rail rather than
+       wrapping/cramming, so labels stay readable. */
     .yearbook-stats {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 6px;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        max-width: 100%;
         margin-bottom: 15px;
-        padding: 0 5px;
+        padding: 6px;
+        gap: 6px;
+        border-radius: 18px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+
+    .yearbook-stats::-webkit-scrollbar {
+        display: none;
     }
 
     .stat-item {
-        padding: 6px 2px;
-        min-width: 0;
-        border-radius: 8px;
-        width: 100%;
-    }
-
-    .stat-number {
-        font-size: clamp(0.85rem, 3vw, 1.1rem);
-        margin-bottom: 0;
+        flex: 0 0 auto;
+        padding: 7px 12px;
+        gap: 7px;
     }
 
     .stat-label {
-        font-size: clamp(0.45rem, 1.8vw, 0.5rem);
-        letter-spacing: -0.2px;
-        text-align: center;
-        line-height: 1.1;
+        font-size: 0.72rem;
+    }
+
+    .stat-number {
+        font-size: 0.65rem;
+        padding: 3px 6px;
     }
 
     /* countdown-number already uses clamp */
@@ -4088,14 +4126,18 @@ body.fp-open { overflow: hidden; }
 }
 
 .fp-header {
+    position: relative;
+    z-index: 2;          /* sit ABOVE the cover banner */
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     gap: 1.2rem;
-    margin: -62px 0 0;
+    margin: -52px 0 0;
     padding: 0 1.4rem 0;
     flex-wrap: wrap;
 }
 .fp-avatar {
+    position: relative;
+    z-index: 2;          /* the photo overlaps the cover, never hides behind it */
     width: 124px;
     height: 124px;
     flex-shrink: 0;

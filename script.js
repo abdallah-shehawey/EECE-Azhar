@@ -293,6 +293,13 @@ const SOCIAL_CONFIG = {
   },
 };
 
+// True when the current URL path is one of the transient overlay routes
+// (/student → quick card, /profile → full profile). These aren't real
+// sections; they sit on top of one and are driven by their open/close funcs.
+function _isOverlayPath(name) {
+  return location.pathname.replace(/^\/+|\/+$/g, "") === name;
+}
+
 function openPhotoModal(student) {
   let modal = document.getElementById("photoModal");
 
@@ -307,7 +314,7 @@ function openPhotoModal(student) {
     modal.closeModal = (fromPopState = false) => {
       modal.classList.remove("active");
       setTimeout(() => (modal.style.display = "none"), 300);
-      if (!fromPopState && window.location.hash === "#student") {
+      if (!fromPopState && _isOverlayPath("student")) {
         history.back();
       }
     };
@@ -338,10 +345,7 @@ function openPhotoModal(student) {
 
     // Handle hardware back button
     window.addEventListener("popstate", (e) => {
-      if (
-        modal.style.display === "flex" &&
-        window.location.hash !== "#student"
-      ) {
+      if (modal.style.display === "flex" && !_isOverlayPath("student")) {
         modal.closeModal(true);
       }
     });
@@ -476,8 +480,8 @@ function openPhotoModal(student) {
   modal.classList.add("active");
 
   // Add state to browser history for mobile back button
-  if (window.location.hash !== "#student") {
-    history.pushState(null, "", "#student");
+  if (!_isOverlayPath("student")) {
+    history.pushState({ overlay: "student" }, "", "/student");
   }
 }
 
@@ -625,12 +629,13 @@ function openFullProfile(student) {
         <div class="fp-member-grid">${members}</div>
       </div>`;
     }).join("");
-    // Clicking a registered member swaps this profile for theirs (their full
-    // profile page). Non-registered names aren't clickable.
+    // Clicking a registered member opens THEIR quick card (the photo modal) on
+    // top of this profile — from there the visitor can choose to open the full
+    // profile if they want. Non-registered names aren't clickable.
     projPanel.querySelectorAll(".fp-member").forEach((btn) => {
       const rec = studentByName.get(norm(btn.dataset.name));
       if (!rec) { btn.classList.add("fp-member-static"); btn.disabled = true; return; }
-      btn.addEventListener("click", () => openFullProfile(rec));
+      btn.addEventListener("click", () => openPhotoModal(rec));
     });
   } else if (projTabBtn && projPanel) {
     projTabBtn.style.display = "none";
@@ -649,13 +654,13 @@ function openFullProfile(student) {
   page.style.display = "block";
   document.body.classList.add("fp-open");
   window.scrollTo(0, 0);
-  // History: if we came from the quick modal it left a #student entry behind —
+  // History: if we came from the quick modal it left a /student entry behind —
   // replace it (so Back lands on the section, not a closed modal). Otherwise
   // push a fresh entry on top of the current section.
-  if (window.location.hash === "#student") {
-    history.replaceState({ mode: "profile-view", from: _fpReturnMode }, "", "#profile");
+  if (_isOverlayPath("student")) {
+    history.replaceState({ mode: "profile-view", from: _fpReturnMode }, "", "/profile");
   } else {
-    history.pushState({ mode: "profile-view", from: _fpReturnMode }, "", "#profile");
+    history.pushState({ mode: "profile-view", from: _fpReturnMode }, "", "/profile");
   }
 }
 function closeFullProfile() {
@@ -1080,10 +1085,10 @@ function renderStats() {
           ? selectedCategories.size === 0
           : selectedCategories.has(stat.category);
       return `
-        <div class="stat-item ${isActive ? "active-filter" : ""}" data-category="${stat.category}" onclick="toggleCategoryFilter('${stat.category}')">
-            <span class="stat-number" data-target="${stat.count}">0</span>
+        <button type="button" class="stat-item ${isActive ? "active-filter" : ""}" data-category="${stat.category}" aria-pressed="${isActive}" onclick="toggleCategoryFilter('${stat.category}')">
             <span class="stat-label">${stat.label}</span>
-        </div>
+            <span class="stat-number" data-target="${stat.count}">0</span>
+        </button>
         `;
     })
     .join("");
@@ -1126,11 +1131,12 @@ function toggleCategoryFilter(cat) {
   const statItems = document.querySelectorAll(".stat-item");
   statItems.forEach((item) => {
     const itemCat = item.getAttribute("data-category");
-    if (itemCat === "All") {
-      item.classList.toggle("active-filter", selectedCategories.size === 0);
-    } else {
-      item.classList.toggle("active-filter", selectedCategories.has(itemCat));
-    }
+    const on =
+      itemCat === "All"
+        ? selectedCategories.size === 0
+        : selectedCategories.has(itemCat);
+    item.classList.toggle("active-filter", on);
+    item.setAttribute("aria-pressed", String(on));
   });
 
   applyFilters();
@@ -1797,9 +1803,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     switchMode(mode, true); // replay without pushing a new entry
   });
 
-  // Land on the Home page by default (seed the first history entry).
-  const startMode = (location.hash || "").replace("#", "") || "home";
-  history.replaceState({ mode: startMode }, "", `#${startMode}`);
+  // Land on the right view for the current URL (seed the first history entry).
+  // /profile and /student are transient overlays (full profile / quick card)
+  // that need a student object we don't have on a cold load — refreshing there
+  // would leave a blank page, so fall back to a real base section instead.
+  const firstSeg = (location.pathname || "/").replace(/^\/+|\/+$/g, "");
+  const OVERLAY_PATHS = ["profile", "profile-view", "student"];
+  let startMode = OVERLAY_PATHS.includes(firstSeg) ? "yearbook" : pathToMode();
+  history.replaceState({ mode: startMode }, "", modeToPath(startMode));
   switchMode(startMode, true);
 
   // Fetch fresh data from Firebase in the background — no blocking await.
@@ -1849,6 +1860,25 @@ function initNavMenu() {
 // "Join Us" button / account dropdown, not from the section links.
 const PORTAL_MODES = ["submit", "admin"];
 
+// ── Clean-URL routing ──
+// Every view maps to a real path (e.g. "/yearbook"), so links are shareable
+// and refreshing lands on the same view. The server rewrites unknown paths
+// back to index.html (see vercel.json), and we resolve the path → mode here.
+// Home is the root "/", never "/home", so the canonical URL stays clean.
+const VALID_MODES = ["home", "countdown", "yearbook", "projects", "submit", "admin"];
+
+function modeToPath(mode) {
+  return mode === "home" ? "/" : `/${mode}`;
+}
+
+// Resolve the current location (or a given path) to a real mode, falling back
+// to "home" for the root and anything unrecognised.
+function pathToMode(pathname = location.pathname) {
+  const seg = (pathname || "/").replace(/^\/+|\/+$/g, "");
+  if (!seg) return "home";
+  return VALID_MODES.includes(seg) ? seg : "home";
+}
+
 function switchMode(mode, fromHistory = false) {
   const prevMode = currentMode;
   currentMode = mode;
@@ -1857,8 +1887,9 @@ function switchMode(mode, fromHistory = false) {
 
   // Push a history entry so the browser Back button / backspace returns to the
   // previous view instead of leaving the site. popstate replays without pushing.
+  // Clean path-based URLs (e.g. /yearbook); Home lives at the root "/".
   if (!fromHistory && prevMode !== mode) {
-    try { history.pushState({ mode }, "", `#${mode}`); } catch (_) {}
+    try { history.pushState({ mode }, "", modeToPath(mode)); } catch (_) {}
   }
 
   // Always close the mobile nav drawer when navigating.
