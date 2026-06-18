@@ -78,6 +78,7 @@ function mergeStudentSources(studentsData, profilesData) {
         faculty: p.faculty,
         department: p.department,
         classYear: p.classYear,
+        email: p.email || "",
         ownerUid: uid,
       }));
     });
@@ -133,6 +134,8 @@ async function fetchFirebaseData({ attempt = 1, maxAttempts = 4, baseDelay = 200
         applyHierarchyDefaults(project);
       });
     }
+    // Expose for the portal module (ES module can't see top-level lets).
+    window.GRADUATION_PROJECTS = GRADUATION_PROJECTS;
 
     console.log(`Firebase data loaded successfully! (attempt ${attempt})`);
 

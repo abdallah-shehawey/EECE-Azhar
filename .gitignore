@@ -1,0 +1,11 @@
+# Local admin tooling — contains student name→email mapping, never publish.
+scripts/set-student-emails.mjs
+
+# Secrets / env (never commit)
+.env
+.env.*
+*.secret
+
+# OS / editor cruft
+.DS_Store
+node_modules/

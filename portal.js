@@ -236,6 +236,20 @@ function sanitiseFileName(original) {
   return `${clean || "photo"}.${ext}`;
 }
 
+/** Fire an admin notification email (best-effort — never blocks the user). */
+async function notifyAdmin(payload) {
+  try {
+    await fetch("/api/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch (e) {
+    // Non-fatal: the submission already succeeded; the email is just a bonus.
+    console.warn("notifyAdmin failed:", e.message);
+  }
+}
+
 /* ════════════════════════════════════════════
    § 2 — AUTH (Google sign-in / out)
 ════════════════════════════════════════════ */
@@ -292,12 +306,77 @@ onAuthStateChanged(auth, async (user) => {
     } catch (e) {
       console.warn("Could not load profile:", e.message);
     }
+    // No /profiles entry yet? If an existing yearbook card carries this user's
+    // Gmail (assigned by the admin in Firebase), adopt it SILENTLY as their
+    // live profile — as if they'd registered it themselves — and persist the
+    // link (ownerUid) so it sticks. Brand-new users just create a profile.
+    if (!myProfile) {
+      const card = findClaimableCard(user.email, user.displayName);
+      if (card) {
+        myProfile = { ...profileFromLegacy(card), status: "live", email: user.email, uid: user.uid };
+        try {
+          await set(ref(db, `profiles/${user.uid}`), {
+            ...myProfile,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          });
+          // Tag the legacy card with the owner so it isn't matched again / dupes.
+          if (card.ownerUid !== user.uid) {
+            await set(ref(db, `students/${sanitizeKey(card.name)}/ownerUid`), user.uid);
+          }
+          if (typeof window.fetchFirebaseData === "function") window.fetchFirebaseData();
+        } catch (e) {
+          console.warn("Auto-link card failed:", e.message);
+        }
+      }
+    }
   }
   updateAuthUI();
   hydrateProfileForm();
   // If admin is already viewing the Approvals panel, refresh it.
   if (isAdmin && document.body.dataset.mode === "admin") loadPending();
 });
+
+/**
+ * Find an existing, unclaimed (no ownerUid) yearbook card that belongs to this
+ * account. You assign each current student their fixed Gmail in the Firebase
+ * /students/{key}/email field; when they sign in with that Gmail we match it
+ * here so their profile links to their existing card automatically.
+ * Matches by email first (reliable), then by display name as a fallback.
+ */
+function findClaimableCard(email, name) {
+  if (!Array.isArray(window.STUDENTS)) return null;
+  const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+  const e = norm(email);
+  if (e) {
+    const byEmail = window.STUDENTS.find((s) => !s.ownerUid && norm(s.email) === e);
+    if (byEmail) return byEmail;
+  }
+  const n = norm(name);
+  if (n) {
+    const byName = window.STUDENTS.find((s) => !s.ownerUid && norm(s.name) === n);
+    if (byName) return byName;
+  }
+  return null;
+}
+
+/** Build a myProfile-shaped object from a legacy /students record (for claiming). */
+function profileFromLegacy(rec) {
+  return {
+    name: rec.name,
+    gender: rec.gender || "",
+    photo: rec.photo && rec.photo.startsWith("http") ? rec.photo.split("/").pop() : (rec.photo || ""),
+    tracks: rec.track || [],
+    skills: rec.skills || [],
+    color: rec.color || "",
+    university: rec.university || "",
+    faculty: rec.faculty || "",
+    department: rec.department || "",
+    classYear: rec.classYear || "",
+    social: rec.social || {},
+    status: "claim", // sentinel: not yet a real profile
+  };
+}
 
 /**
  * Fill the profile form from myProfile (edit mode) or reset it (create mode),
@@ -365,6 +444,34 @@ function hydrateProfileForm() {
     if (btnLabel) btnLabel.textContent = "⚡ Create profile";
     if (badge) badge.style.display = "none";
   }
+
+  renderMyProjects();
+}
+
+/** List the graduation projects the signed-in user is a member of, on their profile. */
+function renderMyProjects() {
+  const wrap = $("myProjectsWrap");
+  const list = $("myProjectsList");
+  if (!wrap || !list) return;
+  const me = (myProfile && myProfile.name) || (currentUser && currentUser.displayName) || "";
+  const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+  const mine = norm(me);
+  const projects = Array.isArray(window.GRADUATION_PROJECTS) ? window.GRADUATION_PROJECTS : [];
+  const found = !mine ? [] : projects.filter((p) => {
+    const team = Array.isArray(p.team) ? p.team : Object.values(p.team || {});
+    return team.some((m) => norm(m.name) === mine);
+  });
+  if (!found.length) { wrap.style.display = "none"; return; }
+  wrap.style.display = "";
+  list.innerHTML = found.map((p) => {
+    const team = Array.isArray(p.team) ? p.team : Object.values(p.team || {});
+    const mates = team.map((m) => esc(m.name) + (m.leader ? " ★" : "")).join(", ");
+    return `<div class="my-project-item">
+      <div class="my-project-head">${esc(p.icon || "🚀")} <strong>${esc(p.category || "Project")}</strong>
+        <span class="my-project-meta">${esc(p.classYear || "")}</span></div>
+      <div class="my-project-team">${mates}</div>
+    </div>`;
+  }).join("");
 }
 
 /** Load the saved tracks into the multi-select (handled inside the form module). */
@@ -422,10 +529,19 @@ function updateAuthUI() {
   // Admin-only menu item
   if (adminItem) adminItem.style.display = isAdmin ? "" : "none";
 
-  // Home CTA: "Create your profile" → "Open your profile" once signed in.
+  // The navbar "Join Us" button is only for signed-out visitors. Once signed
+  // in, profile actions live inside the account dropdown instead.
+  const navSubmit = $("navSubmitBtn");
+  if (navSubmit) navSubmit.style.display = currentUser ? "none" : "";
+
+  // Dropdown profile item: "Create profile" (no profile yet) → "My profile".
+  const menuSubmitLabel = document.querySelector("#menuSubmitBtn span");
+  if (menuSubmitLabel) menuSubmitLabel.textContent = myProfile ? "My profile" : "Create profile";
+
+  // Home CTA mirrors the same wording.
   const homeCta = $("homeProfileCta");
   if (homeCta) homeCta.textContent = currentUser
-    ? (myProfile ? "Open your profile" : "Create your profile")
+    ? (myProfile ? "My profile" : "Create your profile")
     : "Create your profile";
 
   // Submit section: gate vs form
@@ -526,12 +642,28 @@ function initSubmissionForm() {
   });
 
   /* — Dynamic team list — */
+  // Shared <datalist> of registered yearbook students for team-member
+  // autocomplete (so projects link to real, registered people).
+  function ensureStudentsDatalist() {
+    let dl = $("registeredStudentsList");
+    if (!dl) {
+      dl = document.createElement("datalist");
+      dl.id = "registeredStudentsList";
+      document.body.appendChild(dl);
+    }
+    const names = Array.isArray(window.STUDENTS)
+      ? [...new Set(window.STUDENTS.map((s) => s.name).filter(Boolean))].sort((a, b) => a.localeCompare(b))
+      : [];
+    dl.innerHTML = names.map((n) => `<option value="${n.replace(/"/g, "&quot;")}"></option>`).join("");
+  }
+
   function createTeamRow(isLeader = false) {
+    ensureStudentsDatalist();
     const row = document.createElement("div");
     row.className = "team-member-row";
     const uid = Math.random().toString(36).substr(2, 9);
     row.innerHTML = `
-        <input type="text" class="member-name" placeholder="Member Name" />
+        <input type="text" class="member-name" list="registeredStudentsList" placeholder="Start typing a registered name…" autocomplete="off" />
         <label class="leader-label" for="leader_${uid}">
             <input type="radio" name="teamLeader" id="leader_${uid}" value="1" ${isLeader ? "checked" : ""} />
             Leader
@@ -957,6 +1089,7 @@ function initSubmissionForm() {
     };
     const pendingRef = push(ref(db, "pending"));
     await set(pendingRef, entry);
+    notifyAdmin({ type: "submission", name: currentUser.displayName || "", kind: `${data.type} submission` });
   }
 
   /* — Shape the form data into a /profiles/{uid} object — */
@@ -1034,6 +1167,8 @@ function initSubmissionForm() {
       createdAt: now,
       payload: { ...data, ownerUid: uid },
     });
+    // Tell the admin a new profile is waiting (best-effort email).
+    notifyAdmin({ type: "submission", name: data.name, kind: "student profile" });
     return false;
   }
 

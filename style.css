@@ -3703,6 +3703,19 @@ select.field-input option { background: var(--bg-deep); color: var(--text-primar
     cursor: pointer;
 }
 
+/* ── "Projects you're part of" on the profile ── */
+.my-projects-title { font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin: 0 0 0.8rem; }
+.my-projects-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.my-project-item {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 0.8rem 1rem;
+}
+.my-project-head { font-size: 0.95rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem; }
+.my-project-meta { margin-left: auto; font-size: 0.78rem; color: var(--text-muted); }
+.my-project-team { font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.3rem; }
+
 /* ── Profile status badge (Live / Pending) ── */
 .profile-status-badge {
     display: inline-block;

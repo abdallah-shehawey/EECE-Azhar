@@ -86,7 +86,7 @@
     <!-- Header / Top Navbar (full-width, outside the centered container) -->
     <header class="navbar">
       <div class="navbar-inner">
-            <button class="navbar-brand" type="button" onclick="switchMode('countdown')" aria-label="EECE 2026 — home">
+            <button class="navbar-brand" type="button" onclick="switchMode('home')" aria-label="EECE 2026 — home">
                 <span class="brand-logos" aria-hidden="true">
                     <img src="logo-faculty.webp" alt="" class="brand-logo" width="34" height="34" />
                     <img src="logo-university.webp" alt="" class="brand-logo" width="34" height="34" />
@@ -440,7 +440,7 @@
 
         <!-- ===== MODE: JOIN / SUBMIT ===== -->
         <div id="mode-submit" class="portal-section" style="display: none;">
-            <button type="button" class="portal-back" onclick="switchMode('countdown')" aria-label="Back to home">
+            <button type="button" class="portal-back" onclick="switchMode('home')" aria-label="Back to home">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
                 <span>Back</span>
             </button>
@@ -698,11 +698,17 @@
                     </div>
                 </form>
             </div>
+
+            <!-- Projects this signed-in user is a member of (filled by portal.js) -->
+            <div id="myProjectsWrap" class="glass-panel" style="display:none; margin-top:1.5rem;">
+                <h3 class="my-projects-title">🚀 Projects you're part of</h3>
+                <div id="myProjectsList" class="my-projects-list"></div>
+            </div>
         </div>
 
         <!-- ===== MODE: APPROVALS (Admin) ===== -->
         <div id="mode-admin" class="portal-section" style="display: none;">
-            <button type="button" class="portal-back" onclick="switchMode('countdown')" aria-label="Back to home">
+            <button type="button" class="portal-back" onclick="switchMode('home')" aria-label="Back to home">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
                 <span>Back</span>
             </button>
