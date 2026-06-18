@@ -334,9 +334,11 @@ onAuthStateChanged(auth, async (user) => {
             createdAt: Date.now(),
             updatedAt: Date.now(),
           });
-          // Tag the legacy card with the owner so it isn't matched again / dupes.
+          // Tag the legacy card (by its REAL Firebase key) with the owner so it
+          // isn't matched again. _key is set by mergeStudentSources.
+          const realKey = card._key || sanitizeKey(card.name);
           if (card.ownerUid !== user.uid) {
-            await set(ref(db, `students/${sanitizeKey(card.name)}/ownerUid`), user.uid);
+            await set(ref(db, `students/${realKey}/ownerUid`), user.uid);
           }
           if (typeof window.fetchFirebaseData === "function") window.fetchFirebaseData();
         } catch (e) {

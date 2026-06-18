@@ -51,11 +51,15 @@ function mergeStudentSources(studentsData, profilesData) {
   const byKey = new Map();
   const nrm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
 
-  const legacy = !studentsData
-    ? []
-    : Array.isArray(studentsData)
-      ? studentsData.filter(Boolean)
-      : Object.values(studentsData);
+  // Keep the Firebase key on each legacy record (as _key) so we can target the
+  // exact /students/<key> node later (e.g. to stamp ownerUid). Object.values
+  // would otherwise lose the key.
+  let legacy = [];
+  if (Array.isArray(studentsData)) {
+    legacy = studentsData.map((s, i) => (s ? { ...s, _key: String(i) } : null)).filter(Boolean);
+  } else if (studentsData) {
+    legacy = Object.entries(studentsData).map(([k, s]) => ({ ...s, _key: k }));
+  }
   legacy.forEach((s) => {
     if (!s || !s.name) return;
     applyHierarchyDefaults(s);
