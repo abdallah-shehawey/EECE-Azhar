@@ -95,7 +95,23 @@ body {
 /* ════════════════════════════════════════════
    BACKGROUND — Orbs & Particles
 ════════════════════════════════════════════ */
-.bg-orbs { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+/* Fixed background layer. On mobile the browser toolbar hides on scroll, which
+   GROWS the visual viewport; a layer pinned to inset:0 (the small/layout
+   viewport) then leaves an uncovered strip at the bottom that flashes the page
+   behind and breaks the gradient. Anchoring to the LARGE viewport height (lvh —
+   the toolbar-hidden size) keeps it covering in every toolbar state. The solid
+   html/body background is the final safety net underneath. */
+.bg-orbs {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 100vh;            /* fallback for browsers without lvh */
+    height: 100lvh;           /* always the toolbar-hidden height on mobile */
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+}
 
 .orb {
     position: absolute;
@@ -1568,6 +1584,7 @@ body.nav-open .nav-toggle-bar:nth-child(3) { transform: translateY(-7.5px) rotat
     left: 0;
     width: 100vw;
     height: 100vh;
+    height: 100dvh;            /* track the dynamic viewport so it never leaves a gap on mobile */
     background: rgba(10, 10, 15, 0.85);
     backdrop-filter: blur(8px);
     z-index: 9999;
@@ -3583,6 +3600,30 @@ body.portal-active .footer { display: none !important; }
 
 @media (max-width: 640px) {
     .home-stats { grid-template-columns: repeat(2, 1fr); }
+
+    /* Track breakdown: compact 3-per-row grid (dashboard-style) instead of the
+       wide flex pills that wrapped awkwardly on small screens. */
+    .home-track-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.5rem;
+    }
+    .home-track-item {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 0.25rem;
+        min-width: 0;
+        padding: 0.6rem 0.4rem;
+        border-radius: 12px;
+    }
+    .home-track-count { font-size: 1.25rem; }
+    .home-track-name {
+        font-size: 0.68rem;
+        font-weight: 600;
+        max-width: 100%;
+        line-height: 1.2;
+    }
 }
 
 /* ── Portal sections (Submit / Admin) ── */
@@ -4322,7 +4363,11 @@ body.fp-open { overflow: hidden; }
 
 .full-profile {
     position: fixed;
-    inset: 0;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 100vh;             /* fallback */
+    height: 100dvh;            /* scroll container tracks the dynamic viewport (no bottom gap on mobile) */
     z-index: 1200;
     overflow-y: auto;
     background:
@@ -4649,3 +4694,58 @@ body.fp-open { overflow: hidden; }
     .edit-avatar { width: 92px; height: 92px; bottom: -48px; }
     .edit-profile-head { margin-bottom: 56px; }
 }
+
+/* ── Admin "Edit a profile" picker (built on the fly by openAdminEditPicker) ── */
+.admin-picker-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 100vh;
+    height: 100dvh;
+    z-index: 1400;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 6vh 1rem 1rem;
+    background: rgba(2, 3, 10, 0.72);
+    backdrop-filter: blur(4px);
+}
+.admin-picker {
+    width: 100%;
+    max-width: 460px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    padding: 1.2rem;
+}
+.admin-picker-head { display: flex; align-items: center; justify-content: space-between; }
+.admin-picker-head h3 { margin: 0; font-size: 1.15rem; color: var(--text-primary); }
+.admin-picker-close {
+    background: none; border: none; color: var(--text-secondary);
+    font-size: 1.6rem; line-height: 1; cursor: pointer; padding: 0 0.3rem;
+}
+.admin-picker-close:hover { color: var(--text-primary); }
+.admin-picker-list { overflow-y: auto; display: flex; flex-direction: column; gap: 0.35rem; }
+.admin-picker-row {
+    display: flex; align-items: center; gap: 0.75rem;
+    width: 100%; text-align: left;
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    border-radius: 12px; padding: 0.55rem 0.7rem; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, transform 0.1s;
+}
+.admin-picker-row:hover {
+    border-color: var(--border-accent, rgba(139, 92, 246, 0.55));
+    background: rgba(139, 92, 246, 0.06);
+    transform: translateY(-1px);
+}
+.admin-picker-av {
+    width: 38px; height: 38px; flex-shrink: 0; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 0.8rem; font-weight: 700; color: #fff; background: var(--gradient-2);
+}
+.admin-picker-meta { display: flex; flex-direction: column; min-width: 0; }
+.admin-picker-name { font-weight: 600; color: var(--text-primary); }
+.admin-picker-dept { font-size: 0.78rem; color: var(--text-muted); }
+.admin-picker-empty { color: var(--text-muted); text-align: center; padding: 1rem; }

@@ -1,6 +1,9 @@
 # Local admin tooling — contains student name→email mapping, never publish.
 scripts/set-student-emails.mjs
 
+# Firebase data backups (contain student emails) — local safety copies only.
+scripts/backup/
+
 # Secrets / env (never commit)
 .env
 .env.*

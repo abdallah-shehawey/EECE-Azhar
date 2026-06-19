@@ -58,6 +58,7 @@ let isAdmin = false;
 let pendingCache = {}; // id → entry (so Approve/Reject can read the data)
 let myProfile = null;  // the signed-in user's /profiles/{uid} record (or null)
 let adminAddMode = false; // admin is adding someone else directly (not editing self)
+let adminEditTarget = null; // when an admin edits someone else's record, the student record being edited
 let editMode = false;     // user explicitly chose to edit their existing profile
 
 /* ════════════════════════════════════════════
@@ -106,7 +107,7 @@ const FACULTIES = [
   "Higher Institute of Engineering",
 ];
 const DEPARTMENTS = [
-  "Communication & Electronics",
+  "Electronics and Communication Engineering",
   "Computer Engineering",
   "Electrical Power & Machines",
   "Mechanical Engineering",
@@ -350,7 +351,10 @@ onAuthStateChanged(auth, async (user) => {
     }
   }
   updateAuthUI();
-  hydrateProfileForm();
+  // Signing in should NOT yank the user onto their profile — just sign in and
+  // leave them where they are. Only refresh the submit page's form if they're
+  // actually sitting on it; opening "My profile" is an explicit action.
+  if (document.body.dataset.mode === "submit") hydrateProfileForm();
   // If admin is already viewing the Approvals panel, refresh it.
   if (isAdmin && document.body.dataset.mode === "admin") loadPending();
 });
@@ -410,16 +414,48 @@ function hydrateProfileForm() {
   const badge = $("profileStatusBadge");
   const typeToggle = document.querySelector(".type-toggle-container");
 
+  // The admin Gmail field shows in both admin modes (add / edit-someone-else).
+  const adminEmailGroup = $("adminEmailGroup");
+  if (adminEmailGroup) adminEmailGroup.style.display = (adminAddMode || adminEditTarget) ? "" : "none";
+
   // Admin "add someone directly" mode — blank form, writes live, no approval.
-  if (adminAddMode) {
+  if (adminAddMode && !adminEditTarget) {
     populateInstitutionSelects(null);
     if (typeof window._setSelectedTracks === "function") window._setSelectedTracks([]);
+    if ($("inputEmail")) $("inputEmail").value = "";
     if (titleEl) titleEl.textContent = "Add a student";
     if (subEl) subEl.textContent = "Admin: this student goes live on the site immediately.";
     if (btnLabel) btnLabel.textContent = "➕ Add student (live)";
     if (badge) badge.style.display = "none";
     if (typeToggle) typeToggle.style.display = "none"; // students only here
     const ts = $("typeStudent"); if (ts) ts.checked = true;
+    return;
+  }
+
+  // Admin "edit someone else" mode — prefill the form from their live record and
+  // write straight back (no approval). Reuses the normal student form fields.
+  if (adminEditTarget) {
+    const t = adminEditTarget;
+    if (typeToggle) typeToggle.style.display = "none";
+    populateInstitutionSelects(t);
+    if ($("inputName")) $("inputName").value = t.name || "";
+    if ($("inputEmail")) $("inputEmail").value = t.email || "";
+    if ($("inputGender")) $("inputGender").value = t.gender || "";
+    if ($("inputClassYear") && t.classYear) $("inputClassYear").value = t.classYear;
+    const tsoc = t.social || {};
+    if ($("inputLinkedin")) $("inputLinkedin").value = tsoc.linkedin || "";
+    if ($("inputGithub")) $("inputGithub").value = tsoc.github || "";
+    if ($("inputWhatsapp")) $("inputWhatsapp").value = tsoc.whatsapp || "";
+    if ($("inputFacebook")) $("inputFacebook").value = tsoc.facebook || "";
+    prefillTracks(t.tracks || t.track || []);
+    if (typeof window._setSelectedSkills === "function") window._setSelectedSkills(t.skills || []);
+    if (typeof window._setEditHeader === "function") window._setEditHeader(t.photo ? (String(t.photo).startsWith("http") ? t.photo : `${R2_BASE}/${t.photo}`) : "", t.cover ? (String(t.cover).startsWith("http") ? t.cover : `${R2_BASE}/${t.cover}`) : "");
+    if (titleEl) titleEl.textContent = `Edit: ${t.name || "student"}`;
+    if (subEl) subEl.textContent = "Admin: editing this student — changes go live immediately.";
+    if (btnLabel) btnLabel.textContent = "💾 Save (live)";
+    if (badge) badge.style.display = "none";
+    const ts = $("typeStudent"); if (ts) ts.checked = true;
+    const fw = $("submitFormWrap"); if (fw) fw.style.display = "block";
     return;
   }
   if (typeToggle) typeToggle.style.display = "";
@@ -648,12 +684,24 @@ function updateAuthUI() {
     }
   }
 
-  // Admin-only menu item
+  // Admin-only menu items
   if (adminItem) adminItem.style.display = isAdmin ? "" : "none";
+  const menuAdminAdd = $("menuAdminAddBtn");
+  const menuAdminEdit = $("menuAdminEditBtn");
+  if (menuAdminAdd) menuAdminAdd.style.display = isAdmin ? "" : "none";
+  if (menuAdminEdit) menuAdminEdit.style.display = isAdmin ? "" : "none";
 
   // Dropdown profile item: "Create profile" (no profile yet) → "My profile".
   const menuSubmitLabel = document.querySelector("#menuSubmitBtn span");
   if (menuSubmitLabel) menuSubmitLabel.textContent = myProfile ? "My profile" : "Create profile";
+  // Match the icon to the action: a plain person icon for "My profile" (it just
+  // opens the existing profile), a person-with-plus for "Create profile".
+  const menuSubmitIcon = $("menuSubmitIcon");
+  if (menuSubmitIcon) {
+    menuSubmitIcon.innerHTML = myProfile
+      ? `<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>`
+      : `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>`;
+  }
 
   // Home CTA mirrors the same wording.
   const homeCta = $("homeProfileCta");
@@ -922,10 +970,17 @@ function initSubmissionForm() {
   // Built-in tracks always offered. Custom tracks discovered from existing
   // students get merged in (collectKnownTracks) so a track someone added via
   // "Other" becomes selectable for everyone else.
+  // Professional, canonical SW/HW tracks (match the names used by the Firebase
+  // cleanup so the dropdown, the data, and the filter all agree). Custom tracks
+  // a user adds via "Other" get merged in by collectKnownTracks() afterwards.
   const BUILTIN_TRACKS = [
-    "Embedded Systems", "Embedded Linux", "Digital Design",
-    "Digital Design & Verification", "Network Engineer", "DevOps",
-    "AI", "Software Testing",
+    "Embedded Systems", "Embedded Linux", "Digital IC Design", "ASIC Verification",
+    "AI", "Machine Learning", "Data Science",
+    "Backend Development", "Frontend Development", "Full Stack Development",
+    "Mobile Development", "DevOps", "Cloud Computing",
+    "Cyber Security", "Network Security", "Network Engineering",
+    "Software Testing", "QA", "UI/UX", "Game Development",
+    "Robotics", "IoT", "Automotive",
   ];
   const selectedTracks = new Set();
   const trackSelectBtn = $("trackSelectBtn");
@@ -1318,11 +1373,24 @@ function initSubmissionForm() {
   async function saveStudentProfile(data) {
     if (!currentUser) throw new Error("You must sign in first.");
 
-    // Admin adding someone else directly → write a live, name-keyed /students
-    // record (no profile, no approval). Returns live=true.
-    if (adminAddMode && isAdmin) {
+    // Admin adding OR editing someone else directly → write a live /students
+    // record (no profile, no approval). For an edit we target their existing key
+    // (data.editKey) so we update in place. If they've already linked a profile
+    // (ownerUid), mirror the change to /profiles/{ownerUid} too so it stays live.
+    if ((adminAddMode || adminEditTarget) && isAdmin) {
       const rec = buildLiveRecord({ ...data, type: "student" });
       await set(ref(db, `${rec.node}/${rec.key}`), rec.payload);
+      if (adminEditTarget && adminEditTarget.ownerUid) {
+        try {
+          await set(ref(db, `profiles/${adminEditTarget.ownerUid}`), {
+            ...buildProfileObject({ ...data }),
+            uid: adminEditTarget.ownerUid,
+            email: data.email || adminEditTarget.email || "",
+            status: "live",
+            updatedAt: Date.now(),
+          });
+        } catch (e) { console.warn("Mirror to profile failed:", e.message); }
+      }
       return true;
     }
 
@@ -1386,23 +1454,27 @@ function initSubmissionForm() {
     let data;
     if (formState.submissionType === "student") {
       const inputName = $("inputName");
+      // The "existing" record to fall back to for photo/cover: the admin's edit
+      // target when editing someone else, otherwise the signed-in user's profile.
+      const existing = adminEditTarget || myProfile;
       // Keep the existing photo if the user didn't pick a new one (edit mode).
       if (formState.photoFile) {
         const firstName = inputName.value.trim().split(/\s+/)[0];
         formState.photoPath = sanitiseFileName(`${firstName}.webp`);
-      } else if (myProfile && myProfile.photo) {
-        formState.photoPath = myProfile.photo;
+      } else if (existing && existing.photo) {
+        formState.photoPath = existing.photo;
       }
       // Cover photo: new upload → fresh path; otherwise keep whatever we had.
       if (formState.coverFile) {
         const firstName = inputName.value.trim().split(/\s+/)[0];
         formState.coverPath = sanitiseFileName(`${firstName}-cover.webp`);
-      } else if (myProfile && myProfile.cover) {
-        formState.coverPath = formState.coverPath || myProfile.cover;
+      } else if (existing && existing.cover) {
+        formState.coverPath = formState.coverPath || existing.cover;
       }
       data = {
         type: "student",
         name: inputName.value.trim(),
+        email: ($("inputEmail") && (adminAddMode || adminEditTarget)) ? $("inputEmail").value.trim() : (existing && existing.email) || "",
         gender: $("inputGender").value,
         photo: formState.photoPath,
         cover: formState.coverPath || "",
@@ -1418,6 +1490,12 @@ function initSubmissionForm() {
         whatsapp: $("inputWhatsapp").value.trim(),
         facebook: $("inputFacebook").value.trim(),
       };
+      // Admin editing someone else's record: target their existing key + keep
+      // their ownerUid so the sign-in link survives.
+      if (adminEditTarget) {
+        data.editKey = adminEditTarget._key || sanitizeKey(adminEditTarget.name);
+        data.ownerUid = adminEditTarget.ownerUid || "";
+      }
     } else {
       const team = [];
       teamMembersList.querySelectorAll(".team-member-row").forEach((row) => {
@@ -1492,15 +1570,28 @@ function initSubmissionForm() {
       // Success copy depends on whether it went live or to the queue.
       const fsTitle = firebaseSuccess.querySelector(".fs-title");
       if (fsTitle) {
-        fsTitle.textContent = adminAddMode
+        fsTitle.textContent = (adminAddMode && !adminEditTarget)
           ? "Student added — now live on the site."
-          : savedLive
-            ? "Saved! Your changes are now live on the site."
-            : "Submitted! It will appear once an admin approves it.";
+          : adminEditTarget
+            ? "Saved — this student's profile is updated and live."
+            : savedLive
+              ? "Saved! Your changes are now live on the site."
+              : "Submitted! It will appear once an admin approves it.";
       }
       firebaseSuccess.classList.remove("hidden");
 
-      if (adminAddMode) {
+      if (adminEditTarget) {
+        // Admin finished editing someone else: refresh the live site and go to
+        // the yearbook so the change is visible. Reset admin-edit state.
+        adminEditTarget = null;
+        editMode = false;
+        form.reset();
+        removePhoto();
+        renderTrackChips();
+        if (typeof window._setSelectedTracks === "function") window._setSelectedTracks([]);
+        if (typeof window.fetchFirebaseData === "function") window.fetchFirebaseData();
+        if (typeof window.switchMode === "function") window.switchMode("yearbook");
+      } else if (adminAddMode) {
         // Admin added someone else: clear the form for the next add.
         form.reset();
         removePhoto();
@@ -1603,10 +1694,12 @@ function buildLiveRecord(data) {
     // collide; fall back to the sanitized name for legacy/admin-added records.
     return {
       node: "students",
-      key: data.ownerUid || sanitizeKey(data.name),
+      key: data.editKey || data.ownerUid || sanitizeKey(data.name),
       payload: {
         name: data.name,
+        email: data.email || "",
         photo: data.photo || "",
+        cover: data.cover || "",
         track: data.tracks || [],
         skills: data.skills || [],
         color: data.color,
@@ -1829,6 +1922,68 @@ async function adminDeleteStudent(student) {
 }
 window.adminDeleteStudent = adminDeleteStudent;
 
+/**
+ * Admin-only: a searchable picker (photo + name + department) to choose which
+ * student's profile to edit. Built on the fly so it needs no extra HTML.
+ */
+function openAdminEditPicker() {
+  if (!isAdmin) return;
+  const students = Array.isArray(window.STUDENTS) ? [...window.STUDENTS] : [];
+  students.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+
+  let overlay = document.getElementById("adminEditPicker");
+  if (overlay) overlay.remove();
+  overlay = document.createElement("div");
+  overlay.id = "adminEditPicker";
+  overlay.className = "admin-picker-overlay";
+  overlay.innerHTML = `
+    <div class="admin-picker glass-panel" role="dialog" aria-modal="true" aria-label="Pick a student to edit">
+      <div class="admin-picker-head">
+        <h3>Edit a profile</h3>
+        <button type="button" class="admin-picker-close" aria-label="Close">&times;</button>
+      </div>
+      <input type="search" class="field-input admin-picker-search" placeholder="Search by name…" autocomplete="off" />
+      <div class="admin-picker-list"></div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const listEl = overlay.querySelector(".admin-picker-list");
+  const searchEl = overlay.querySelector(".admin-picker-search");
+  const close = () => overlay.remove();
+
+  const render = (q = "") => {
+    const nq = q.trim().toLowerCase();
+    const rows = students.filter((s) => !nq || String(s.name).toLowerCase().includes(nq));
+    listEl.innerHTML = rows.map((s, i) => {
+      const ini = (s.name || "?").split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+      const avatar = s.photo
+        ? `<span class="admin-picker-av" style='background:center/cover no-repeat url("${(String(s.photo).startsWith("http") ? s.photo : `${R2_BASE}/${s.photo}`)}")'></span>`
+        : `<span class="admin-picker-av" style="background:${s.color || "var(--gradient-2)"}">${ini}</span>`;
+      return `<button type="button" class="admin-picker-row" data-idx="${i}">
+        ${avatar}
+        <span class="admin-picker-meta">
+          <span class="admin-picker-name">${esc(s.name || "")}</span>
+          <span class="admin-picker-dept">${esc(s.department || "")}</span>
+        </span>
+      </button>`;
+    }).join("") || `<p class="admin-picker-empty">No students match.</p>`;
+    listEl.querySelectorAll(".admin-picker-row").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const s = rows[+btn.dataset.idx];
+        close();
+        if (typeof window.adminEditStudent === "function") window.adminEditStudent(s);
+      });
+    });
+  };
+
+  render();
+  searchEl.addEventListener("input", () => render(searchEl.value));
+  overlay.querySelector(".admin-picker-close").addEventListener("click", close);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+  document.addEventListener("keydown", function esc(e) { if (e.key === "Escape") { close(); document.removeEventListener("keydown", esc); } });
+  setTimeout(() => searchEl.focus(), 50);
+}
+
 /* ════════════════════════════════════════════
    § 5 — WIRE UP
 ════════════════════════════════════════════ */
@@ -1905,6 +2060,7 @@ function init() {
   window.openMyProfileEdit = () => {
     if (!currentUser) return;
     adminAddMode = false;
+    adminEditTarget = null;
     editMode = true;
     if (typeof window.switchMode === "function") window.switchMode("submit");
     const gate = $("submitLoginGate"); if (gate) gate.style.display = "none";
@@ -1914,19 +2070,39 @@ function init() {
   const refreshBtn = $("adminRefreshBtn");
   if (refreshBtn) refreshBtn.addEventListener("click", loadPending);
 
-  // Admin: "Add a student directly" opens the form in admin-add mode.
-  const adminAddBtn = $("adminAddBtn");
-  if (adminAddBtn) adminAddBtn.addEventListener("click", () => {
+  // Admin: "Add a student directly" — blank form, writes live, no approval.
+  function startAdminAdd() {
     if (!isAdmin) return;
     adminAddMode = true;
+    adminEditTarget = null;
     editMode = true;
     if (typeof window.switchMode === "function") window.switchMode("submit");
-    // Make sure the gate is bypassed (admin is signed in) and form is blank.
     const gate = $("submitLoginGate"); if (gate) gate.style.display = "none";
     const wrap = $("submitFormWrap"); if (wrap) wrap.style.display = "block";
     const f = $("submissionForm"); if (f) f.reset();
+    if (typeof window._setEditHeader === "function") window._setEditHeader("", "");
     hydrateProfileForm();
-  });
+  }
+  // Admin: edit ANY student's live record in place.
+  function startAdminEdit(student) {
+    if (!isAdmin || !student) return;
+    adminAddMode = false;
+    adminEditTarget = student;
+    editMode = true;
+    if (typeof window.switchMode === "function") window.switchMode("submit");
+    const gate = $("submitLoginGate"); if (gate) gate.style.display = "none";
+    const wrap = $("submitFormWrap"); if (wrap) wrap.style.display = "block";
+    hydrateProfileForm();
+  }
+  window.adminEditStudent = startAdminEdit;
+
+  const adminAddBtn = $("adminAddBtn");
+  if (adminAddBtn) adminAddBtn.addEventListener("click", startAdminAdd);
+  const menuAdminAddBtn = $("menuAdminAddBtn");
+  if (menuAdminAddBtn) menuAdminAddBtn.addEventListener("click", () => { closeUserMenu(); startAdminAdd(); });
+  // "Edit a profile" from the menu → open a searchable student picker.
+  const menuAdminEditBtn = $("menuAdminEditBtn");
+  if (menuAdminEditBtn) menuAdminEditBtn.addEventListener("click", () => { closeUserMenu(); openAdminEditPicker(); });
 
   initSubmissionForm();
   updateAuthUI();

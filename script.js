@@ -111,7 +111,7 @@ let GRADUATION_PROJECTS = [];
 const DEFAULT_CLASS_YEAR = "2026";
 const DEFAULT_UNIVERSITY = "Al-Azhar University";
 const DEFAULT_FACULTY = "Faculty of Engineering";
-const DEFAULT_DEPARTMENT = "Communication & Electronics";
+const DEFAULT_DEPARTMENT = "Electronics and Communication Engineering";
 
 /** Fill any missing hierarchy fields on a student/profile record in place. */
 function applyHierarchyDefaults(rec) {
@@ -663,7 +663,7 @@ function openFullProfile(student, opts = {}) {
   setEl("fpSub", [student.department, student.classYear ? `Class of ${student.classYear}` : ""].filter(Boolean).join(" · "));
   setEl("fpUniversity", student.university || "Al-Azhar University");
   setEl("fpFaculty", student.faculty || "Faculty of Engineering");
-  setEl("fpDepartment", student.department || "Communication & Electronics");
+  setEl("fpDepartment", student.department || "Electronics and Communication Engineering");
   setEl("fpClassYear", student.classYear || "2026");
 
   const chips = (arr, cls) => {
@@ -1054,8 +1054,10 @@ function buildFilterPanel() {
     const selected = yearbookFilter[dim.key];
     // Include selected values even if currently zero-count so the user can untick them.
     const values = _sortFilterValues(dim.key, new Set([...counts.keys(), ...selected]));
-    // Hide a group that offers nothing useful (0 or 1 option and not in use).
-    if (values.length < 2 && selected.size === 0) return "";
+    // Hide a group only when it has NO real values at all. (We intentionally show
+    // single-value groups like University/Department/Class so the visitor can see
+    // the cohort that's actually present — e.g. "Al-Azhar University · 27".)
+    if (values.length === 0) return "";
 
     const opts = values.map((v) => {
       const n = counts.get(v) || 0;
@@ -1143,14 +1145,19 @@ function initYearbookFilters() {
     (panel && panel.style.display === "none") ? openPanel() : closePanel();
   });
 
-  // Option toggles inside the popover.
+  // Option toggles inside the popover. Stop propagation BEFORE the rebuild so the
+  // document-level outside-click handler below never sees this click — otherwise
+  // buildFilterPanel() replaces the option element, the click target detaches,
+  // and panel.contains(detachedTarget) is false → the panel would wrongly close.
+  // This keeps the popover open so you can pick several filters in one go.
   if (groups) groups.addEventListener("click", (e) => {
     const opt = e.target.closest(".filter-opt");
     if (!opt) return;
+    e.stopPropagation();
     toggleFilterValue(opt.dataset.dim, opt.dataset.val);
   });
 
-  if (clearBtn) clearBtn.addEventListener("click", () => clearAllFilters());
+  if (clearBtn) clearBtn.addEventListener("click", (e) => { e.stopPropagation(); clearAllFilters(); });
 
   // Removing a chip clears that one selection.
   if (chipsWrap) chipsWrap.addEventListener("click", (e) => {
@@ -1184,26 +1191,6 @@ function matchesYearbookScope(s, exceptKey) {
 // Back-compat shim: the old cascading builder name is still called after data
 // loads / on yearbook entry. Route it to the new popover builder.
 function buildYearbookFilters() { buildFilterPanel(); }
-
-function getStudentCategories(student) {
-  let tracks = student.track;
-  if (!tracks) return new Set();
-  if (!Array.isArray(tracks)) tracks = [tracks];
-
-  let categories = new Set();
-  tracks.forEach((track) => {
-    const t = track.toLowerCase();
-    if (t.includes("embedded")) categories.add("Embedded");
-    else if (t.includes("digital") || t.includes("ic") || t.includes("asic"))
-      categories.add("Digital Design");
-    else if (t.includes("network")) categories.add("Network");
-    else if (t.includes("ai")) categories.add("AI");
-    else if (t.includes("devops")) categories.add("DevOps");
-    else if (t.includes("test")) categories.add("Software Testing");
-    else categories.add(track);
-  });
-  return categories;
-}
 
 // The old track-stats row was replaced by the Filter popover. Kept as a no-op
 // so existing callers (applyDbPayload, switchMode, etc.) stay valid; the popover
