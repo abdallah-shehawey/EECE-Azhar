@@ -458,7 +458,14 @@ function hydrateProfileForm() {
     const fw = $("submitFormWrap"); if (fw) fw.style.display = "block";
     return;
   }
-  if (typeToggle) typeToggle.style.display = "";
+  // Edit Profile is student-only now — graduation projects are created/edited
+  // from the profile's "Graduation Project" tab, so hide the student/project
+  // toggle and force the student form.
+  if (typeToggle) typeToggle.style.display = "none";
+  const tsForce = $("typeStudent"); if (tsForce) tsForce.checked = true;
+  formState.submissionType = "student";
+  const sc = $("studentFormContainer"); if (sc) { sc.classList.add("active"); sc.classList.remove("hidden"); }
+  const pc = $("projectFormContainer"); if (pc) { pc.classList.remove("active"); pc.classList.add("hidden"); }
 
   // Existing profile + not actively editing → show the Facebook-style full
   // profile page (same layout used when opening someone's card), instead of the
@@ -1983,6 +1990,157 @@ function openAdminEditPicker() {
   document.addEventListener("keydown", function esc(e) { if (e.key === "Escape") { close(); document.removeEventListener("keydown", esc); } });
   setTimeout(() => searchEl.focus(), 50);
 }
+
+/**
+ * Collaborative graduation-project editor. Opened from the profile's project
+ * tab by any team member (shared ownership). Lets them edit the category,
+ * description and repo, and manage the team via a yearbook search that shows
+ * each candidate's photo + name + department (LinkedIn-style). Writes back to
+ * /projects/{key} so the change is live for everyone on the team.
+ */
+function openProjectEditor(project) {
+  if (!project || !currentUser) return;
+  const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+  // Working copy of the team (array of {name, leader}).
+  let team = (Array.isArray(project.team) ? project.team : Object.values(project.team || {}))
+    .map((m) => ({ name: m.name, leader: !!m.leader }));
+
+  let overlay = document.getElementById("projectEditor");
+  if (overlay) overlay.remove();
+  overlay = document.createElement("div");
+  overlay.id = "projectEditor";
+  overlay.className = "admin-picker-overlay";
+  overlay.innerHTML = `
+    <div class="admin-picker glass-panel proj-editor" role="dialog" aria-modal="true" aria-label="Edit graduation project">
+      <div class="admin-picker-head">
+        <h3>Edit graduation project</h3>
+        <button type="button" class="admin-picker-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="proj-editor-body">
+        <label class="field-label">Category</label>
+        <input type="text" class="field-input pe-category" value="${esc(project.category || "")}" placeholder="e.g. Embedded Systems" />
+        <label class="field-label">Description</label>
+        <textarea class="field-input pe-desc" rows="3" placeholder="What does the project do?">${esc(project.description || "")}</textarea>
+        <label class="field-label">GitHub repo</label>
+        <input type="url" class="field-input pe-repo" value="${esc(project.repo || "")}" placeholder="https://github.com/…" />
+
+        <label class="field-label" style="margin-top:0.6rem;">Team</label>
+        <div class="pe-team"></div>
+
+        <label class="field-label" style="margin-top:0.6rem;">Add a member (from the yearbook)</label>
+        <input type="search" class="field-input pe-search" placeholder="Search students by name…" autocomplete="off" />
+        <div class="pe-results admin-picker-list"></div>
+      </div>
+      <div class="proj-editor-actions">
+        <button type="button" class="btn-secondary pe-cancel">Cancel</button>
+        <button type="button" class="btn-primary pe-save">💾 Save project</button>
+      </div>
+      <div class="pe-status" style="display:none;"></div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const teamEl = overlay.querySelector(".pe-team");
+  const searchEl = overlay.querySelector(".pe-search");
+  const resultsEl = overlay.querySelector(".pe-results");
+  const statusEl = overlay.querySelector(".pe-status");
+  const close = () => overlay.remove();
+
+  const students = Array.isArray(window.STUDENTS) ? window.STUDENTS : [];
+  const studentByName = new Map(students.map((s) => [norm(s.name), s]));
+  const avatarHtml = (rec, name) => {
+    const ini = (name || "?").split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+    if (rec && rec.photo) {
+      const url = String(rec.photo).startsWith("http") ? rec.photo : `${R2_BASE}/${rec.photo}`;
+      return `<span class="admin-picker-av" style='background:center/cover no-repeat url("${url}")'></span>`;
+    }
+    return `<span class="admin-picker-av" style="background:${(rec && rec.color) || "var(--gradient-2)"}">${ini}</span>`;
+  };
+
+  const renderTeam = () => {
+    teamEl.innerHTML = team.map((m, i) => {
+      const rec = studentByName.get(norm(m.name));
+      return `<div class="pe-member">
+        ${avatarHtml(rec, m.name)}
+        <span class="pe-member-name">${esc(m.name)}</span>
+        <label class="pe-leader"><input type="radio" name="peLeader" ${m.leader ? "checked" : ""} data-i="${i}"> Leader</label>
+        <button type="button" class="pe-remove" data-i="${i}" aria-label="Remove">✕</button>
+      </div>`;
+    }).join("") || `<p class="admin-picker-empty">No members yet.</p>`;
+    teamEl.querySelectorAll(".pe-remove").forEach((b) => b.addEventListener("click", () => {
+      team.splice(+b.dataset.i, 1); renderTeam();
+    }));
+    teamEl.querySelectorAll('input[name="peLeader"]').forEach((r) => r.addEventListener("change", () => {
+      team = team.map((m, idx) => ({ ...m, leader: idx === +r.dataset.i }));
+      renderTeam();
+    }));
+  };
+
+  const renderResults = (q = "") => {
+    const nq = q.trim().toLowerCase();
+    if (!nq) { resultsEl.innerHTML = ""; return; }
+    const onTeam = new Set(team.map((m) => norm(m.name)));
+    const rows = students
+      .filter((s) => s.name && !onTeam.has(norm(s.name)) && s.name.toLowerCase().includes(nq))
+      .slice(0, 12);
+    resultsEl.innerHTML = rows.map((s, i) => `<button type="button" class="admin-picker-row" data-i="${i}">
+      ${avatarHtml(s, s.name)}
+      <span class="admin-picker-meta">
+        <span class="admin-picker-name">${esc(s.name)}</span>
+        <span class="admin-picker-dept">${esc(s.department || "")}</span>
+      </span>
+    </button>`).join("") || `<p class="admin-picker-empty">No match.</p>`;
+    resultsEl.querySelectorAll(".admin-picker-row").forEach((btn) => btn.addEventListener("click", () => {
+      const s = rows[+btn.dataset.i];
+      team.push({ name: s.name, leader: team.length === 0 });
+      searchEl.value = ""; renderResults(""); renderTeam();
+    }));
+  };
+
+  renderTeam();
+  searchEl.addEventListener("input", () => renderResults(searchEl.value));
+  overlay.querySelector(".admin-picker-close").addEventListener("click", close);
+  overlay.querySelector(".pe-cancel").addEventListener("click", close);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+
+  overlay.querySelector(".pe-save").addEventListener("click", async () => {
+    const category = overlay.querySelector(".pe-category").value.trim();
+    const description = overlay.querySelector(".pe-desc").value.trim();
+    const repo = overlay.querySelector(".pe-repo").value.trim();
+    if (!category) { statusEl.style.display = ""; statusEl.textContent = "Category is required."; return; }
+    if (!team.length) { statusEl.style.display = ""; statusEl.textContent = "Add at least one team member."; return; }
+    if (!team.some((m) => m.leader)) team[0].leader = true; // ensure a leader
+
+    // Sort leader-first and build the key-ordered team object Firebase expects.
+    const sorted = [...team].sort((a, b) => (b.leader - a.leader) || a.name.localeCompare(b.name));
+    const teamObj = {};
+    sorted.forEach((m, i) => {
+      const prefix = m.leader ? "0000" : String(i).padStart(4, "0");
+      teamObj[`${prefix}_${sanitizeKey(m.name)}`] = { name: m.name, leader: !!m.leader };
+    });
+
+    const payload = {
+      ...project,
+      category,
+      description,
+      repo,
+      icon: project.icon || "",
+      team: teamObj,
+      updatedAt: Date.now(),
+    };
+    delete payload._key; // never store the helper key inside the record
+
+    statusEl.style.display = ""; statusEl.textContent = "Saving…";
+    try {
+      await set(ref(db, `projects/${project._key}`), payload);
+      statusEl.textContent = "Saved ✓";
+      if (typeof window.fetchFirebaseData === "function") window.fetchFirebaseData();
+      setTimeout(close, 600);
+    } catch (e) {
+      statusEl.textContent = "Save failed: " + e.message;
+    }
+  });
+}
+window.openProjectEditor = openProjectEditor;
 
 /* ════════════════════════════════════════════
    § 5 — WIRE UP

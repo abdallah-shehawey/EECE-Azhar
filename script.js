@@ -59,9 +59,11 @@ function applyDbPayload({ studentsData, projectsData, profilesData }) {
   window.STUDENTS = STUDENTS;
 
   if (projectsData) {
+    // Keep the Firebase key on each project (as _key) so the project editor can
+    // write back to the exact record.
     GRADUATION_PROJECTS = Array.isArray(projectsData)
-      ? projectsData.filter(Boolean)
-      : Object.values(projectsData);
+      ? projectsData.map((p, i) => (p ? { ...p, _key: p._key || String(i) } : null)).filter(Boolean)
+      : Object.entries(projectsData).map(([k, p]) => ({ ...p, _key: k }));
 
     GRADUATION_PROJECTS.forEach((project) => {
       if (project.team && !Array.isArray(project.team)) {
@@ -688,6 +690,8 @@ function openFullProfile(student, opts = {}) {
   const projPanel = document.getElementById("fpProject");
   const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
   const mine = norm(student.name);
+  // Is the signed-in user viewing their OWN profile? (controls project-edit access)
+  const isOwnerViewing = !!(window.__myUid && student.ownerUid && window.__myUid === student.ownerUid);
   const projects = (GRADUATION_PROJECTS || []).filter((p) => {
     const team = Array.isArray(p.team) ? p.team : Object.values(p.team || {});
     return team.some((m) => norm(m.name) === mine);
@@ -724,13 +728,26 @@ function openFullProfile(student, opts = {}) {
         ? `<span class="fp-proj-icon cat-${catKey}">${PROJ_ICONS[p.category]}</span>`
         : esc(p.icon || "🚀");
       const catLabel = CAT_LABELS[p.category] || p.category || "Project";
+      // Any team member (or admin) may edit the project — shared ownership.
+      const viewerIsMember = team.some((m) => norm(m.name) === norm(student.name));
+      const canEdit = isOwnerViewing && (viewerIsMember || window.__isAdmin);
+      const editBtn = canEdit
+        ? `<button type="button" class="fp-proj-edit" data-proj-key="${esc(p._key || "")}">✎ Edit project</button>`
+        : "";
       return `<div class="fp-proj-card">
-        <div class="fp-proj-head">${icon} <strong>${esc(catLabel)}</strong> <span class="fp-proj-year">${esc(p.classYear || "")}</span></div>
+        <div class="fp-proj-head">${icon} <strong>${esc(catLabel)}</strong> <span class="fp-proj-year">${esc(p.classYear || "")}</span>${editBtn}</div>
         ${desc}${repo}
         <h4 class="fp-proj-team-title">Team</h4>
         <div class="fp-member-grid">${members}</div>
       </div>`;
     }).join("");
+    // Wire "Edit project" buttons (shared ownership: any listed member / admin).
+    projPanel.querySelectorAll(".fp-proj-edit").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const proj = projects.find((p) => (p._key || "") === btn.dataset.projKey) || projects[0];
+        if (typeof window.openProjectEditor === "function") window.openProjectEditor(proj);
+      });
+    });
     // Clicking a registered member opens THEIR quick card (the photo modal) on
     // top of this profile — from there the visitor can choose to open the full
     // profile if they want. Non-registered names aren't clickable.
