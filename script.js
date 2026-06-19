@@ -1701,16 +1701,12 @@ const CAT_LABELS = {
   Network: "Network",
 };
 
+// The category tabs were removed in favour of the Filter (Track / University /
+// …) popover, so currentProjectCat stays "All" and category filtering now lives
+// in the Track dimension. Kept as a thin helper for any remaining callers
+// (e.g. openProjectFromId resetting the view) — it no longer touches the DOM.
 function switchProjectCat(cat) {
   currentProjectCat = cat;
-
-  // Update tab active state
-  document
-    .querySelectorAll(".project-tab")
-    .forEach((btn) => btn.classList.remove("active"));
-  const activeBtn = document.querySelector(`[data-pcat="${cat}"]`);
-  if (activeBtn) activeBtn.classList.add("active");
-
   renderProjects();
 }
 

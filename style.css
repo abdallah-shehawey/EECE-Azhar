@@ -3592,8 +3592,8 @@ body.portal-active .footer { display: none !important; }
     margin-bottom: 1rem;
 }
 .home-track-grid {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);   /* 4 columns on laptop/desktop */
     justify-content: center;
     gap: 0.7rem;
 }
@@ -3605,10 +3605,15 @@ body.portal-active .footer { display: none !important; }
     border: 1px solid var(--glass-border);
     border-radius: 16px;
     padding: 0.85rem 1.25rem;
-    min-width: 150px;
+    min-width: 0;                            /* allow cells to shrink within the grid */
     transition: border-color 0.2s, transform 0.15s, background 0.2s;
 }
 .home-track-item:hover { border-color: var(--border-accent); background: rgba(139, 92, 246, 0.06); transform: translateY(-2px); }
+/* Tablet: step down to 2 columns so the 4-col laptop grid doesn't cram between
+   the desktop (4) and phone (3) breakpoints. */
+@media (max-width: 900px) and (min-width: 641px) {
+    .home-track-grid { grid-template-columns: repeat(2, 1fr); }
+}
 .home-track-count {
     font-family: var(--font-primary);
     font-size: 1.8rem;
