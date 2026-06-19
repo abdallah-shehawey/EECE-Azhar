@@ -43,8 +43,11 @@ class SPAHandler(SimpleHTTPRequestHandler):
         super().__init__(*args, directory=ROOT, **kwargs)
 
     def translate_and_rewrite(self):
-        # Strip the query string for the file-existence check.
-        path = self.path.split("?", 1)[0]
+        # Strip the query string, then URL-decode so paths with spaces / Arabic /
+        # emoji (e.g. the audio filenames) are checked against the real file name
+        # on disk, not the percent-encoded form. (Vercel decodes too.)
+        from urllib.parse import unquote
+        path = unquote(self.path.split("?", 1)[0])
 
         # Leave API routes and real assets alone.
         if path.startswith("/api/") or HAS_EXTENSION.search(path):

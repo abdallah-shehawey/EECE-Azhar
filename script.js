@@ -107,12 +107,26 @@ function applyDbPayload({ studentsData, projectsData, profilesData }) {
       }
       _pendingProfileKey = null;
       _pendingProfileId = null;
+    } else if (_pendingProfileId) {
+      // Data is now loaded but the id still doesn't resolve → the profile really
+      // doesn't exist (bad/old shared link). Tell the user instead of silently
+      // dropping them on the yearbook, and canonicalise the URL.
+      if (typeof showToast === "function") showToast("That profile couldn't be found.");
+      try { history.replaceState({ mode: "yearbook" }, "", "/yearbook"); } catch (_) {}
+      _pendingProfileId = null;
+      _pendingProfileKey = null;
     }
   }
 
   // A refresh / deep link landed on /project/<id> before the data was ready.
   if (_pendingProjectId && typeof openProjectFromId === "function") {
-    if (openProjectFromId(_pendingProjectId)) _pendingProjectId = null;
+    if (openProjectFromId(_pendingProjectId)) {
+      _pendingProjectId = null;
+    } else if ((GRADUATION_PROJECTS || []).length && !(GRADUATION_PROJECTS || []).some((p) => (p._key || "") === _pendingProjectId)) {
+      // Projects are loaded but this key isn't among them → stale link.
+      if (typeof showToast === "function") showToast("That project couldn't be found.");
+      _pendingProjectId = null;
+    }
   }
 
   return true;
@@ -2693,7 +2707,6 @@ function showCelebrationOverlay(tab) {
       badge: "DONE!",
       title: "Congratulations!",
       en: "The Final Exam is officially OVER.",
-      ar: "كفاره يجدعاااااااان 🙌",
       tag: "Class of 2026",
     },
     discussion: {
@@ -2701,7 +2714,6 @@ function showCelebrationOverlay(tab) {
       badge: "DONE!",
       title: "Congratulations!",
       en: "Project Discussion is officially complete.",
-      ar: "خلصت المناقشة! ماشاء الله 🌟",
       tag: "Class of 2026",
     },
     party: {
@@ -2709,7 +2721,6 @@ function showCelebrationOverlay(tab) {
       badge: "GRADUATED!",
       title: "Happy Graduation!",
       en: "This is YOUR day. You earned every second of it.",
-      ar: "مبروك التخرج! ربنا يكمل بالخير 🎉",
       tag: "Class of 2026",
     },
   };
@@ -2830,14 +2841,6 @@ function showCelebrationOverlay(tab) {
         font-size: clamp(0.95rem,3vw,1.2rem); font-weight: 400;
         color: rgba(255,255,255,0.85); margin-bottom: 0.5rem;
         animation: co-fadeUp 0.5s ease 0.75s both;
-      }
-
-      /* Subtitle AR */
-      #co-ar {
-        font-size: clamp(0.9rem,2.8vw,1.1rem); font-weight: 500;
-        color: #c4b5fd; margin-bottom: 1.8rem;
-        direction: rtl;
-        animation: co-fadeUp 0.5s ease 0.85s both;
       }
 
       /* Progress bar */

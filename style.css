@@ -56,8 +56,11 @@
     --accent-light: #a78bfa;
     --accent-glow: rgba(139, 92, 246, 0.4);
     --text-primary: #f0f0ff;
-    --text-secondary: rgba(200, 200, 230, 0.7);
-    --text-muted: rgba(160, 160, 200, 0.5);
+    /* Tuned for WCAG AA (≥4.5:1 on the dark bg). The old muted token at 0.5
+       opacity rendered ~2.7:1 (Lighthouse contrast failure on stat labels +
+       footer). Bumped opacity/lightness so all muted text passes. */
+    --text-secondary: rgba(206, 206, 236, 0.82);
+    --text-muted: rgba(184, 186, 214, 0.85);
     --glass-bg: rgba(255, 255, 255, 0.04);
     --glass-border: rgba(255, 255, 255, 0.08);
     --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -1561,7 +1564,7 @@ body.nav-open .nav-toggle-bar:nth-child(3) { transform: translateY(-7.5px) rotat
     opacity: 0;
     transition: opacity 0.35s ease;
     border-radius: 20px;
-    pointer-events: none;  /* لا تـ block الـ clicks على الـ buttons */
+    pointer-events: none;  /* don't block clicks on the buttons */
     z-index: 0;
 }
 
