@@ -1931,8 +1931,9 @@ function _projLeaderRecord(p) {
   return (STUDENTS || []).find((s) => norm(s.name) === norm(leader.name)) || null;
 }
 
-// Every value a project contributes to a dimension. Tracks aggregate across the
-// whole team so filtering by "Embedded Systems" finds any team that has one.
+// Every value a project contributes to a dimension.
+// Used for FILTER MATCHING — tracks include ALL team members so filtering by
+// "Embedded Systems" finds any team that has at least one member in that track.
 function _projectValues(p, dim) {
   const rec = _projLeaderRecord(p);
   if (dim.key === "track") {
@@ -1950,6 +1951,22 @@ function _projectValues(p, dim) {
   }
   const v = p[dim.field] || (rec && rec[dim.field]) || dim.fallback();
   return v ? [v] : [];
+}
+
+// Values used for BUILDING THE FILTER PANEL (counts + displayed options).
+// For tracks, only the project's own track field is used — NOT individual
+// team members' yearbook tracks — so the filter panel shows only tracks that
+// are genuinely the project's declared specialisation.
+function _projectValuesForDisplay(p, dim) {
+  if (dim.key === "track") {
+    const set = new Set();
+    const add = (t) => { (Array.isArray(t) ? t : t ? [t] : []).forEach((x) => x && set.add(x)); };
+    // Only the project's own track declaration.
+    add(p.track || p.tracks);
+    return [...set];
+  }
+  // For all other dimensions delegate to the standard function.
+  return _projectValues(p, dim);
 }
 
 function matchesProjectScope(p, exceptKey) {
@@ -1985,7 +2002,9 @@ function _projCountsForDimension(dim) {
   (GRADUATION_PROJECTS || []).forEach((p) => {
     if (currentProjectCat !== "All" && p.category !== currentProjectCat) return;
     if (!matchesProjectScope(p, dim.key)) return;
-    _projectValues(p, dim).forEach((v) => counts.set(v, (counts.get(v) || 0) + 1));
+    // Use display values (project's own tracks only) so the panel doesn't show
+    // tracks that only exist in a team member's yearbook profile.
+    _projectValuesForDisplay(p, dim).forEach((v) => counts.set(v, (counts.get(v) || 0) + 1));
   });
   return counts;
 }
@@ -2006,7 +2025,8 @@ function buildProjectFilterPanel() {
     const selected = projectFilter[dim.key];
     // Only show values that either have projects behind them (count > 0)
     // OR are currently selected (so user can deselect them).
-    // This ensures tracks with zero matching projects stay hidden.
+    // Counts are built from _projectValuesForDisplay (project's own track only)
+    // so no phantom tracks from team members' yearbook profiles appear here.
     const values = _sortFilterValues(
       dim.key,
       new Set([...counts.keys(), ...selected])
