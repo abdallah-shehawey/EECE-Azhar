@@ -474,7 +474,7 @@
 
         <!-- ===== MODE: JOIN / SUBMIT ===== -->
         <div id="mode-submit" class="portal-section" style="display: none;">
-            <button type="button" class="portal-back" onclick="switchMode('home')" aria-label="Back to home">
+            <button type="button" class="portal-back" onclick="goBackFromPortal()" aria-label="Back">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
                 <span>Back</span>
             </button>
@@ -591,7 +591,7 @@
                             </div>
                             <div class="field-group">
                                 <label for="inputClassYear" class="field-label">Class Year <span class="required">*</span></label>
-                                <select id="inputClassYear" class="field-input">
+                                <select id="inputClassYear" class="field-input" data-other="inputClassYearOther">
                                     <option value="2030">2030</option>
                                     <option value="2029">2029</option>
                                     <option value="2028">2028</option>
@@ -603,7 +603,9 @@
                                     <option value="2022">2022</option>
                                     <option value="2021">2021</option>
                                     <option value="2020">2020</option>
+                                    <option value="__other">Other…</option>
                                 </select>
+                                <input type="text" id="inputClassYearOther" class="field-input hidden" style="margin-top:0.5rem;" inputmode="numeric" pattern="\d{4}" maxlength="4" placeholder="Type your year (4 digits, e.g. 2031)" />
                             </div>
                         </div>
 
@@ -733,13 +735,18 @@
                             </div>
                             <div class="field-group">
                                 <label for="pjClassYear" class="field-label">Class Year <span class="required">*</span></label>
-                                <select id="pjClassYear" class="field-input">
+                                <select id="pjClassYear" class="field-input" data-other="pjClassYearOther">
+                                    <option value="2030">2030</option>
+                                    <option value="2029">2029</option>
+                                    <option value="2028">2028</option>
                                     <option value="2027">2027</option>
                                     <option value="2026" selected>2026</option>
                                     <option value="2025">2025</option>
                                     <option value="2024">2024</option>
                                     <option value="2023">2023</option>
+                                    <option value="__other">Other…</option>
                                 </select>
+                                <input type="text" id="pjClassYearOther" class="field-input hidden" style="margin-top:0.5rem;" inputmode="numeric" pattern="\d{4}" maxlength="4" placeholder="Type the year (4 digits)" />
                             </div>
                         </div>
                         <div class="field-group">
@@ -804,7 +811,7 @@
 
         <!-- ===== MODE: APPROVALS (Admin) ===== -->
         <div id="mode-admin" class="portal-section" style="display: none;">
-            <button type="button" class="portal-back" onclick="switchMode('home')" aria-label="Back to home">
+            <button type="button" class="portal-back" onclick="goBackFromPortal()" aria-label="Back">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
                 <span>Back</span>
             </button>

@@ -18,6 +18,8 @@ import {
   signInWithPopup,
   signOut,
   onAuthStateChanged,
+  setPersistence,
+  browserLocalPersistence,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   getDatabase,
@@ -52,6 +54,15 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 const provider = new GoogleAuthProvider();
+
+// Keep the user signed in across refreshes/tabs (Facebook-style persistent
+// session). browserLocalPersistence stores the session in localStorage so a page
+// refresh restores it without bouncing through a sign-out/sign-in flash. This is
+// best-effort: if the browser blocks storage we just fall back to the default.
+let __authResolved = false; // flips true after the FIRST onAuthStateChanged fire
+setPersistence(auth, browserLocalPersistence).catch((e) =>
+  console.warn("Auth persistence fallback:", e.message)
+);
 
 let currentUser = null;
 let isAdmin = false;
@@ -212,15 +223,63 @@ function readSelectWithOther(selectId) {
   return sel.value || "";
 }
 
+// A class year is valid only when it is EXACTLY four digits (e.g. 2026). This
+// blocks fake/malformed graduation years like "24", "026", "abcd", "20266".
+const CLASS_YEAR_RE = /^\d{4}$/;
+function isValidClassYear(v) {
+  return CLASS_YEAR_RE.test(String(v || "").trim());
+}
+
+// Set a static <select data-other> to `value`. If the value isn't one of the
+// options, switch the select to "Other…" and put the value in the free-text box
+// (so a saved custom class year survives an edit instead of snapping to default).
+function setSelectWithOther(selectId, value) {
+  const sel = $(selectId);
+  if (!sel) return;
+  const v = String(value == null ? "" : value).trim();
+  const hasOption = [...sel.options].some((o) => o.value === v);
+  const otherEl = sel.dataset.other ? $(sel.dataset.other) : null;
+  if (v && hasOption) {
+    sel.value = v;
+    if (otherEl) { otherEl.value = ""; otherEl.classList.add("hidden"); }
+  } else if (v && otherEl) {
+    sel.value = "__other";
+    otherEl.value = v;
+    otherEl.classList.remove("hidden");
+  } else if (v) {
+    sel.value = v; // no "other" box available; best effort
+  }
+}
+
+// Merge a curated built-in list with every distinct value already used by live
+// students/projects on the site, so a university/faculty/department that someone
+// registered (via "Other…") is offered to everyone else afterwards — i.e. the
+// dropdowns grow dynamically from approved data, not just the hardcoded seed.
+function knownValues(builtin, field) {
+  const set = new Set(builtin);
+  const eat = (coll) => {
+    (Array.isArray(coll) ? coll : []).forEach((r) => {
+      const v = r && r[field];
+      if (typeof v === "string" && v.trim()) set.add(v.trim());
+    });
+  };
+  eat(window.STUDENTS);
+  eat(window.GRADUATION_PROJECTS);
+  return Array.from(set).sort((a, b) => a.localeCompare(b));
+}
+
 /** Fill every hierarchy select in both the student and project forms. */
 function populateInstitutionSelects(profile) {
   const p = profile || {};
-  fillSelectWithOther("inputUniversity", UNIVERSITIES, { selected: p.university || "" });
-  fillSelectWithOther("inputFaculty", FACULTIES, { selected: p.faculty || "" });
-  fillSelectWithOther("inputDepartment", DEPARTMENTS, { selected: p.department || "" });
-  fillSelectWithOther("pjUniversity", UNIVERSITIES, { selected: "" });
-  fillSelectWithOther("pjFaculty", FACULTIES, { selected: "" });
-  fillSelectWithOther("pjDepartment", DEPARTMENTS, { selected: "" });
+  const unis = knownValues(UNIVERSITIES, "university");
+  const facs = knownValues(FACULTIES, "faculty");
+  const deps = knownValues(DEPARTMENTS, "department");
+  fillSelectWithOther("inputUniversity", unis, { selected: p.university || "" });
+  fillSelectWithOther("inputFaculty", facs, { selected: p.faculty || "" });
+  fillSelectWithOther("inputDepartment", deps, { selected: p.department || "" });
+  fillSelectWithOther("pjUniversity", unis, { selected: "" });
+  fillSelectWithOther("pjFaculty", facs, { selected: "" });
+  fillSelectWithOther("pjDepartment", deps, { selected: "" });
 }
 
 /** Sanitize a string to be a valid Firebase key (mirrors the old server). */
@@ -310,6 +369,19 @@ onAuthStateChanged(auth, async (user) => {
   window.__isAdmin = isAdmin; // so script.js can render admin-only controls
   window.__myUid = user ? user.uid : null; // so script.js can show the owner's Edit on the full profile
   myProfile = null;
+
+  // Reveal the resolved auth state IMMEDIATELY — before the (async) profile
+  // fetch below. The restored session is known the instant this callback fires,
+  // so the header should show the avatar right away. Waiting for the profile
+  // network round-trip is what made a refresh look like a sign-out → sign-in
+  // flash. The profile-dependent bits (the "My profile" label) refresh once the
+  // fetch resolves via the updateAuthUI() call at the end.
+  if (!__authResolved) {
+    __authResolved = true;
+    document.body.classList.add("auth-ready");
+    document.body.classList.toggle("is-authed", !!user);
+    updateAuthUI();
+  }
   // Re-render the yearbook so admin delete buttons appear/disappear.
   // No entrance animation — this is a silent in-place refresh, not a navigation.
   if (typeof window.applyFilters === "function" && document.body.dataset.mode === "yearbook") {
@@ -457,7 +529,7 @@ function hydrateProfileForm() {
     if ($("inputName")) $("inputName").value = t.name || "";
     if ($("inputEmail")) $("inputEmail").value = t.email || "";
     if ($("inputGender")) $("inputGender").value = t.gender || "";
-    if ($("inputClassYear") && t.classYear) $("inputClassYear").value = t.classYear;
+    if (t.classYear) setSelectWithOther("inputClassYear", t.classYear);
     const tsoc = t.social || {};
     if ($("inputLinkedin")) $("inputLinkedin").value = tsoc.linkedin || "";
     if ($("inputGithub")) $("inputGithub").value = tsoc.github || "";
@@ -509,7 +581,7 @@ function hydrateProfileForm() {
     // Edit mode — prefill student fields.
     if ($("inputName")) $("inputName").value = myProfile.name || "";
     if ($("inputGender")) $("inputGender").value = myProfile.gender || "";
-    if ($("inputClassYear") && myProfile.classYear) $("inputClassYear").value = myProfile.classYear;
+    if (myProfile.classYear) setSelectWithOther("inputClassYear", myProfile.classYear);
     const soc = myProfile.social || {};
     if ($("inputLinkedin")) $("inputLinkedin").value = soc.linkedin || "";
     if ($("inputGithub")) $("inputGithub").value = soc.github || "";
@@ -589,9 +661,13 @@ function renderMyProjects() {
  */
 function profileToStudent(p) {
   if (!p) return null;
+  const tracks = p.tracks || p.track || [];
   return {
     ...p,
-    track: p.tracks || p.track || [],
+    // Provide both aliases so every render path (which reads `track`) and the
+    // canonical schema (`tracks`) agree.
+    tracks,
+    track: tracks,
     skills: p.skills || [],
     social: p.social || {},
     ownerUid: p.ownerUid || p.uid || (currentUser && currentUser.uid) || "",
@@ -778,9 +854,29 @@ let formState = {
   isUploading: false,
 };
 
+// Reveal/hide a select's "Other…" free-text input. Used for the class-year
+// selects, which are populated statically in the HTML (not by fillSelectWithOther),
+// so they need their toggle wired explicitly.
+function wireOtherToggle(selectId) {
+  const sel = $(selectId);
+  if (!sel || !sel.dataset.other) return;
+  const other = $(sel.dataset.other);
+  if (!other) return;
+  const sync = () => {
+    if (sel.value === "__other") { other.classList.remove("hidden"); }
+    else { other.classList.add("hidden"); }
+  };
+  sel.onchange = sync;
+  sync();
+}
+
 function initSubmissionForm() {
   const form = $("submissionForm");
   if (!form) return;
+
+  // Class-year selects expose an "Other…" → 4-digit free-text entry.
+  wireOtherToggle("inputClassYear");
+  wireOtherToggle("pjClassYear");
 
   const typeStudent = $("typeStudent");
   const typeProject = $("typeProject");
@@ -1266,6 +1362,9 @@ function initSubmissionForm() {
       if (!readSelectWithOther("inputFaculty")) errors.push("Please choose your Faculty.");
       if (!readSelectWithOther("inputDepartment")) errors.push("Please choose your Department.");
       if (getSelectedTracks().length === 0) errors.push("At least one Track is required.");
+      const sYear = readSelectWithOther("inputClassYear");
+      if (!sYear) errors.push("Class Year is required.");
+      else if (!isValidClassYear(sYear)) errors.push("Class Year must be exactly 4 digits (e.g. 2026).");
       [
         { el: $("inputLinkedin"), l: "LinkedIn" },
         { el: $("inputGithub"), l: "GitHub" },
@@ -1288,6 +1387,9 @@ function initSubmissionForm() {
       if (!readSelectWithOther("pjUniversity")) errors.push("Please choose the University.");
       if (!readSelectWithOther("pjFaculty")) errors.push("Please choose the Faculty.");
       if (!readSelectWithOther("pjDepartment")) errors.push("Please choose the Department.");
+      const pYear = readSelectWithOther("pjClassYear");
+      if (!pYear) errors.push("Class Year is required.");
+      else if (!isValidClassYear(pYear)) errors.push("Class Year must be exactly 4 digits (e.g. 2026).");
       let hasLeader = false;
       let emptyName = false;
       const rows = teamMembersList.querySelectorAll(".team-member-row");
@@ -1507,7 +1609,7 @@ function initSubmissionForm() {
         university: readSelectWithOther("inputUniversity"),
         faculty: readSelectWithOther("inputFaculty"),
         department: readSelectWithOther("inputDepartment"),
-        classYear: $("inputClassYear").value,
+        classYear: readSelectWithOther("inputClassYear"),
         linkedin: $("inputLinkedin").value.trim(),
         github: $("inputGithub").value.trim(),
         whatsapp: $("inputWhatsapp").value.trim(),
@@ -1537,7 +1639,7 @@ function initSubmissionForm() {
         university: readSelectWithOther("pjUniversity"),
         faculty: readSelectWithOther("pjFaculty"),
         department: readSelectWithOther("pjDepartment"),
-        classYear: $("pjClassYear").value,
+        classYear: readSelectWithOther("pjClassYear"),
       };
     }
 
@@ -1628,18 +1730,22 @@ function initSubmissionForm() {
         renderTrackChips();
         if ($("inputName") && currentUser) $("inputName").value = currentUser.displayName || "";
       } else {
-        // Students: profile saved — return home and show the full profile view
-        // (so Back/close from the profile lands on a real page, not the now-empty
-        // submit form).
+        // Students: profile saved. Step ONE entry back through the browser
+        // history (edit → profile → … → the section you started on) so the Back
+        // chain stays symmetric — exactly like pressing the browser Back button.
+        // The popstate handler reopens whatever was underneath (the profile view),
+        // so the user sees their saved changes without us force-jumping anywhere.
         myProfile = { ...(myProfile || {}), ...buildProfileObject(data), status: savedLive ? "live" : "pending" };
         editMode = false;
         // Cover is now persisted on the profile — clear the pending upload so a
         // later edit doesn't needlessly re-upload it.
         formState.coverFile = null;
-        if (typeof window.switchMode === "function") window.switchMode("home");
         hydrateProfileForm();
         // Refresh the live site so an edit shows immediately.
         if (savedLive && typeof window.fetchFirebaseData === "function") window.fetchFirebaseData();
+        // Return to the previous step (the profile view) via history, not a jump.
+        if (window.history.length > 1) history.back();
+        else if (typeof window.switchMode === "function") window.switchMode("yearbook");
       }
       setTimeout(() => uploadProgress.classList.add("hidden"), 1600);
     } catch (err) {
@@ -1723,7 +1829,8 @@ function buildLiveRecord(data) {
         email: data.email || "",
         photo: data.photo || "",
         cover: data.cover || "",
-        track: data.tracks || [],
+        // Canonical field is `tracks` (array) after the schema normalization.
+        tracks: data.tracks || [],
         skills: data.skills || [],
         color: data.color,
         gender: data.gender,
@@ -1827,21 +1934,46 @@ function renderPending() {
       let body = "";
       if (d.type === "student") {
         const photo = d.photo ? `${R2_BASE}/${esc(d.photo)}` : "";
-        const tracks = (d.tracks || []).map((t) => `<span class="chip">${esc(t)}</span>`).join("");
+        const trackList = d.tracks || d.track || [];
+        const tracks = trackList.map((t) => `<span class="chip">${esc(t)}</span>`).join("");
         const socials = ["linkedin", "github", "whatsapp", "facebook"]
           .filter((k) => d[k])
           .map((k) => `<a href="${esc(d[k])}" target="_blank" rel="noopener">${k}</a>`)
           .join(" · ");
+        // Validation hints surfaced inline so the admin sees problems before
+        // approving (mirrors the rules enforced in approve()).
+        const issues = pendingMetaIssues(d);
+        const issuesHtml = issues.length
+          ? `<div class="pc-issues">⚠ ${issues.map(esc).join(" · ")}</div>` : "";
+        // Yearbook-card preview — uses the SAME public card classes so the admin
+        // sees exactly how the card will look once live.
+        const ini = (d.name || "?").split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+        const avatar = photo
+          ? `<div class="student-photo-wrap"><img class="student-photo" src="${photo}" alt="" onerror="this.style.display='none'"></div>`
+          : `<div class="student-photo-wrap"><div class="student-avatar" style="background:${esc(d.color || "var(--gradient-2)")}">${esc(ini)}</div></div>`;
+        const previewTracks = trackList.map((t) => `<span class="student-track">${esc(t)}</span>`).join("");
+        const cardPreview = `
+          <div class="pc-preview">
+            <div class="pc-preview-label">Yearbook card preview</div>
+            <div class="student-card pc-card-sample">
+              ${avatar}
+              <p class="student-name">${esc(d.name || "")}</p>
+              <p class="student-uni">${esc(d.university || "Al-Azhar University")}</p>
+              ${previewTracks ? `<div class="student-track-container">${previewTracks}</div>` : ""}
+            </div>
+          </div>`;
         body = `
           <div class="pc-student">
             ${photo ? `<img class="pc-photo" src="${photo}" alt="" onerror="this.style.display='none'">` : ""}
             <div class="pc-fields">
               <div class="pc-name">${esc(d.name)}</div>
-              <div class="pc-meta">${esc(d.gender || "")}</div>
+              <div class="pc-meta">${esc([d.gender, d.university, d.faculty, d.department, d.classYear ? "Class of " + d.classYear : ""].filter(Boolean).join(" · "))}</div>
               <div class="chip-container">${tracks}</div>
               ${socials ? `<div class="pc-socials">${socials}</div>` : ""}
+              ${issuesHtml}
             </div>
-          </div>`;
+          </div>
+          ${cardPreview}`;
       } else {
         const team = (Array.isArray(d.team) ? d.team : [])
           .map((m) => `<span class="chip${m.leader ? " is-leader" : ""}">${m.leader ? "★ " : ""}${esc(m.name)}</span>`)
@@ -1860,6 +1992,7 @@ function renderPending() {
           </div>
           ${body}
           <div class="pc-actions">
+            ${d.type === "student" ? `<button class="pc-btn pc-view" data-act="view" data-id="${id}">👁 View full profile</button>` : ""}
             <button class="pc-btn pc-approve" data-act="approve" data-id="${id}">✓ Approve</button>
             <button class="pc-btn pc-reject" data-act="reject" data-id="${id}">✕ Reject</button>
           </div>
@@ -1871,14 +2004,69 @@ function renderPending() {
     btn.addEventListener("click", () => {
       const id = btn.dataset.id;
       if (btn.dataset.act === "approve") approve(id, btn);
+      else if (btn.dataset.act === "view") viewPendingProfile(id);
       else reject(id, btn);
     });
   });
 }
 
+// Metadata problems that should block (or at least warn before) approval. Mirrors
+// the registration validation so the admin never publishes malformed records.
+function pendingMetaIssues(d) {
+  const out = [];
+  if (!d || d.type !== "student") return out;
+  if (!d.university) out.push("No university");
+  if (!d.faculty) out.push("No faculty");
+  if (!d.department) out.push("No department");
+  if (!((d.tracks || d.track || []).length)) out.push("No track");
+  if (!d.classYear) out.push("No class year");
+  else if (!/^\d{4}$/.test(String(d.classYear).trim())) out.push("Class year not 4 digits");
+  return out;
+}
+
+// Open the pending applicant's FULL profile (read-only overlay) so the admin can
+// inspect every public field before approving — without writing anything live.
+function viewPendingProfile(id) {
+  const entry = pendingCache[id];
+  if (!entry || !entry.payload || entry.payload.type !== "student") return;
+  const d = entry.payload;
+  const tracks = d.tracks || d.track || [];
+  const student = {
+    name: d.name || "",
+    gender: d.gender || "",
+    photo: d.photo || "",
+    cover: d.cover || "",
+    color: d.color || "",
+    tracks, track: tracks,
+    skills: d.skills || [],
+    university: d.university || "",
+    faculty: d.faculty || "",
+    department: d.department || "",
+    classYear: d.classYear || "",
+    email: d.email || "",
+    social: {
+      linkedin: d.linkedin || "", github: d.github || "",
+      whatsapp: d.whatsapp || "", facebook: d.facebook || "",
+    },
+    _preview: true,
+  };
+  if (typeof window.openFullProfile === "function") {
+    window.openFullProfile(student, { returnMode: "admin" });
+  }
+}
+
 async function approve(id, btn) {
   const entry = pendingCache[id];
   if (!entry || !entry.payload) return;
+  // Block approval of malformed student metadata (empty hierarchy / bad year).
+  const issues = pendingMetaIssues(entry.payload);
+  if (issues.length) {
+    const ok = confirm(
+      `This submission has problems:\n\n• ${issues.join("\n• ")}\n\n` +
+      `Approving will publish it as-is. Approve anyway?`
+    );
+    if (!ok) return;
+  }
   btn.disabled = true;
   btn.textContent = "…";
   try {
@@ -2028,6 +2216,42 @@ function openProjectEditor(project, opts = {}) {
   const dFac = project.faculty || "Faculty of Engineering";
   const dDep = project.department || "Electronics and Communication Engineering";
   const dYear = project.classYear || "2026";
+  // The project's own tracks (primary first), NOT the union of members' tracks.
+  // Prefer the explicit field; fall back to the legacy category→tracks mapping so
+  // editing an old record pre-fills sensibly. A project may have several tracks:
+  // the first is the primary (the track the project mainly belongs to).
+  const CAT_TO_TRACKS = {
+    Digital: ["Digital IC Design", "ASIC Verification"],
+    Embedded: ["Embedded Systems", "Embedded Linux", "IoT", "AI"],
+    Network: ["Network"],
+  };
+  const _trackArr = (v) =>
+    typeof v === "string" ? (v.trim() ? [v.trim()] : [])
+    : Array.isArray(v) ? v.map((x) => String(x || "").trim()).filter(Boolean)
+    : [];
+  let projTracks = _trackArr(project.track !== undefined ? project.track : project.tracks);
+  if (!projTracks.length && project.category) {
+    projTracks = CAT_TO_TRACKS[project.category] ? [...CAT_TO_TRACKS[project.category]] : [project.category];
+  }
+  // De-dup while preserving order (primary stays first).
+  projTracks = (() => { const s = new Set(); return projTracks.filter((t) => (s.has(t) ? false : (s.add(t), true))); })();
+
+  // Available tracks for the picker, gathered DYNAMICALLY from the same pool the
+  // students use (every track on any student/profile) plus any track already on a
+  // project — so the project picker offers exactly the student tracks, and new
+  // tracks anyone introduces show up automatically. Users can also type a brand
+  // new one.
+  const trackUniverse = (() => {
+    const set = new Set();
+    const addAll = (v) => _trackArr(v).forEach((t) => set.add(t));
+    (Array.isArray(window.STUDENTS) ? window.STUDENTS : []).forEach((s) => addAll(s.track || s.tracks));
+    (Array.isArray(window.GRADUATION_PROJECTS) ? window.GRADUATION_PROJECTS : []).forEach((p) => {
+      addAll(p.track !== undefined ? p.track : p.tracks);
+    });
+    Object.values(CAT_TO_TRACKS).forEach((arr) => arr.forEach((t) => set.add(t)));
+    projTracks.forEach((t) => set.add(t));
+    return [...set].sort((a, b) => a.localeCompare(b));
+  })();
 
   let overlay = document.getElementById("projectEditor");
   if (overlay) overlay.remove();
@@ -2045,7 +2269,14 @@ function openProjectEditor(project, opts = {}) {
         <input type="text" class="field-input pe-name" value="${esc(project.name || project.title || "")}" placeholder="e.g. Autonomous Delivery Robot" />
 
         <label class="field-label">Category</label>
-        <input type="text" class="field-input pe-category" value="${esc(project.category || "")}" placeholder="e.g. Embedded Systems" />
+        <input type="text" class="field-input pe-category" value="${esc(project.category || "")}" placeholder="e.g. Embedded" />
+
+        <label class="field-label">Tracks <span class="required" aria-hidden="true">*</span></label>
+        <div class="pe-tracks-selected"></div>
+        <input type="search" class="field-input pe-track-search" placeholder="Add a track (e.g. Embedded Systems)…" autocomplete="off" list="peTrackList" />
+        <datalist id="peTrackList">${trackUniverse.map((t) => `<option value="${esc(t)}"></option>`).join("")}</datalist>
+        <div class="pe-track-suggest"></div>
+        <p class="field-hint">The track(s) this graduation project belongs to (not the members' tracks). The first one is the primary track.</p>
 
         <label class="field-label">Description</label>
         <textarea class="field-input pe-desc" rows="3" placeholder="What does the project do?">${esc(project.description || "")}</textarea>
@@ -2094,6 +2325,9 @@ function openProjectEditor(project, opts = {}) {
   const searchEl = overlay.querySelector(".pe-search");
   const resultsEl = overlay.querySelector(".pe-results");
   const statusEl = overlay.querySelector(".pe-status");
+  const trackSelEl = overlay.querySelector(".pe-tracks-selected");
+  const trackSearchEl = overlay.querySelector(".pe-track-search");
+  const trackSuggestEl = overlay.querySelector(".pe-track-suggest");
   const close = () => overlay.remove();
 
   const students = Array.isArray(window.STUDENTS) ? window.STUDENTS : [];
@@ -2147,6 +2381,52 @@ function openProjectEditor(project, opts = {}) {
     }));
   };
 
+  // ── Track picker (multi-select, primary = first chip) ──
+  const normT = (s) => String(s || "").trim().toLowerCase();
+  const renderTracks = () => {
+    trackSelEl.innerHTML = projTracks.length
+      ? projTracks.map((t, i) =>
+          `<span class="pe-track-chip${i === 0 ? " is-primary" : ""}">
+            ${i === 0 ? '<span class="pe-track-star" title="Primary track">★</span>' : ""}
+            <span class="pe-track-name">${esc(t)}</span>
+            ${i !== 0 ? `<button type="button" class="pe-track-makeprimary" data-i="${i}" title="Make primary">⤴</button>` : ""}
+            <button type="button" class="pe-track-remove" data-i="${i}" aria-label="Remove track">✕</button>
+          </span>`
+        ).join("")
+      : `<span class="admin-picker-empty">No tracks yet — add at least one.</span>`;
+    trackSelEl.querySelectorAll(".pe-track-remove").forEach((b) =>
+      b.addEventListener("click", () => { projTracks.splice(+b.dataset.i, 1); renderTracks(); }));
+    trackSelEl.querySelectorAll(".pe-track-makeprimary").forEach((b) =>
+      b.addEventListener("click", () => {
+        const i = +b.dataset.i; const [t] = projTracks.splice(i, 1); projTracks.unshift(t); renderTracks();
+      }));
+  };
+  const addTrack = (raw) => {
+    const t = String(raw || "").trim();
+    if (!t) return;
+    if (projTracks.some((x) => normT(x) === normT(t))) return; // no dups
+    projTracks.push(t);
+    trackSearchEl.value = ""; renderTrackSuggest(""); renderTracks();
+  };
+  const renderTrackSuggest = (q = "") => {
+    const nq = normT(q);
+    if (!nq) { trackSuggestEl.innerHTML = ""; return; }
+    const chosen = new Set(projTracks.map(normT));
+    const rows = trackUniverse.filter((t) => !chosen.has(normT(t)) && normT(t).includes(nq)).slice(0, 8);
+    const exact = trackUniverse.some((t) => normT(t) === nq);
+    let html = rows.map((t) => `<button type="button" class="pe-track-opt" data-t="${esc(t)}">${esc(t)}</button>`).join("");
+    // Offer to create a brand-new track when the typed value isn't already known.
+    if (!exact && q.trim()) html += `<button type="button" class="pe-track-opt is-new" data-t="${esc(q.trim())}">+ Add “${esc(q.trim())}”</button>`;
+    trackSuggestEl.innerHTML = html;
+    trackSuggestEl.querySelectorAll(".pe-track-opt").forEach((b) =>
+      b.addEventListener("click", () => addTrack(b.dataset.t)));
+  };
+  trackSearchEl.addEventListener("input", () => renderTrackSuggest(trackSearchEl.value));
+  trackSearchEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); addTrack(trackSearchEl.value); }
+  });
+  renderTracks();
+
   renderTeam();
   searchEl.addEventListener("input", () => renderResults(searchEl.value));
   overlay.querySelector(".admin-picker-close").addEventListener("click", close);
@@ -2157,6 +2437,10 @@ function openProjectEditor(project, opts = {}) {
     const val = (sel) => { const el = overlay.querySelector(sel); return el ? el.value.trim() : ""; };
     const name = val(".pe-name");
     const category = val(".pe-category");
+    // Project tracks (primary first). Trim/de-dup defensively.
+    const track = (() => { const s = new Set(); return projTracks
+      .map((t) => String(t || "").trim()).filter(Boolean)
+      .filter((t) => (s.has(t.toLowerCase()) ? false : (s.add(t.toLowerCase()), true))); })();
     const description = val(".pe-desc");
     const repo = val(".pe-repo");
     const university = val(".pe-university");
@@ -2164,8 +2448,13 @@ function openProjectEditor(project, opts = {}) {
     const department = val(".pe-department");
     const classYear = val(".pe-classyear");
     const supervisor = val(".pe-supervisor");
-    if (!category) { statusEl.style.display = ""; statusEl.textContent = "Category is required."; return; }
-    if (!team.length) { statusEl.style.display = ""; statusEl.textContent = "Add at least one team member."; return; }
+    const fail = (msg) => { statusEl.style.display = ""; statusEl.textContent = msg; };
+    if (!category) return fail("Category is required.");
+    if (!track.length) return fail("Add at least one track.");
+    if (!university) return fail("University is required.");
+    if (!department) return fail("Department is required.");
+    if (!classYear) return fail("Class year is required.");
+    if (!team.length) return fail("Add at least one team member.");
     if (!team.some((m) => m.leader)) team[0].leader = true; // ensure a leader
 
     // Sort leader-first and build the key-ordered team object Firebase expects.
@@ -2180,6 +2469,7 @@ function openProjectEditor(project, opts = {}) {
       ...project,
       name,
       category,
+      track,
       description,
       university,
       faculty,
@@ -2287,13 +2577,18 @@ function init() {
   };
 
   // Open the owner's profile as the read-only full-profile overlay over the
-  // current page; Back/close returns home (the page underneath stays usable).
+  // current page; Back/close returns to the SECTION the user was on (so editing
+  // from the yearbook and pressing Back lands back on the yearbook, not home).
+  // Portal pages (submit/admin) can't host the overlay, so those fall back to the
+  // yearbook — a real, usable page rather than a dead-end form.
   function openMyProfileView() {
     if (!myProfile || typeof window.openFullProfile !== "function") {
       hydrateProfileForm();
       return;
     }
-    window.openFullProfile(profileToStudent(myProfile), { returnMode: "home" });
+    const base = document.body.dataset.mode || "yearbook";
+    const returnMode = (base === "submit" || base === "admin") ? "yearbook" : base;
+    window.openFullProfile(profileToStudent(myProfile), { returnMode });
   }
   window.openMyProfileView = openMyProfileView;
   const menuAdmin = $("menuAdminBtn");

@@ -70,6 +70,7 @@ function applyDbPayload({ studentsData, projectsData, profilesData }) {
         project.team = Object.values(project.team);
       }
       applyHierarchyDefaults(project);
+      applyProjectDefaults(project);
     });
   }
   // Expose for the portal module (ES module can't see top-level lets).
@@ -143,13 +144,84 @@ const DEFAULT_UNIVERSITY = "Al-Azhar University";
 const DEFAULT_FACULTY = "Faculty of Engineering";
 const DEFAULT_DEPARTMENT = "Electronics and Communication Engineering";
 
+// Legacy projects only carried a short `category` key (Digital/Embedded/Network).
+// A graduation project's TRACK set is a project-level attribute (what the project
+// is about), independent of which tracks its members happen to belong to. Each
+// project has ONE primary track plus optional sub-tracks. For older records that
+// predate the explicit `track` field, seed the track set from the category. The
+// FIRST entry is always the primary track.
+const CAT_TO_TRACKS = {
+  Digital: ["Digital IC Design", "ASIC Verification"],
+  Embedded: ["Embedded Systems", "Embedded Linux", "IoT", "AI"],
+  Network: ["Network"],
+};
+
+/**
+ * The graduation project's own track set as an array (primary first). Prefers the
+ * explicit project.track field; falls back to the legacy category mapping. NEVER
+ * derived from members. Returns [] when nothing is known.
+ */
+function projectTracks(p) {
+  if (!p) return [];
+  let t = p.track !== undefined ? p.track : p.tracks;
+  if (typeof t === "string") t = t.trim() ? [t.trim()] : [];
+  else if (Array.isArray(t)) t = t.map((x) => String(x || "").trim()).filter(Boolean);
+  else t = [];
+  if (t.length) {
+    // De-dup, preserve order (primary stays first).
+    const seen = new Set();
+    return t.filter((x) => (seen.has(x) ? false : (seen.add(x), true)));
+  }
+  if (p.category && CAT_TO_TRACKS[p.category]) return [...CAT_TO_TRACKS[p.category]];
+  if (p.category) return [p.category];
+  return [];
+}
+
+/** The project's single primary track (first of the set), or "". */
+function projectPrimaryTrack(p) {
+  const t = projectTracks(p);
+  return t.length ? t[0] : "";
+}
+
+/**
+ * Coerce a student/profile's track field into a clean de-duped array. After the
+ * Firebase field normalization the canonical field is `tracks`, but we still read
+ * a stray legacy `track` defensively so old cached payloads don't break.
+ */
+function studentTracks(rec) {
+  let raw = rec && rec.tracks !== undefined ? rec.tracks : (rec && rec.track);
+  if (typeof raw === "string") raw = raw.trim() ? [raw.trim()] : [];
+  else if (Array.isArray(raw)) raw = raw.map((x) => String(x || "").trim()).filter(Boolean);
+  else raw = [];
+  const seen = new Set();
+  return raw.filter((x) => (seen.has(x.toLowerCase()) ? false : (seen.add(x.toLowerCase()), true)));
+}
+
 /** Fill any missing hierarchy fields on a student/profile record in place. */
 function applyHierarchyDefaults(rec) {
   if (!rec.university) rec.university = DEFAULT_UNIVERSITY;
   if (!rec.faculty) rec.faculty = DEFAULT_FACULTY;
   if (!rec.department) rec.department = DEFAULT_DEPARTMENT;
   if (!rec.classYear) rec.classYear = DEFAULT_CLASS_YEAR;
+  // Canonicalise tracks onto BOTH `tracks` (the schema field) and `track` (the
+  // alias every render/filter path already reads) so the whole app sees one,
+  // consistent array no matter which field the source record used.
+  const t = studentTracks(rec);
+  rec.tracks = t;
+  rec.track = t;
   return rec;
+}
+
+/**
+ * Project-specific defaults. Stamps a `track` array derived from the legacy
+ * category so old records (which only had `category`) filter correctly by
+ * project track. Call AFTER applyHierarchyDefaults for projects.
+ */
+function applyProjectDefaults(proj) {
+  // Normalise track to an array (primary first); seed from category if absent.
+  const t = projectTracks(proj);
+  if (t.length) proj.track = t;
+  return proj;
 }
 
 /**
@@ -193,7 +265,8 @@ function mergeStudentSources(studentsData, profilesData) {
         name: p.name,
         gender: p.gender || "",
         photo: p.photo || "",
-        track: p.tracks || p.track || [],
+        // Canonical field is `tracks`; applyHierarchyDefaults mirrors it to `track`.
+        tracks: p.tracks || p.track || [],
         skills: p.skills || [],
         color: p.color || "",
         social: p.social || {},
@@ -921,8 +994,23 @@ function openFullProfile(student, opts = {}) {
       const editBtn = canEdit
         ? `<button type="button" class="fp-proj-edit" data-proj-key="${esc(p._key || "")}">✎ Edit project</button>`
         : "";
+      // Project's own tracks (primary first) — project metadata, not member tracks.
+      const tracks = projectTracks(p);
+      const tracksHtml = tracks.length
+        ? `<div class="project-tracks">${tracks
+            .map((t, i) => `<span class="project-track-chip${i === 0 ? " is-primary" : ""}">${esc(t)}</span>`)
+            .join("")}</div>`
+        : "";
+      // Hierarchy line from the project's own metadata (with safe fallbacks).
+      const metaBits = [
+        p.university || DEFAULT_UNIVERSITY,
+        p.department || DEFAULT_DEPARTMENT,
+        p.classYear || DEFAULT_CLASS_YEAR,
+      ].filter(Boolean);
+      const metaHtml = `<p class="fp-proj-meta">${esc(metaBits.join(" · "))}</p>`;
       return `<div class="fp-proj-card">
         <div class="fp-proj-head">${icon} <strong>${esc(catLabel)}</strong> <span class="fp-proj-year">${esc(p.classYear || "")}</span>${editBtn}</div>
+        ${tracksHtml}${metaHtml}
         ${desc}${repo}
         <h4 class="fp-proj-team-title">Team</h4>
         <div class="fp-member-grid">${members}</div>
@@ -1714,6 +1802,8 @@ function renderProjects() {
   const grid = document.getElementById("projectsGrid");
   if (!grid) return;
 
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
   // Combine the category tab + the text search + the dimension filters
   // (University / Faculty / Department / Class / Track), then sort by leader.
   const filtered = GRADUATION_PROJECTS
@@ -1894,7 +1984,21 @@ function renderProjects() {
     teamSection.appendChild(teamLabel);
     teamSection.appendChild(membersRow);
 
+    // ── Track badges (project's own tracks: primary first, then sub-tracks) ──
+    const tracks = projectTracks(project);
+    let tracksEl = null;
+    if (tracks.length) {
+      tracksEl = document.createElement("div");
+      tracksEl.className = "project-tracks";
+      tracksEl.innerHTML = tracks
+        .map((t, i) =>
+          `<span class="project-track-chip${i === 0 ? " is-primary" : ""}">${esc(t)}</span>`
+        )
+        .join("");
+    }
+
     card.appendChild(cardTop);
+    if (tracksEl) card.appendChild(tracksEl);
     card.appendChild(comingSoonEl);
     card.appendChild(teamSection);
 
@@ -1921,37 +2025,27 @@ function _projTeam(p) {
   return Array.isArray(p.team) ? p.team : Object.values(p.team || {});
 }
 
-// The yearbook record for a project's leader (or first member) — used to fill in
-// hierarchy/track values the project record itself doesn't carry.
-function _projLeaderRecord(p) {
-  const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
-  const team = _projTeam(p);
-  const leader = team.find((m) => m.leader) || team[0];
-  if (!leader) return null;
-  return (STUDENTS || []).find((s) => norm(s.name) === norm(leader.name)) || null;
-}
-
-// Every value a project contributes to a dimension.
-// Used for FILTER MATCHING — tracks include ALL team members so filtering by
-// "Embedded Systems" finds any team that has at least one member in that track.
+// Every value a project contributes to a dimension — derived ONLY from the
+// project's own metadata, never from its members. A graduation project belongs
+// to exactly one track (the track the PROJECT is about); if a Communications
+// student joins an Embedded project, the project still filters as Embedded only.
+// Hierarchy fields fall back to the cohort defaults so legacy records still
+// filter. Used for BOTH matching and the filter-panel option list, so what the
+// panel offers and what it matches are always identical.
 function _projectValues(p, dim) {
-  const rec = _projLeaderRecord(p);
   if (dim.key === "track") {
-    const set = new Set();
-    const add = (t) => { (Array.isArray(t) ? t : t ? [t] : []).forEach((x) => x && set.add(x)); };
-    add(p.track || p.tracks);
-    if (rec) add(rec.track);
-    // Also pull each registered member's tracks so team-level track filters work.
-    const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
-    _projTeam(p).forEach((m) => {
-      const sr = (STUDENTS || []).find((s) => norm(s.name) === norm(m.name));
-      if (sr) add(sr.track);
-    });
-    return [...set];
+    // ALL of the project's own tracks (primary + sub). Filtering by any one of
+    // them surfaces the project, so a multi-track project appears under each of
+    // its tracks.
+    return projectTracks(p);
   }
-  const v = p[dim.field] || (rec && rec[dim.field]) || dim.fallback();
+  const v = p[dim.field] || dim.fallback();
   return v ? [v] : [];
 }
+
+// The filter panel and matching share the same project-only value source so the
+// options shown always correspond to projects that actually match.
+const _projectValuesForDisplay = _projectValues;
 
 function matchesProjectScope(p, exceptKey) {
   for (const dim of FILTER_DIMENSIONS) {
@@ -2578,6 +2672,24 @@ const VALID_MODES = ["home", "countdown", "yearbook", "projects", "submit", "adm
 function modeToPath(mode) {
   return mode === "home" ? "/" : `/${mode}`;
 }
+
+// Back button for the portal pages (submit / edit / admin). Steps ONE entry back
+// through the browser history so navigation is symmetric — pressing Back retraces
+// exactly the path the user took to get here (e.g. edit → my profile → their card
+// → yearbook), one step at a time, instead of jumping to a fixed section. Falls
+// back to home only when there's no in-app history to step back into (e.g. the
+// user deep-linked straight onto /submit in a fresh tab).
+function goBackFromPortal() {
+  // The very first history entry we seed has `_seed: true` in initial routing; if
+  // we're already at the bottom of the stack, history.back() would leave the site,
+  // so route home instead. Otherwise step back and let popstate replay the view.
+  if (window.history.length > 1) {
+    history.back();
+  } else {
+    switchMode("home");
+  }
+}
+window.goBackFromPortal = goBackFromPortal;
 
 // Resolve the current location (or a given path) to a real mode, falling back
 // to "home" for the root and anything unrecognised.
