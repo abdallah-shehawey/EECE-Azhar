@@ -1954,15 +1954,21 @@ function _projectValues(p, dim) {
 }
 
 // Values used for BUILDING THE FILTER PANEL (counts + displayed options).
-// For tracks, only the project's own track field is used — NOT individual
-// team members' yearbook tracks — so the filter panel shows only tracks that
-// are genuinely the project's declared specialisation.
+// For tracks: use the project's own declared track first. If the project has no
+// track field of its own (common when stored without one), fall back to the
+// team leader's yearbook track — but NOT all members — so the panel only shows
+// the project's primary specialisation, not every personal track in the team.
 function _projectValuesForDisplay(p, dim) {
   if (dim.key === "track") {
     const set = new Set();
     const add = (t) => { (Array.isArray(t) ? t : t ? [t] : []).forEach((x) => x && set.add(x)); };
-    // Only the project's own track declaration.
+    // 1. Project's own declared track (most precise).
     add(p.track || p.tracks);
+    // 2. Fallback: leader's track if the project itself has no track field.
+    if (set.size === 0) {
+      const rec = _projLeaderRecord(p);
+      if (rec) add(rec.track);
+    }
     return [...set];
   }
   // For all other dimensions delegate to the standard function.
