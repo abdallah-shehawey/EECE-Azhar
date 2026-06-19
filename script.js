@@ -80,6 +80,7 @@ function applyDbPayload({ studentsData, projectsData, profilesData }) {
 
   // Rebuild cascading filters (fresh data may add new universities/years…).
   if (typeof buildYearbookFilters === "function") buildYearbookFilters();
+  if (typeof buildProjectFilterPanel === "function") buildProjectFilterPanel();
   if (currentMode === "home" && typeof renderHomeStats === "function") renderHomeStats();
 
   // Re-render whichever view is currently active so it reflects the new data.
@@ -92,13 +93,26 @@ function applyDbPayload({ studentsData, projectsData, profilesData }) {
   }
   if (typeof renderStats === "function") renderStats();
 
-  // A refresh landed on /profile before the data was ready — reopen it now.
-  if (_pendingProfileKey && typeof openFullProfile === "function") {
-    const s = (STUDENTS || []).find((st) => studentKey(st) === _pendingProfileKey);
+  // A refresh / deep link landed on /profile/<id> before the data was ready —
+  // reopen it now. Prefer the URL id (canonical), fall back to the saved key.
+  if ((_pendingProfileId || _pendingProfileKey) && typeof openFullProfile === "function") {
+    const s = (_pendingProfileId && findStudentById(_pendingProfileId)) ||
+              (_pendingProfileKey && (STUDENTS || []).find((st) => studentKey(st) === _pendingProfileKey)) || null;
     if (s) {
       openFullProfile(s);
+      if (_pendingEditAfterOpen && window.__myUid && s.ownerUid === window.__myUid &&
+          typeof window.openMyProfileEdit === "function") {
+        window.openMyProfileEdit();
+        _pendingEditAfterOpen = false;
+      }
       _pendingProfileKey = null;
+      _pendingProfileId = null;
     }
+  }
+
+  // A refresh / deep link landed on /project/<id> before the data was ready.
+  if (_pendingProjectId && typeof openProjectFromId === "function") {
+    if (openProjectFromId(_pendingProjectId)) _pendingProjectId = null;
   }
 
   return true;
@@ -348,17 +362,60 @@ const SOCIAL_CONFIG = {
   },
 };
 
-// True when the current URL path is one of the transient overlay routes
-// (/student → quick card, /profile → full profile). These aren't real
-// sections; they sit on top of one and are driven by their open/close funcs.
+// True when the current URL path matches a transient overlay route. These
+// aren't real sections; they sit on top of one and are driven by their
+// open/close funcs:
+//   "student"      → /student            (quick card)
+//   "profile"      → /profile/<id>       (full profile)
+//   "profile-edit" → /profile/<id>/edit  (edit page)
 function _isOverlayPath(name) {
-  return location.pathname.replace(/^\/+|\/+$/g, "") === name;
+  const seg = location.pathname.replace(/^\/+|\/+$/g, "");
+  if (name === "student") return seg === "student";
+  if (name === "profile") return /^profile\/[^/]+$/.test(seg);
+  if (name === "profile-edit") return /^profile\/[^/]+\/edit$/.test(seg);
+  return seg === name;
+}
+
+// Pull the <id> out of /profile/<id> or /profile/<id>/edit.
+function profileIdFromPath(pathname = location.pathname) {
+  const m = pathname.replace(/^\/+|\/+$/g, "").match(/^profile\/([^/]+)(?:\/edit)?$/);
+  return m ? decodeURIComponent(m[1]) : null;
 }
 
 // Scroll position of the underlying section, saved when an overlay (quick card
 // / full profile) opens so we can land back on the SAME card after closing,
 // instead of being thrown to the top of the grid.
 let _overlayReturnScroll = null;
+
+// Re-apply a saved scroll position across several frames. A freshly re-rendered
+// grid grows as its lazy images decode, so a single scrollTo lands short. We
+// re-assert the target until the page is tall enough for it (or we give up after
+// ~700ms), which keeps "Back from a profile" on the exact same card. Cancels on
+// any user scroll/touch so we never fight the user.
+function _restoreScrollRobust(target) {
+  if (target == null) return;
+  let cancelled = false;
+  const stop = () => { cancelled = true; cleanup(); };
+  const cleanup = () => {
+    window.removeEventListener("wheel", stop, { passive: true });
+    window.removeEventListener("touchmove", stop, { passive: true });
+    window.removeEventListener("keydown", stop);
+  };
+  window.addEventListener("wheel", stop, { passive: true });
+  window.addEventListener("touchmove", stop, { passive: true });
+  window.addEventListener("keydown", stop);
+
+  const start = performance.now();
+  const tick = () => {
+    if (cancelled) return;
+    window.scrollTo(0, target);
+    const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+    const reached = Math.abs(window.scrollY - target) <= 2 || target > maxScroll + 2;
+    if (reached || performance.now() - start > 700) { cleanup(); return; }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
 
 function openPhotoModal(student) {
   let modal = document.getElementById("photoModal");
@@ -415,13 +472,21 @@ function openPhotoModal(student) {
 
   const isAvatar = !student.photo;
 
+  // Escape every user-authored field before it lands in innerHTML below. Names,
+  // tracks, departments etc. are entered by students, so they could contain
+  // "<", ">" or quotes — without this they'd be a stored-XSS vector.
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  // CSS colours are validated separately: only allow a safe subset (hex,
+  // rgb/rgba, hsl, named colours, gradients) so style="" can't be broken out of.
+  const safeColor = (c) => (/^[#a-z0-9 ,.()%-]*$/i.test(String(c || "")) ? String(c || "") : "");
+
   // ── Generate Tracks HTML ──
   let tracksHtml = "";
   let tracks = student.track;
   if (tracks) {
     if (!Array.isArray(tracks)) tracks = [tracks];
     const badges = tracks
-      .map((t) => `<span class="student-track">${t}</span>`)
+      .map((t) => `<span class="student-track">${esc(t)}</span>`)
       .join("");
     tracksHtml = `<div class="student-track-container">${badges}</div>`;
   }
@@ -433,7 +498,7 @@ function openPhotoModal(student) {
     student.department,
     student.classYear ? `Class of ${student.classYear}` : "",
   ].filter(Boolean);
-  if (metaBits.length) metaHtml = `<p class="modal-meta">${metaBits.join(" · ")}</p>`;
+  if (metaBits.length) metaHtml = `<p class="modal-meta">${esc(metaBits.join(" · "))}</p>`;
 
   // Skills are NOT shown in the quick card modal — they live on the full profile.
   const skillsHtml = "";
@@ -455,8 +520,8 @@ function openPhotoModal(student) {
         const cfg = SOCIAL_CONFIG[platform];
         if (!cfg) return "";
         return `
-                <a class="social-btn social-${platform}" href="${cfg.buildUrl(value)}" target="_blank" rel="noopener noreferrer" title="${cfg.title}">
-                    <img src="${cfg.icon}" alt="${cfg.title}" class="social-icon" />
+                <a class="social-btn social-${esc(platform)}" href="${esc(cfg.buildUrl(value))}" target="_blank" rel="noopener noreferrer" title="${esc(cfg.title)}">
+                    <img src="${esc(cfg.icon)}" alt="${esc(cfg.title)}" class="social-icon" />
                 </a>
             `;
       })
@@ -468,11 +533,13 @@ function openPhotoModal(student) {
 
   // Build the photo element with retry logic if needed
   let photoHtml;
+  const initialsEsc = esc(getInitials(student.name));
+  const colorEsc = safeColor(student.color);
   if (isAvatar) {
-    photoHtml = `<div class="photo-modal-avatar" style="background: ${student.color}">${getInitials(student.name)}</div>`;
+    photoHtml = `<div class="photo-modal-avatar" style="background: ${colorEsc}">${initialsEsc}</div>`;
   } else {
-    photoHtml = `<div class="photo-modal-avatar" style="background: ${student.color}" id="_modalAvatarFallback">${getInitials(student.name)}</div>
-      <img id="_modalPhotoImg" alt="${student.name}" style="display:none" />`;
+    photoHtml = `<div class="photo-modal-avatar" style="background: ${colorEsc}" id="_modalAvatarFallback">${initialsEsc}</div>
+      <img id="_modalPhotoImg" alt="${esc(student.name)}" style="display:none" />`;
   }
 
   modal.setAttribute("aria-label", `${student.name} — details`);
@@ -480,7 +547,7 @@ function openPhotoModal(student) {
         <span class="photo-modal-close" role="button" tabindex="0" aria-label="Close">&times;</span>
         <div class="photo-modal-content">
             ${photoHtml}
-            <h3>${student.name}</h3>
+            <h3>${esc(student.name)}</h3>
             ${leaderBadgeHtml}
             ${metaHtml}
             ${tracksHtml}
@@ -539,12 +606,18 @@ function openPhotoModal(student) {
   void modal.offsetWidth;
   modal.classList.add("active");
 
-  // Add state to browser history for mobile back button
+  // Add state to browser history for mobile back button. We tag the entry with
+  // the section it sits on (base mode) so popstate can tear the card down and
+  // restore the right grid even if it's read as a navigation target. Opening a
+  // member card from ON a full profile (Projects → member → profile → member)
+  // must NOT clobber the section the profile returns to, so we keep the existing
+  // base when one is already open.
   if (!_isOverlayPath("student")) {
+    const base = _isOverlayPath("profile") ? _fpReturnMode : currentMode;
     // Remember where the user was in the grid so closing returns to the same
     // card rather than scrolling back to the very first one.
     if (!_isOverlayPath("profile")) _overlayReturnScroll = window.scrollY;
-    history.pushState({ overlay: "student" }, "", "/student");
+    history.pushState({ overlay: "student", mode: base }, "", "/student");
   }
 }
 
@@ -610,6 +683,13 @@ let _fpReturnMode = "yearbook";
 // Set when a refresh landed on /profile but the student data isn't loaded yet;
 // the next applyDbPayload() reopens that profile once the data arrives.
 let _pendingProfileKey = null;
+// The URL profile id awaiting data (deep link / refresh on /profile/<id>).
+let _pendingProfileId = null;
+// True when the deep link was /profile/<id>/edit — open the editor after the
+// profile opens (owner only).
+let _pendingEditAfterOpen = false;
+// The URL project id awaiting data (deep link / refresh on /project/<id>).
+let _pendingProjectId = null;
 
 // A stable key for a student so a profile survives a page refresh. Prefer the
 // auth uid (unique); fall back to the normalised name (unique in practice).
@@ -623,9 +703,72 @@ function findStudentByKey(key) {
   return (STUDENTS || []).find((s) => studentKey(s) === key) || null;
 }
 
+// ── URL-addressable profiles ──
+// The profile is identified directly in the URL (/profile/<id>) so a refresh or
+// a shared/deep link reconstructs it from the URL + Firebase — never from
+// transient sessionStorage. The id is a human-readable name slug
+// (e.g. "abdallah-shehawey"). When two people share a name we disambiguate by
+// appending the short uid, but the bare slug still resolves to the first match.
+function slugify(name) {
+  return String(name || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[؀-ۿ]/g, "") // drop Arabic chars so the slug stays URL-clean
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+// The id we put in the URL for a student. A stable slug; uniquified with the
+// uid tail only when the bare slug would collide with someone else.
+function profileId(student) {
+  if (!student) return "";
+  const base = slugify(student.name) || (student.ownerUid ? student.ownerUid.slice(0, 8) : "student");
+  const sameSlug = (STUDENTS || []).filter((s) => slugify(s.name) === slugify(student.name));
+  if (sameSlug.length > 1 && student.ownerUid) return `${base}-${student.ownerUid.slice(0, 6)}`;
+  return base;
+}
+
+// Resolve a URL id back to a student record. Matches (in order) the uid tail,
+// the exact slug, then a slug prefix — so both "/profile/abdallah-shehawey" and
+// "/profile/abdallah-shehawey-ab12cd" land on the right person.
+function findStudentById(id) {
+  if (!id) return null;
+  const students = STUDENTS || [];
+  // 1) "<slug>-<uidPrefix>" — match by the uid tail when present.
+  const m = id.match(/-([a-z0-9]{6})$/i);
+  if (m) {
+    const byUid = students.find((s) => s.ownerUid && s.ownerUid.slice(0, 6) === m[1]);
+    if (byUid) return byUid;
+  }
+  // 2) Exact slug.
+  const exact = students.find((s) => slugify(s.name) === id);
+  if (exact) return exact;
+  // 3) Slug prefix (handles the "<slug>-<uid>" form when the uid match missed).
+  return students.find((s) => id.startsWith(slugify(s.name))) || null;
+}
+
+// Build the canonical path for a student's profile / edit page.
+function profilePath(student) { return `/profile/${profileId(student)}`; }
+function profileEditPath(student) { return `/profile/${profileId(student)}/edit`; }
+
+// The student record currently rendered in the full-profile overlay. Kept so we
+// can re-render it in place when auth resolves (owner's Edit button) without
+// touching the history stack.
+let _openProfileStudent = null;
+
+// Re-render the open profile after the auth state changes (called by portal.js
+// from onAuthStateChanged). Re-running openFullProfile with fromHistory keeps
+// the URL/history untouched but recomputes owner-only controls.
+window.refreshOpenProfileAuth = function () {
+  if (_openProfileStudent && document.body.classList.contains("fp-open")) {
+    openFullProfile(_openProfileStudent, { fromHistory: true });
+  }
+};
+
 function openFullProfile(student, opts = {}) {
   const page = document.getElementById("fullProfile");
   if (!page || !student) return;
+  _openProfileStudent = student;
   // The owner's "My profile" is hosted on the submit page (which is otherwise
   // blank behind the overlay) — return them to home on Back/close instead of a
   // dead-end submit page. Everyone else returns to the section they came from.
@@ -634,18 +777,48 @@ function openFullProfile(student, opts = {}) {
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const initials = (student.name || "?").split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 
-  // Cover photo (falls back to the gradient banner when none is set).
+  // Cover photo — robust lifecycle so it never "disappears":
+  //   • no cover set        → gradient banner (clean default)
+  //   • cover set           → show a loading shimmer, PRELOAD the image off-DOM,
+  //                           apply it only once it actually decodes (so we never
+  //                           paint a broken/empty box), retrying .jpg→.jpeg→.webp
+  //                           like the avatar/yearbook photos. On total failure we
+  //                           fall back to the gradient instead of a blank box.
   const cover = document.getElementById("fpCover");
   if (cover) {
+    cover.classList.remove("is-loading", "has-cover");
+    cover.style.backgroundImage = "";
     if (student.cover) {
-      const curl = String(student.cover).startsWith("http") ? student.cover : `${CLOUDFLARE_BASE_URL}/${student.cover}`;
-      cover.style.backgroundImage = `url("${curl}")`;
-      cover.style.backgroundSize = "cover";
-      cover.style.backgroundPosition = "center";
-      cover.classList.add("has-cover");
-    } else {
-      cover.style.backgroundImage = "";
-      cover.classList.remove("has-cover");
+      const base = String(student.cover).startsWith("http") ? student.cover : `${CLOUDFLARE_BASE_URL}/${student.cover}`;
+      cover.classList.add("is-loading");
+      // Token guards against a stale load winning after the user opened another
+      // profile (race): only the latest open for this element may apply.
+      const token = (cover._coverToken = (cover._coverToken || 0) + 1);
+      let attempt = 0;
+      const DELAYS = [0, 1500, 3500];
+      const loadCover = () => {
+        if (cover._coverToken !== token) return; // superseded
+        let url = base;
+        if (attempt === 1) url = base.replace(/\.jpg$/i, ".jpeg");
+        else if (attempt === 2) url = base.replace(/\.jpg$/i, ".webp");
+        else if (attempt > 2) { const sep = base.includes("?") ? "&" : "?"; url = base.replace(/\.jpg$/i, ".webp") + sep + "_r=" + attempt; }
+        const img = new Image();
+        img.onload = () => {
+          if (cover._coverToken !== token) return;
+          cover.style.backgroundImage = `url("${url}")`;
+          cover.style.backgroundSize = "cover";
+          cover.style.backgroundPosition = "center";
+          cover.classList.remove("is-loading");
+          cover.classList.add("has-cover");
+        };
+        img.onerror = () => {
+          if (cover._coverToken !== token) return;
+          if (attempt < 3) { attempt++; setTimeout(loadCover, DELAYS[attempt] || 4000); }
+          else { cover.classList.remove("is-loading"); } // give up → gradient
+        };
+        img.src = url;
+      };
+      loadCover();
     }
   }
 
@@ -757,8 +930,26 @@ function openFullProfile(student, opts = {}) {
       btn.addEventListener("click", () => openPhotoModal(rec));
     });
   } else if (projTabBtn && projPanel) {
-    projTabBtn.style.display = "none";
-    projPanel.innerHTML = "";
+    // No project on this person yet.
+    if (isOwnerViewing) {
+      // The owner sees an empty-state with a call to action so they can add one.
+      projTabBtn.style.display = "";
+      projPanel.innerHTML = `
+        <div class="fp-proj-empty">
+          <div class="fp-proj-empty-icon">🚀</div>
+          <h4 class="fp-proj-empty-title">No GP Project Added Yet</h4>
+          <p class="fp-proj-empty-sub">Add your graduation project so juniors and recruiters can see what you built.</p>
+          <button type="button" class="btn-primary fp-add-proj">+ Add GP Project</button>
+        </div>`;
+      const addBtn = projPanel.querySelector(".fp-add-proj");
+      if (addBtn) addBtn.addEventListener("click", () => {
+        if (typeof window.openNewProjectForMe === "function") window.openNewProjectForMe();
+      });
+    } else {
+      // Visitors just don't see the tab when there's nothing to show.
+      projTabBtn.style.display = "none";
+      projPanel.innerHTML = "";
+    }
   }
 
   // Edit button only for the profile owner (portal exposes the current uid).
@@ -779,11 +970,12 @@ function openFullProfile(student, opts = {}) {
     _overlayReturnScroll = window.scrollY;
   }
   window.scrollTo(0, 0);
-  // Remember which profile is open + which section it sits on, so a page
-  // refresh on /profile can reopen the same profile instead of dumping the
-  // user back on the yearbook. (sessionStorage survives reloads; history.state
-  // alone can be dropped by some browsers on a hard refresh.)
-  const profileState = { mode: "profile-view", from: _fpReturnMode, student: studentKey(student) };
+  // The profile is addressed directly in the URL (/profile/<id>). On refresh or
+  // a shared link we reconstruct it from that id + Firebase — the canonical
+  // source of truth. sessionStorage only remembers the *section underneath* so
+  // closing returns there; it's no longer needed to identify the profile.
+  const id = profileId(student);
+  const profileState = { mode: "profile-view", from: _fpReturnMode, student: studentKey(student), id };
   try { sessionStorage.setItem("eece-open-profile", JSON.stringify(profileState)); } catch (_) {}
   // When reopened by Back/Forward (popstate), the history entry already exists —
   // don't push/replace another or we'd corrupt the stack.
@@ -792,15 +984,20 @@ function openFullProfile(student, opts = {}) {
   // replace it (so Back lands on the section, not a closed modal). Otherwise
   // push a fresh entry on top of the current section.
   if (_isOverlayPath("student")) {
-    history.replaceState(profileState, "", "/profile");
+    history.replaceState(profileState, "", profilePath(student));
+  } else if (_isOverlayPath("profile")) {
+    // Already on a /profile/<id> entry (e.g. switching from one member's card to
+    // another). Replace in place so we don't stack endless profile entries.
+    history.replaceState(profileState, "", profilePath(student));
   } else {
-    history.pushState(profileState, "", "/profile");
+    history.pushState(profileState, "", profilePath(student));
   }
 }
 function closeFullProfile() {
   const page = document.getElementById("fullProfile");
   if (page) page.style.display = "none";
   document.body.classList.remove("fp-open");
+  _openProfileStudent = null;
   try { sessionStorage.removeItem("eece-open-profile"); } catch (_) {}
 }
 function fpShowTab(tab) {
@@ -1156,14 +1353,50 @@ function initYearbookFilters() {
   const groups = document.getElementById("filterGroups");
   const clearBtn = document.getElementById("filterClearBtn");
   const chipsWrap = document.getElementById("activeFilters");
+  const backdrop = document.getElementById("filterSheetBackdrop");
+  const sheetClose = document.getElementById("filterSheetClose");
+  const sheetReset = document.getElementById("filterSheetReset");
+  const sheetApply = document.getElementById("filterSheetApply");
 
-  const openPanel = () => { if (panel) { panel.style.display = ""; btn.setAttribute("aria-expanded", "true"); } };
-  const closePanel = () => { if (panel) { panel.style.display = "none"; btn.setAttribute("aria-expanded", "false"); } };
+  // On phones the panel is a bottom sheet: it needs a backdrop and a page-scroll
+  // lock. We detect the sheet breakpoint at open time so a rotation/resize is
+  // honoured. Closing always cleans both up regardless of viewport.
+  //
+  // The panel normally lives inside .yb-filter-wrap (so the desktop popover
+  // anchors to the button). But .container is a stacking context (z-index:1), so
+  // a fixed sheet inside it can't rise above the body-level backdrop. As a sheet
+  // we PORTAL the panel to <body> on open and return it to its anchor on close.
+  const isSheet = () => window.matchMedia("(max-width: 700px)").matches;
+  const homeParent = panel ? panel.parentNode : null;
+  const openPanel = () => {
+    if (!panel) return;
+    if (isSheet()) {
+      document.body.appendChild(panel);           // escape .container's context
+      if (backdrop) backdrop.hidden = false;
+      document.body.classList.add("filter-sheet-open");
+    }
+    panel.style.display = "";
+    btn.setAttribute("aria-expanded", "true");
+  };
+  const closePanel = () => {
+    if (!panel) return;
+    panel.style.display = "none";
+    btn.setAttribute("aria-expanded", "false");
+    if (backdrop) backdrop.hidden = true;
+    document.body.classList.remove("filter-sheet-open");
+    if (homeParent && panel.parentNode !== homeParent) homeParent.appendChild(panel); // restore anchor
+  };
 
   if (btn) btn.addEventListener("click", (e) => {
     e.stopPropagation();
     (panel && panel.style.display === "none") ? openPanel() : closePanel();
   });
+  // Bottom-sheet controls: × and backdrop dismiss; Reset clears; "Show results"
+  // (filters already applied live) just closes the sheet.
+  if (sheetClose) sheetClose.addEventListener("click", (e) => { e.stopPropagation(); closePanel(); });
+  if (backdrop) backdrop.addEventListener("click", () => closePanel());
+  if (sheetReset) sheetReset.addEventListener("click", (e) => { e.stopPropagation(); clearAllFilters(); });
+  if (sheetApply) sheetApply.addEventListener("click", (e) => { e.stopPropagation(); closePanel(); });
 
   // Option toggles inside the popover. Stop propagation BEFORE the rebuild so the
   // document-level outside-click handler below never sees this click — otherwise
@@ -1471,10 +1704,12 @@ function renderProjects() {
   const grid = document.getElementById("projectsGrid");
   if (!grid) return;
 
-  // "All" shows every project; otherwise filter to the chosen category.
-  // Sort alphabetically by leader name.
+  // Combine the category tab + the text search + the dimension filters
+  // (University / Faculty / Department / Class / Track), then sort by leader.
   const filtered = GRADUATION_PROJECTS
     .filter((p) => currentProjectCat === "All" || p.category === currentProjectCat)
+    .filter((p) => matchesProjectScope(p))
+    .filter((p) => matchesProjectSearch(p))
     .sort((a, b) => {
       const aLeader = (a.team || []).find(m => m.leader);
       const bLeader = (b.team || []).find(m => m.leader);
@@ -1485,7 +1720,7 @@ function renderProjects() {
 
   if (filtered.length === 0) {
     grid.innerHTML =
-      '<p class="no-projects">No projects found in this category.</p>';
+      '<p class="no-projects">No projects match your search or filters.</p>';
     return;
   }
 
@@ -1497,6 +1732,7 @@ function renderProjects() {
     const card = document.createElement("div");
     card.className = `project-card cat-${catKey}`;
     card.style.animationDelay = `${idx * 0.1}s`;
+    if (project._key) card.dataset.projKey = project._key;
 
     // ── Card Top: badge + icon ──
     const cardTop = document.createElement("div");
@@ -1656,6 +1892,258 @@ function renderProjects() {
   });
 
   updateProjectDiscussionCountdowns();
+}
+
+// ===== GP Projects filtering (search + University/Faculty/Department/Class/Track) =====
+// Mirrors the Yearbook filter UX. Each project derives its hierarchy fields from
+// its own metadata; when a field is missing we fall back to the team leader's
+// (then any member's) yearbook record, so older project records still filter.
+let currentProjectSearch = "";
+const projectFilter = {
+  university: new Set(),
+  faculty: new Set(),
+  department: new Set(),
+  classYear: new Set(),
+  track: new Set(),
+};
+
+function _projTeam(p) {
+  return Array.isArray(p.team) ? p.team : Object.values(p.team || {});
+}
+
+// The yearbook record for a project's leader (or first member) — used to fill in
+// hierarchy/track values the project record itself doesn't carry.
+function _projLeaderRecord(p) {
+  const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+  const team = _projTeam(p);
+  const leader = team.find((m) => m.leader) || team[0];
+  if (!leader) return null;
+  return (STUDENTS || []).find((s) => norm(s.name) === norm(leader.name)) || null;
+}
+
+// Every value a project contributes to a dimension. Tracks aggregate across the
+// whole team so filtering by "Embedded Systems" finds any team that has one.
+function _projectValues(p, dim) {
+  const rec = _projLeaderRecord(p);
+  if (dim.key === "track") {
+    const set = new Set();
+    const add = (t) => { (Array.isArray(t) ? t : t ? [t] : []).forEach((x) => x && set.add(x)); };
+    add(p.track || p.tracks);
+    if (rec) add(rec.track);
+    // Also pull each registered member's tracks so team-level track filters work.
+    const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+    _projTeam(p).forEach((m) => {
+      const sr = (STUDENTS || []).find((s) => norm(s.name) === norm(m.name));
+      if (sr) add(sr.track);
+    });
+    return [...set];
+  }
+  const v = p[dim.field] || (rec && rec[dim.field]) || dim.fallback();
+  return v ? [v] : [];
+}
+
+function matchesProjectScope(p, exceptKey) {
+  for (const dim of FILTER_DIMENSIONS) {
+    if (dim.key === exceptKey) continue;
+    const sel = projectFilter[dim.key];
+    if (sel.size === 0) continue;
+    const vals = _projectValues(p, dim);
+    if (!vals.some((v) => sel.has(v))) return false;
+  }
+  return true;
+}
+
+// Search matches project name, ANY team member's name, the team name and the
+// supervisor — case-insensitive, English/Arabic alike.
+function matchesProjectSearch(p) {
+  const q = currentProjectSearch;
+  if (!q) return true;
+  const hay = [
+    p.name, p.title, p.category, p.teamName, p.team_name, p.supervisor,
+    ..._projTeam(p).map((m) => m.name),
+  ].filter(Boolean).join(" ").toLowerCase();
+  return hay.includes(q);
+}
+
+function filterProjectsSearch(query) {
+  currentProjectSearch = String(query || "").trim().toLowerCase();
+  renderProjects();
+}
+
+function _projCountsForDimension(dim) {
+  const counts = new Map();
+  (GRADUATION_PROJECTS || []).forEach((p) => {
+    if (currentProjectCat !== "All" && p.category !== currentProjectCat) return;
+    if (!matchesProjectScope(p, dim.key)) return;
+    _projectValues(p, dim).forEach((v) => counts.set(v, (counts.get(v) || 0) + 1));
+  });
+  return counts;
+}
+
+function buildProjectFilterPanel() {
+  const groupsWrap = document.getElementById("projFilterGroups");
+  if (!groupsWrap) return;
+
+  // Drop selections that no longer exist in the data.
+  FILTER_DIMENSIONS.forEach((dim) => {
+    const present = new Set();
+    (GRADUATION_PROJECTS || []).forEach((p) => _projectValues(p, dim).forEach((v) => present.add(v)));
+    projectFilter[dim.key].forEach((v) => { if (!present.has(v)) projectFilter[dim.key].delete(v); });
+  });
+
+  const html = FILTER_DIMENSIONS.map((dim) => {
+    const counts = _projCountsForDimension(dim);
+    const selected = projectFilter[dim.key];
+    const values = _sortFilterValues(dim.key, new Set([...counts.keys(), ...selected]));
+    if (values.length === 0) return "";
+    const opts = values.map((v) => {
+      const n = counts.get(v) || 0;
+      const isOn = selected.has(v);
+      const esc = (x) => String(x).replace(/"/g, "&quot;");
+      return `<button type="button" class="filter-opt${isOn ? " is-on" : ""}" role="checkbox" aria-checked="${isOn}"
+        data-dim="${dim.key}" data-val="${esc(v)}">
+        <span class="filter-opt-check" aria-hidden="true"></span>
+        <span class="filter-opt-label">${esc(v)}</span>
+        <span class="filter-opt-count">${n}</span>
+      </button>`;
+    }).join("");
+    return `<div class="filter-group" data-dim="${dim.key}">
+      <div class="filter-group-title">${dim.label}</div>
+      <div class="filter-opts">${opts}</div>
+    </div>`;
+  }).join("");
+
+  groupsWrap.innerHTML = html || `<p class="filter-empty">No filters available yet.</p>`;
+  _updateProjFilterButtonCount();
+  _renderProjActiveChips();
+}
+
+function _projActiveFilterCount() {
+  return FILTER_DIMENSIONS.reduce((n, dim) => n + projectFilter[dim.key].size, 0);
+}
+function _updateProjFilterButtonCount() {
+  const badge = document.getElementById("projFilterCount");
+  const btn = document.getElementById("projFilterToggleBtn");
+  if (!badge) return;
+  const n = _projActiveFilterCount();
+  badge.textContent = n;
+  badge.style.display = n ? "" : "none";
+  if (btn) btn.classList.toggle("has-active", n > 0);
+}
+function _renderProjActiveChips() {
+  const wrap = document.getElementById("projActiveFilters");
+  if (!wrap) return;
+  const chips = [];
+  FILTER_DIMENSIONS.forEach((dim) => {
+    projectFilter[dim.key].forEach((v) => {
+      const esc = (x) => String(x).replace(/"/g, "&quot;");
+      chips.push(`<button type="button" class="active-filter-chip" data-dim="${dim.key}" data-val="${esc(v)}">
+        ${esc(v)} <span class="active-filter-x" aria-hidden="true">×</span>
+      </button>`);
+    });
+  });
+  wrap.innerHTML = chips.join("");
+  wrap.style.display = chips.length ? "" : "none";
+}
+function toggleProjectFilterValue(dimKey, val) {
+  const set = projectFilter[dimKey];
+  if (set.has(val)) set.delete(val); else set.add(val);
+  buildProjectFilterPanel();
+  renderProjects();
+}
+function clearAllProjectFilters() {
+  FILTER_DIMENSIONS.forEach((dim) => projectFilter[dim.key].clear());
+  buildProjectFilterPanel();
+  renderProjects();
+}
+
+// Wire the project Filter button, popover/bottom-sheet and option/chip clicks.
+function initProjectFilters() {
+  const btn = document.getElementById("projFilterToggleBtn");
+  const panel = document.getElementById("projFilterPanel");
+  const groups = document.getElementById("projFilterGroups");
+  const clearBtn = document.getElementById("projFilterClearBtn");
+  const chipsWrap = document.getElementById("projActiveFilters");
+  const backdrop = document.getElementById("filterSheetBackdrop");
+  const sheetClose = document.getElementById("projFilterSheetClose");
+  const sheetReset = document.getElementById("projFilterSheetReset");
+  const sheetApply = document.getElementById("projFilterSheetApply");
+  if (!panel) return;
+
+  const isSheet = () => window.matchMedia("(max-width: 700px)").matches;
+  const homeParent = panel.parentNode;
+  const openPanel = () => {
+    if (isSheet()) {
+      document.body.appendChild(panel);           // escape .container's stacking context
+      if (backdrop) backdrop.hidden = false;
+      document.body.classList.add("filter-sheet-open");
+    }
+    panel.style.display = "";
+    if (btn) btn.setAttribute("aria-expanded", "true");
+  };
+  const closePanel = () => {
+    panel.style.display = "none";
+    if (btn) btn.setAttribute("aria-expanded", "false");
+    if (backdrop) backdrop.hidden = true;
+    document.body.classList.remove("filter-sheet-open");
+    if (homeParent && panel.parentNode !== homeParent) homeParent.appendChild(panel);
+  };
+
+  if (btn) btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    (panel.style.display === "none") ? openPanel() : closePanel();
+  });
+  if (sheetClose) sheetClose.addEventListener("click", (e) => { e.stopPropagation(); closePanel(); });
+  if (sheetReset) sheetReset.addEventListener("click", (e) => { e.stopPropagation(); clearAllProjectFilters(); });
+  if (sheetApply) sheetApply.addEventListener("click", (e) => { e.stopPropagation(); closePanel(); });
+  // The shared backdrop is dismissed by the yearbook handler too; add ours so it
+  // works regardless of which panel opened it.
+  if (backdrop) backdrop.addEventListener("click", () => closePanel());
+
+  if (groups) groups.addEventListener("click", (e) => {
+    const opt = e.target.closest(".filter-opt");
+    if (!opt) return;
+    e.stopPropagation();
+    toggleProjectFilterValue(opt.dataset.dim, opt.dataset.val);
+  });
+  if (clearBtn) clearBtn.addEventListener("click", (e) => { e.stopPropagation(); clearAllProjectFilters(); });
+  if (chipsWrap) chipsWrap.addEventListener("click", (e) => {
+    const chip = e.target.closest(".active-filter-chip");
+    if (!chip) return;
+    toggleProjectFilterValue(chip.dataset.dim, chip.dataset.val);
+  });
+  document.addEventListener("click", (e) => {
+    if (panel.style.display === "none") return;
+    if (panel.contains(e.target) || (btn && btn.contains(e.target))) return;
+    closePanel();
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePanel(); });
+}
+
+// ── Project deep-linking ──
+// A project is addressed by its Firebase key in the URL (/project/<key>).
+// openProjectFromId scrolls the Projects grid to that project's card and gives
+// it a brief highlight, so a refresh / shared link lands on the right project.
+function projectId(project) { return project && (project._key || ""); }
+
+function openProjectFromId(id) {
+  if (!id) return false;
+  const proj = (GRADUATION_PROJECTS || []).find((p) => (p._key || "") === id);
+  if (!proj) return false;
+  if (currentMode !== "projects") return false; // grid not rendered yet
+  // The category tab must include this project for its card to exist.
+  if (currentProjectCat !== "All" && proj.category !== currentProjectCat) {
+    switchProjectCat("All");
+  }
+  const grid = document.getElementById("projectsGrid");
+  if (!grid) return false;
+  // Find the card by matching the leader name (cards are rendered in order).
+  const card = grid.querySelector(`[data-proj-key="${CSS.escape(id)}"]`);
+  if (!card) return false;
+  card.scrollIntoView({ behavior: "auto", block: "center" });
+  card.classList.add("project-card-highlight");
+  setTimeout(() => card.classList.remove("project-card-highlight"), 2400);
+  return true;
 }
 
 function updateProjectDiscussionCountdowns() {
@@ -1867,6 +2355,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   initKeyboardNav();
   initNavMenu();
   initYearbookFilters();
+  initProjectFilters();
   initContactForm();
   initFullProfile();
 
@@ -1908,9 +2397,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (mode === "profile-view") {
       // Leaving the edit form (which lives in submit mode) — hide it.
       if (typeof window.__hideEditForm === "function") window.__hideEditForm();
-      let key = (e.state && e.state.student) || null;
-      if (!key) { try { key = (JSON.parse(sessionStorage.getItem("eece-open-profile") || "null") || {}).student; } catch (_) {} }
-      const s = key && typeof findStudentByKey === "function" ? findStudentByKey(key) : null;
+      // Resolve the student from the URL id first (survives any state loss),
+      // then the state key, then sessionStorage.
+      let s = null;
+      const urlId = profileIdFromPath();
+      if (urlId) s = findStudentById(urlId);
+      if (!s) {
+        let key = (e.state && e.state.student) || null;
+        if (!key) { try { key = (JSON.parse(sessionStorage.getItem("eece-open-profile") || "null") || {}).student; } catch (_) {} }
+        s = key && typeof findStudentByKey === "function" ? findStudentByKey(key) : null;
+      }
       if (s && typeof openFullProfile === "function") openFullProfile(s, { fromHistory: true });
       return;
     }
@@ -1918,59 +2414,88 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Closing an overlay (quick card / full profile) → we have a saved scroll
     // position to restore so the user lands back on the same card. switchMode
     // re-renders the grid and forces scroll to the top, so re-apply our saved
-    // position right after (and after layout settles).
+    // position over the next few frames (the grid's lazy images can shift the
+    // page height after the first paint, which would otherwise lose the spot).
     const restoreScroll = _overlayReturnScroll;
     switchMode(mode, true); // replay without pushing a new entry
     if (restoreScroll != null) {
-      window.scrollTo(0, restoreScroll);
-      requestAnimationFrame(() => window.scrollTo(0, restoreScroll));
+      _restoreScrollRobust(restoreScroll);
       _overlayReturnScroll = null;
     }
   });
 
   // Land on the right view for the current URL (seed the first history entry).
-  // /student is a transient quick-card overlay that needs a student object we
-  // don't have on a cold load, so it falls back to the yearbook. /profile is
-  // restored: we remembered which student was open (sessionStorage), so we land
-  // on the section it sat on and reopen the same profile once data is ready.
+  //
+  // The URL is the source of truth:
+  //   /profile/<id>[/edit] → reconstruct that exact profile from the id, even
+  //                          on a cold refresh or a shared deep link.
+  //   /project/<id>        → open the projects section + that project's card.
+  //   /student             → transient quick-card overlay; needs a live student
+  //                          object we don't have cold, so it falls back to the
+  //                          yearbook section underneath.
   const rawPath = (location.pathname || "/").replace(/^\/+|\/+$/g, "");
-  // Treat /profile/edit as its own overlay path.
-  const isEditPath = rawPath === "profile/edit";
-  const firstSeg = isEditPath ? "profile/edit" : rawPath;
-  const OVERLAY_PATHS = ["profile", "profile-view", "student", "profile/edit"];
+  const urlProfileId = profileIdFromPath();          // set on /profile/<id>[/edit]
+  const isProfilePath = !!urlProfileId;
+  const isEditPath = isProfilePath && /\/edit$/.test(rawPath);
+  const projMatch = rawPath.match(/^project\/([^/]+)$/);
+  const urlProjectId = projMatch ? decodeURIComponent(projMatch[1]) : null;
 
+  // The section the overlay sits on. Remembered across the refresh so closing
+  // the overlay returns there; defaults to yearbook for profiles, projects for
+  // a project deep link.
   let savedProfile = null;
-  if (firstSeg === "profile" || firstSeg === "profile-view" || isEditPath) {
+  if (isProfilePath) {
     try { savedProfile = JSON.parse(sessionStorage.getItem("eece-open-profile") || "null"); } catch (_) {}
   }
 
   let startMode;
-  if (savedProfile && savedProfile.student) {
-    // The section the profile sat on (yearbook/projects/home) is the base view.
-    startMode = VALID_MODES.includes(savedProfile.from) ? savedProfile.from : "yearbook";
-  } else if (OVERLAY_PATHS.includes(firstSeg)) {
+  if (isProfilePath) {
+    startMode = (savedProfile && VALID_MODES.includes(savedProfile.from)) ? savedProfile.from : "yearbook";
+  } else if (urlProjectId) {
+    startMode = "projects";
+  } else if (rawPath === "student") {
     startMode = "yearbook";
   } else {
     startMode = pathToMode();
   }
+  // Seed the base section as the FIRST history entry (so Back from the overlay
+  // lands on the section, and Back from the section leaves the site cleanly).
   history.replaceState({ mode: startMode }, "", modeToPath(startMode));
   switchMode(startMode, true);
 
-  // If a profile was open before the refresh, reopen it. Try now (data may
-  // already be in the offline cache); if the student isn't loaded yet, stash
-  // the key so fetchFirebaseData reopens it the moment fresh data arrives.
-  if (savedProfile && savedProfile.student) {
+  // Reopen the profile addressed by the URL. Resolve the id against the current
+  // data; if the student isn't loaded yet (cold network), stash the id so
+  // fetchFirebaseData reopens it the moment fresh data arrives.
+  if (isProfilePath) {
+    _pendingEditAfterOpen = isEditPath;
     const reopen = () => {
-      const s = findStudentByKey(savedProfile.student);
+      const s = findStudentById(urlProfileId) ||
+                (savedProfile && savedProfile.student ? findStudentByKey(savedProfile.student) : null);
       if (s && typeof openFullProfile === "function") {
-        // Push a fresh /profile entry on top of the base section so Back works.
         openFullProfile(s);
+        // Deep-linked straight to the edit page → open the editor on top.
+        if (_pendingEditAfterOpen && window.__myUid && s.ownerUid === window.__myUid &&
+            typeof window.openMyProfileEdit === "function") {
+          // We're already ON /profile/<id>/edit (refresh/deep link). openFullProfile
+          // pushed /profile/<id>; let the editor push /profile/<id>/edit on top so
+          // the Back chain is base → profile → edit (Back lands on the profile).
+          window.openMyProfileEdit();
+          _pendingEditAfterOpen = false;
+        }
         _pendingProfileKey = null;
+        _pendingProfileId = null;
         return true;
       }
       return false;
     };
-    if (!reopen()) _pendingProfileKey = savedProfile.student;
+    if (!reopen()) { _pendingProfileId = urlProfileId; _pendingProfileKey = savedProfile && savedProfile.student; }
+  } else if (urlProjectId) {
+    _pendingProjectId = urlProjectId;
+    // Cards render synchronously inside switchMode("projects") above, but the
+    // data may still be loading — try now, and applyDbPayload retries on arrival.
+    requestAnimationFrame(() => {
+      if (_pendingProjectId && openProjectFromId(_pendingProjectId)) _pendingProjectId = null;
+    });
   }
 
   // Fetch fresh data from Firebase in the background — no blocking await.
@@ -2114,6 +2639,16 @@ function switchMode(mode, fromHistory = false) {
       applyFilters(!fromHistory);
     } else if (mode === "projects") {
       sections.projects.style.display = "block";
+      // Fresh entry from another section → start clean (clear search + filters).
+      // Back/Forward (returning from a project's member profile) keeps the search,
+      // filters and category so the user lands exactly where they left off.
+      if (!fromHistory && prevMode !== "projects") {
+        const ps = document.getElementById("projectSearch");
+        if (ps) ps.value = "";
+        currentProjectSearch = "";
+        FILTER_DIMENSIONS.forEach((dim) => projectFilter[dim.key].clear());
+      }
+      buildProjectFilterPanel();
       renderProjects();
     } else if (mode === "submit" && sections.submit) {
       sections.submit.style.display = "block";

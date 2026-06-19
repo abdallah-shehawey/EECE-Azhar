@@ -357,6 +357,22 @@ onAuthStateChanged(auth, async (user) => {
   if (document.body.dataset.mode === "submit") hydrateProfileForm();
   // If admin is already viewing the Approvals panel, refresh it.
   if (isAdmin && document.body.dataset.mode === "admin") loadPending();
+
+  // The full profile may already be open (e.g. a refresh on /profile/<id>
+  // reopened it before auth resolved). Now that we know who's signed in, re-run
+  // openFullProfile for the SAME student so the owner's "Edit profile" button
+  // appears and the project-edit controls unlock — without it the Edit button
+  // would stay hidden until the next navigation. (script.js exposes the helper.)
+  if (document.body.classList.contains("fp-open") &&
+      typeof window.refreshOpenProfileAuth === "function") {
+    window.refreshOpenProfileAuth();
+  }
+
+  // Mark auth as resolved so the UI can stop showing the "checking session"
+  // state. The very first callback is the real, restored session — there is no
+  // separate "signed out then in" flash once we gate the UI on this flag.
+  document.body.classList.add("auth-ready");
+  document.body.classList.toggle("is-authed", !!user);
 });
 
 /**
@@ -1998,12 +2014,20 @@ function openAdminEditPicker() {
  * each candidate's photo + name + department (LinkedIn-style). Writes back to
  * /projects/{key} so the change is live for everyone on the team.
  */
-function openProjectEditor(project) {
-  if (!project || !currentUser) return;
+function openProjectEditor(project, opts = {}) {
+  if (!currentUser) return;
+  const isNew = !!opts.isNew || !project || !project._key;
+  project = project || {};
   const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
   // Working copy of the team (array of {name, leader}).
   let team = (Array.isArray(project.team) ? project.team : Object.values(project.team || {}))
     .map((m) => ({ name: m.name, leader: !!m.leader }));
+
+  // Defaults for the hierarchy fields (everyone here is Al-Azhar ECE 2026).
+  const dUni = project.university || "Al-Azhar University";
+  const dFac = project.faculty || "Faculty of Engineering";
+  const dDep = project.department || "Electronics and Communication Engineering";
+  const dYear = project.classYear || "2026";
 
   let overlay = document.getElementById("projectEditor");
   if (overlay) overlay.remove();
@@ -2011,16 +2035,43 @@ function openProjectEditor(project) {
   overlay.id = "projectEditor";
   overlay.className = "admin-picker-overlay";
   overlay.innerHTML = `
-    <div class="admin-picker glass-panel proj-editor" role="dialog" aria-modal="true" aria-label="Edit graduation project">
+    <div class="admin-picker glass-panel proj-editor" role="dialog" aria-modal="true" aria-label="${isNew ? "Add" : "Edit"} graduation project">
       <div class="admin-picker-head">
-        <h3>Edit graduation project</h3>
+        <h3>${isNew ? "Add GP Project" : "Edit GP Project"}</h3>
         <button type="button" class="admin-picker-close" aria-label="Close">&times;</button>
       </div>
       <div class="proj-editor-body">
+        <label class="field-label">Project name</label>
+        <input type="text" class="field-input pe-name" value="${esc(project.name || project.title || "")}" placeholder="e.g. Autonomous Delivery Robot" />
+
         <label class="field-label">Category</label>
         <input type="text" class="field-input pe-category" value="${esc(project.category || "")}" placeholder="e.g. Embedded Systems" />
+
         <label class="field-label">Description</label>
         <textarea class="field-input pe-desc" rows="3" placeholder="What does the project do?">${esc(project.description || "")}</textarea>
+
+        <div class="pe-grid">
+          <div>
+            <label class="field-label">University</label>
+            <input type="text" class="field-input pe-university" value="${esc(dUni)}" />
+          </div>
+          <div>
+            <label class="field-label">Faculty</label>
+            <input type="text" class="field-input pe-faculty" value="${esc(dFac)}" />
+          </div>
+          <div>
+            <label class="field-label">Department</label>
+            <input type="text" class="field-input pe-department" value="${esc(dDep)}" />
+          </div>
+          <div>
+            <label class="field-label">Class year</label>
+            <input type="text" class="field-input pe-classyear" value="${esc(dYear)}" inputmode="numeric" />
+          </div>
+        </div>
+
+        <label class="field-label">Supervisor</label>
+        <input type="text" class="field-input pe-supervisor" value="${esc(project.supervisor || "")}" placeholder="e.g. Dr. Ahmed Mohamed" />
+
         <label class="field-label">GitHub repo</label>
         <input type="url" class="field-input pe-repo" value="${esc(project.repo || "")}" placeholder="https://github.com/…" />
 
@@ -2033,7 +2084,7 @@ function openProjectEditor(project) {
       </div>
       <div class="proj-editor-actions">
         <button type="button" class="btn-secondary pe-cancel">Cancel</button>
-        <button type="button" class="btn-primary pe-save">💾 Save project</button>
+        <button type="button" class="btn-primary pe-save">${isNew ? "➕ Create project" : "💾 Save project"}</button>
       </div>
       <div class="pe-status" style="display:none;"></div>
     </div>`;
@@ -2103,9 +2154,16 @@ function openProjectEditor(project) {
   overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
 
   overlay.querySelector(".pe-save").addEventListener("click", async () => {
-    const category = overlay.querySelector(".pe-category").value.trim();
-    const description = overlay.querySelector(".pe-desc").value.trim();
-    const repo = overlay.querySelector(".pe-repo").value.trim();
+    const val = (sel) => { const el = overlay.querySelector(sel); return el ? el.value.trim() : ""; };
+    const name = val(".pe-name");
+    const category = val(".pe-category");
+    const description = val(".pe-desc");
+    const repo = val(".pe-repo");
+    const university = val(".pe-university");
+    const faculty = val(".pe-faculty");
+    const department = val(".pe-department");
+    const classYear = val(".pe-classyear");
+    const supervisor = val(".pe-supervisor");
     if (!category) { statusEl.style.display = ""; statusEl.textContent = "Category is required."; return; }
     if (!team.length) { statusEl.style.display = ""; statusEl.textContent = "Add at least one team member."; return; }
     if (!team.some((m) => m.leader)) team[0].leader = true; // ensure a leader
@@ -2120,19 +2178,31 @@ function openProjectEditor(project) {
 
     const payload = {
       ...project,
+      name,
       category,
       description,
+      university,
+      faculty,
+      department,
+      classYear,
+      supervisor,
       repo,
       icon: project.icon || "",
       team: teamObj,
       updatedAt: Date.now(),
     };
+    if (isNew) payload.createdAt = Date.now();
     delete payload._key; // never store the helper key inside the record
 
     statusEl.style.display = ""; statusEl.textContent = "Saving…";
     try {
-      await set(ref(db, `projects/${project._key}`), payload);
-      statusEl.textContent = "Saved ✓";
+      if (isNew) {
+        // A brand-new project gets a fresh Firebase key.
+        await set(push(ref(db, "projects")), payload);
+      } else {
+        await set(ref(db, `projects/${project._key}`), payload);
+      }
+      statusEl.textContent = isNew ? "Created ✓" : "Saved ✓";
       if (typeof window.fetchFirebaseData === "function") window.fetchFirebaseData();
       setTimeout(close, 600);
     } catch (e) {
@@ -2141,6 +2211,16 @@ function openProjectEditor(project) {
   });
 }
 window.openProjectEditor = openProjectEditor;
+
+// Open the editor pre-seeded with the current user as the team leader, for
+// creating their first GP project from the profile's empty state.
+function openNewProjectForMe() {
+  if (!currentUser) return;
+  const myName = (myProfile && myProfile.name) || currentUser.displayName || "";
+  const seed = { team: myName ? [{ name: myName, leader: true }] : [] };
+  openProjectEditor(seed, { isNew: true });
+}
+window.openNewProjectForMe = openNewProjectForMe;
 
 /* ════════════════════════════════════════════
    § 5 — WIRE UP
@@ -2236,10 +2316,16 @@ function init() {
     if (typeof window.switchMode === "function") window.switchMode("submit", true); // no extra history entry
     const gate = $("submitLoginGate"); if (gate) gate.style.display = "none";
     hydrateProfileForm();
-    // Push a real /profile/edit entry. (script.js popstate reads mode ===
-    // "profile-edit" to reopen this form on Forward.)
+    // Push a real /profile/<id>/edit entry. (script.js popstate reads mode ===
+    // "profile-edit" to reopen this form on Forward.) The id makes the edit page
+    // refresh-safe and deep-linkable, like the profile itself.
     if (!opts.fromHistory) {
-      try { history.pushState({ mode: "profile-edit" }, "", "/profile/edit"); } catch (_) {}
+      let editPath = "/profile/edit";
+      try {
+        const me = profileToStudent(myProfile);
+        if (me && typeof window.profileEditPath === "function") editPath = window.profileEditPath(me);
+      } catch (_) {}
+      try { history.pushState({ mode: "profile-edit", id: (myProfile && window.profileId && window.profileId(profileToStudent(myProfile))) || "" }, "", editPath); } catch (_) {}
     }
   };
 

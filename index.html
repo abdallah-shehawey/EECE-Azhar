@@ -2,6 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
+    <!-- Anchor every relative URL (script.js, style.css, fonts, icons, fetches)
+         to the site root. Without this, a deep route like /profile/<id> resolves
+         "script.js" against "/profile/" → 404, so the whole app fails to load on
+         refresh/deep-link. This is the single fix that makes clean nested URLs
+         refresh-safe. MUST stay first so it applies to every tag below. -->
+    <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>EECE — Class of 2026 · Al-Azhar University</title>
     <meta name="description" content="Class of 2026 — Electronics & Communication Engineering, Faculty of Engineering, Al-Azhar University. Live countdown, digital class yearbook, and graduation projects." />
@@ -102,7 +108,7 @@
                 <button class="nav-link active" id="modeHomeBtn" data-mode="home" onclick="switchMode('home')">Home</button>
                 <button class="nav-link" id="modeCountdownBtn" data-mode="countdown" onclick="switchMode('countdown')">Countdown</button>
                 <button class="nav-link" id="modeYearbookBtn" data-mode="yearbook" onclick="switchMode('yearbook')">Yearbook</button>
-                <button class="nav-link" id="modeProjectsBtn" data-mode="projects" onclick="switchMode('projects')">Projects</button>
+                <button class="nav-link" id="modeProjectsBtn" data-mode="projects" onclick="switchMode('projects')">GP Projects</button>
             </nav>
 
             <div class="navbar-actions">
@@ -112,6 +118,9 @@
                     </button>
                 </div>
                 <div class="auth-area" id="authArea">
+                    <!-- Placeholder shown only while Firebase restores the session,
+                         so neither "Sign in" nor the avatar flashes on refresh. -->
+                    <span class="auth-skeleton" aria-hidden="true"></span>
                     <button id="loginBtn" class="auth-btn auth-login" aria-label="Sign in with Google">
                         <svg class="g-icon" viewBox="0 0 48 48" width="16" height="16" aria-hidden="true">
                             <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.4 29.3 35 24 35c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 5.1 29.6 3 24 3 12.9 3 4 11.9 4 23s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/>
@@ -332,14 +341,20 @@
                             <span class="yb-filter-count" id="filterCount" style="display:none;">0</span>
                         </button>
 
-                        <!-- Filter popover -->
-                        <div class="filter-panel" id="filterPanel" role="dialog" aria-label="Filter students" style="display:none;">
+                        <!-- Filter popover (desktop) / bottom sheet (mobile) -->
+                        <div class="filter-panel" id="filterPanel" role="dialog" aria-modal="true" aria-label="Filter students" style="display:none;">
                             <div class="filter-panel-head">
                                 <span class="filter-panel-title">Filter by</span>
                                 <button type="button" class="filter-clear" id="filterClearBtn">Clear all</button>
+                                <button type="button" class="filter-sheet-close" id="filterSheetClose" aria-label="Close filters">&times;</button>
                             </div>
                             <!-- Filter groups rendered by buildFilterPanel() -->
                             <div class="filter-groups" id="filterGroups"></div>
+                            <!-- Sticky footer — shown as a bottom sheet on phones -->
+                            <div class="filter-sheet-footer">
+                                <button type="button" class="filter-sheet-reset" id="filterSheetReset">Reset</button>
+                                <button type="button" class="filter-sheet-apply" id="filterSheetApply">Show results</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -402,9 +417,51 @@
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="title-projects-icon">
                         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                     </svg>
-                    Graduation Projects
+                    GP Projects
                 </h2>
                 <p class="projects-subtitle">Electronics &amp; Communication · Faculty of Engineering · Al-Azhar University · Class of 2026</p>
+
+                <!-- Search + Filter row (same UX as the Yearbook). Search matches
+                     project name, any team member's name, the team name and the
+                     supervisor. The Filter button opens a popover (desktop) /
+                     bottom sheet (mobile) for University / Faculty / Department /
+                     Class / Track. Managed by buildProjectFilterPanel() in script.js. -->
+                <div class="yearbook-search-row">
+                    <div class="yearbook-search-wrapper">
+                        <span class="search-icon" aria-hidden="true">🔍</span>
+                        <input
+                            type="search"
+                            id="projectSearch"
+                            class="yearbook-search"
+                            placeholder="Search by project, student, team or supervisor…"
+                            aria-label="Search projects by name, student, team or supervisor"
+                            autocomplete="off"
+                            oninput="filterProjectsSearch(this.value)"
+                        />
+                    </div>
+                    <div class="yb-filter-wrap">
+                        <button type="button" class="yb-filter-btn" id="projFilterToggleBtn"
+                                aria-haspopup="dialog" aria-expanded="false" aria-controls="projFilterPanel">
+                            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+                            <span>Filter</span>
+                            <span class="yb-filter-count" id="projFilterCount" style="display:none;">0</span>
+                        </button>
+
+                        <div class="filter-panel" id="projFilterPanel" role="dialog" aria-modal="true" aria-label="Filter projects" style="display:none;">
+                            <div class="filter-panel-head">
+                                <span class="filter-panel-title">Filter by</span>
+                                <button type="button" class="filter-clear" id="projFilterClearBtn">Clear all</button>
+                                <button type="button" class="filter-sheet-close" id="projFilterSheetClose" aria-label="Close filters">&times;</button>
+                            </div>
+                            <div class="filter-groups" id="projFilterGroups"></div>
+                            <div class="filter-sheet-footer">
+                                <button type="button" class="filter-sheet-reset" id="projFilterSheetReset">Reset</button>
+                                <button type="button" class="filter-sheet-apply" id="projFilterSheetApply">Show results</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="active-filters" id="projActiveFilters"></div>
 
                 <!-- Project Category Tabs -->
                 <div class="project-tabs" id="projectTabs">
@@ -910,6 +967,9 @@
             </form>
         </div>
     </div>
+
+    <!-- Backdrop behind the mobile filter bottom sheet (tap to dismiss). -->
+    <div class="filter-sheet-backdrop" id="filterSheetBackdrop" hidden></div>
 
     <!-- Audio Player -->
     <audio id="bgAudio"></audio>
