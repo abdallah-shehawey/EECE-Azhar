@@ -4609,6 +4609,27 @@ body.fp-open { overflow: hidden; }
     position: relative;
     margin: 0 0 64px;       /* room for the avatar that overlaps below the cover */
 }
+
+/* Sectioned "cards" so the edit page reads like a profile (LinkedIn/Facebook
+   style) rather than one long flat form. Each card groups related fields. */
+.edit-card {
+    background: var(--card-bg, rgba(255, 255, 255, 0.03));
+    border: 1px solid var(--card-border, rgba(255, 255, 255, 0.08));
+    border-radius: var(--radius-lg, 18px);
+    padding: 1.3rem 1.4rem 0.5rem;
+    margin-bottom: 1.1rem;
+}
+.edit-card-title {
+    margin: 0 0 1.1rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    padding-bottom: 0.7rem;
+    border-bottom: 1px solid var(--card-border, rgba(255, 255, 255, 0.08));
+}
+@media (max-width: 560px) {
+    .edit-card { padding: 1rem 1rem 0.3rem; }
+}
 .edit-cover {
     display: block;
     width: 100%;

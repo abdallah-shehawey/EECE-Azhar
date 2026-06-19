@@ -2038,6 +2038,16 @@ function init() {
     openProfileEntry();
   });
 
+  // Hide the edit form + leave submit mode (used when Back returns to the
+  // profile from /profile/edit). editMode is reset so a later view re-renders.
+  window.__hideEditForm = () => {
+    editMode = false;
+    adminEditTarget = null;
+    const sub = document.getElementById("mode-submit");
+    if (sub) sub.style.display = "none";
+    const wrap = $("submitFormWrap"); if (wrap) wrap.style.display = "none";
+  };
+
   // Open the owner's profile as the read-only full-profile overlay over the
   // current page; Back/close returns home (the page underneath stays usable).
   function openMyProfileView() {
@@ -2056,15 +2066,23 @@ function init() {
   if (pvEdit) pvEdit.addEventListener("click", () => { editMode = true; hydrateProfileForm(); });
 
   // Called by the full-profile page's Edit button (script.js) — owner only.
-  // Take the owner to the Submit page straight into the editable form.
-  window.openMyProfileEdit = () => {
+  // Opens the editable form as a dedicated /profile/edit route so the browser
+  // Back button returns to the profile (not home), with stable history.
+  window.openMyProfileEdit = (opts = {}) => {
     if (!currentUser) return;
     adminAddMode = false;
     adminEditTarget = null;
     editMode = true;
-    if (typeof window.switchMode === "function") window.switchMode("submit");
+    // The full profile overlay (if open) must come down so the edit form shows.
+    if (typeof window.closeFullProfile === "function") window.closeFullProfile();
+    if (typeof window.switchMode === "function") window.switchMode("submit", true); // no extra history entry
     const gate = $("submitLoginGate"); if (gate) gate.style.display = "none";
     hydrateProfileForm();
+    // Push a real /profile/edit entry. (script.js popstate reads mode ===
+    // "profile-edit" to reopen this form on Forward.)
+    if (!opts.fromHistory) {
+      try { history.pushState({ mode: "profile-edit" }, "", "/profile/edit"); } catch (_) {}
+    }
   };
 
   const refreshBtn = $("adminRefreshBtn");

@@ -516,6 +516,8 @@
                         </div>
                         <input type="file" id="coverInput" accept="image/*" class="hidden-file" aria-hidden="true" tabindex="-1" />
 
+                        <div class="edit-card">
+                            <h3 class="edit-card-title">Basic info</h3>
                         <div class="field-group">
                             <label for="inputName" class="field-label">Full Name <span class="required">*</span></label>
                             <input type="text" id="inputName" class="field-input" placeholder="e.g. Abdallah Shehawey" autocomplete="name" />
@@ -529,7 +531,10 @@
                             <input type="email" id="inputEmail" class="field-input" placeholder="student@gmail.com" autocomplete="off" />
                             <span class="field-hint">When this person signs in with this Gmail, this profile becomes theirs automatically.</span>
                         </div>
+                        </div><!-- /Basic info card -->
 
+                        <div class="edit-card">
+                            <h3 class="edit-card-title">Academic</h3>
                         <!-- Institution hierarchy -->
                         <div class="field-row">
                             <div class="field-group">
@@ -575,6 +580,7 @@
                                 <option value="female">Female</option>
                             </select>
                         </div>
+                        </div><!-- /Academic card -->
                         <!-- Legacy photo uploader — hidden now that the avatar at
                              the top handles photo upload. Kept in the DOM because
                              initSubmissionForm() still wires these elements. -->
@@ -598,6 +604,9 @@
                             <input type="file" id="photoInput" accept="image/*" class="hidden-file" aria-hidden="true" tabindex="-1" />
                             <span class="field-hint" id="photoPathDisplay">Generated path will appear here after upload</span>
                         </div>
+
+                        <div class="edit-card">
+                            <h3 class="edit-card-title">Specialization</h3>
                         <div class="field-group">
                             <label class="field-label">Track / Specialization <span class="required">*</span></label>
                             <!-- Multi-select dropdown: pick one or more tracks; selected
@@ -643,9 +652,10 @@
                             <div id="skillChips" class="chip-container" aria-label="Selected skills"></div>
                             <span class="field-hint">✎ e.g. <em>C/C++, Python, Verilog, PCB Design, Linux</em></span>
                         </div>
+                        </div><!-- /Specialization card -->
 
-                        <div class="divider"><span>Social Links</span></div>
-
+                        <div class="edit-card">
+                            <h3 class="edit-card-title">Social links</h3>
                         <div class="field-group">
                             <label for="inputLinkedin" class="field-label">LinkedIn</label>
                             <input type="url" id="inputLinkedin" class="field-input" placeholder="https://linkedin.com/in/username" />
@@ -663,6 +673,7 @@
                             <label for="inputFacebook" class="field-label">Facebook</label>
                             <input type="url" id="inputFacebook" class="field-input" placeholder="https://facebook.com/profile" />
                         </div>
+                        </div><!-- /Social card -->
                     </div>
 
                     <!-- PROJECT -->

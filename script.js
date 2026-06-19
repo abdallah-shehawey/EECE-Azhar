@@ -768,6 +768,9 @@ function openFullProfile(student, opts = {}) {
   // alone can be dropped by some browsers on a hard refresh.)
   const profileState = { mode: "profile-view", from: _fpReturnMode, student: studentKey(student) };
   try { sessionStorage.setItem("eece-open-profile", JSON.stringify(profileState)); } catch (_) {}
+  // When reopened by Back/Forward (popstate), the history entry already exists —
+  // don't push/replace another or we'd corrupt the stack.
+  if (opts.fromHistory) return;
   // History: if we came from the quick modal it left a /student entry behind —
   // replace it (so Back lands on the section, not a closed modal). Otherwise
   // push a fresh entry on top of the current section.
@@ -1865,15 +1868,35 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Browser Back/Forward (and backspace) navigate between views in-page.
   window.addEventListener("popstate", (e) => {
     const mode = (e.state && e.state.mode) || "home";
+
+    // Returning to the edit page (Forward into /profile/edit): reopen the form.
+    if (mode === "profile-edit") {
+      if (typeof closeFullProfile === "function") closeFullProfile();
+      if (typeof window.openMyProfileEdit === "function") {
+        window.openMyProfileEdit({ fromHistory: true });
+      }
+      return;
+    }
+
     // The full-profile overlay sits on top of a section. If we're leaving it
-    // (hash no longer #profile), tear it down first so the section underneath
+    // (path no longer /profile), tear it down first so the section underneath
     // shows through — without refetching the yearbook.
     if (mode !== "profile-view" && typeof closeFullProfile === "function") {
       closeFullProfile();
     }
-    // "profile-view" isn't a real section; the overlay is shown by openFullProfile.
-    // Restore the section that was under it instead so Back/Forward stays sane.
-    if (mode === "profile-view") return;
+
+    // Back/Forward landing on a /profile entry (e.g. Back out of /profile/edit):
+    // reopen the full profile so it isn't a blank page. The student to reopen is
+    // remembered in the state or in sessionStorage.
+    if (mode === "profile-view") {
+      // Leaving the edit form (which lives in submit mode) — hide it.
+      if (typeof window.__hideEditForm === "function") window.__hideEditForm();
+      let key = (e.state && e.state.student) || null;
+      if (!key) { try { key = (JSON.parse(sessionStorage.getItem("eece-open-profile") || "null") || {}).student; } catch (_) {} }
+      const s = key && typeof findStudentByKey === "function" ? findStudentByKey(key) : null;
+      if (s && typeof openFullProfile === "function") openFullProfile(s, { fromHistory: true });
+      return;
+    }
 
     // Closing an overlay (quick card / full profile) → we have a saved scroll
     // position to restore so the user lands back on the same card. switchMode
@@ -1893,11 +1916,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   // don't have on a cold load, so it falls back to the yearbook. /profile is
   // restored: we remembered which student was open (sessionStorage), so we land
   // on the section it sat on and reopen the same profile once data is ready.
-  const firstSeg = (location.pathname || "/").replace(/^\/+|\/+$/g, "");
-  const OVERLAY_PATHS = ["profile", "profile-view", "student"];
+  const rawPath = (location.pathname || "/").replace(/^\/+|\/+$/g, "");
+  // Treat /profile/edit as its own overlay path.
+  const isEditPath = rawPath === "profile/edit";
+  const firstSeg = isEditPath ? "profile/edit" : rawPath;
+  const OVERLAY_PATHS = ["profile", "profile-view", "student", "profile/edit"];
 
   let savedProfile = null;
-  if (firstSeg === "profile" || firstSeg === "profile-view") {
+  if (firstSeg === "profile" || firstSeg === "profile-view" || isEditPath) {
     try { savedProfile = JSON.parse(sessionStorage.getItem("eece-open-profile") || "null"); } catch (_) {}
   }
 
