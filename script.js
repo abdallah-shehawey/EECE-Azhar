@@ -1994,7 +1994,7 @@ function buildProjectFilterPanel() {
   const groupsWrap = document.getElementById("projFilterGroups");
   if (!groupsWrap) return;
 
-  // Drop selections that no longer exist in the data.
+  // Drop selections that no longer exist in the data (project may have been removed).
   FILTER_DIMENSIONS.forEach((dim) => {
     const present = new Set();
     (GRADUATION_PROJECTS || []).forEach((p) => _projectValues(p, dim).forEach((v) => present.add(v)));
@@ -2004,8 +2004,17 @@ function buildProjectFilterPanel() {
   const html = FILTER_DIMENSIONS.map((dim) => {
     const counts = _projCountsForDimension(dim);
     const selected = projectFilter[dim.key];
-    const values = _sortFilterValues(dim.key, new Set([...counts.keys(), ...selected]));
+    // Only show values that either have projects behind them (count > 0)
+    // OR are currently selected (so user can deselect them).
+    // This ensures tracks with zero matching projects stay hidden.
+    const values = _sortFilterValues(
+      dim.key,
+      new Set([...counts.keys(), ...selected])
+    ).filter((v) => (counts.get(v) || 0) > 0 || selected.has(v));
+
+    // Hide the entire group if there are no options at all.
     if (values.length === 0) return "";
+
     const opts = values.map((v) => {
       const n = counts.get(v) || 0;
       const isOn = selected.has(v);
