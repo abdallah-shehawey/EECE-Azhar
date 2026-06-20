@@ -1985,6 +1985,51 @@ function fileToBase64(file) {
   });
 }
 
+/*
+ * Shared image helpers for the inline profile editor (script.js). Compress +
+ * upload a picked file to R2 under a deterministic path, or delete an old object.
+ * Exposed on window so the SPA editor can reuse the exact same pipeline as the
+ * legacy form (one place for compression sizes + the /api/upload contract).
+ */
+async function uploadProfileImage(file, filename, { cover = false } = {}) {
+  const compressed = cover
+    ? await compressImage(file, 1600, 0.82)   // wide banner
+    : await compressImage(file, 800, 0.8);    // square-ish avatar
+  const fileBase64 = await fileToBase64(compressed);
+  const res = await fetch("/api/upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fileBase64, filename, mimeType: compressed.type || "image/webp" }),
+  });
+  let json; try { json = await res.json(); } catch { throw new Error(`Upload server error (${res.status}).`); }
+  if (!res.ok || !json.success) throw new Error(json?.error || `Upload error ${res.status}`);
+  return filename;
+}
+window.uploadProfileImage = uploadProfileImage;
+
+async function deleteProfileImage(path) {
+  // Only delete bucket-relative keys we own; never touch external (http) URLs.
+  const key = String(path || "").trim();
+  if (!key || /^https?:\/\//i.test(key)) return false;
+  try {
+    const res = await fetch("/api/upload", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename: key }),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+window.deleteProfileImage = deleteProfileImage;
+
+// Build a deterministic R2 key for a user's avatar/cover from their name, so a
+// replacement overwrites predictably and we know the old key to delete.
+window.profileImagePath = function (name, { cover = false } = {}) {
+  const first = String(name || "user").trim().split(/\s+/)[0] || "user";
+  const stamp = Date.now().toString(36); // bust CDN cache + avoid collisions
+  return sanitiseFileName(`${first}-${stamp}${cover ? "-cover" : ""}.webp`);
+};
+
 /* ════════════════════════════════════════════
    § 4 — ADMIN APPROVALS
 ════════════════════════════════════════════ */

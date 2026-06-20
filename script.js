@@ -1305,7 +1305,37 @@ function _renderProfileEditInline(student) {
     return sel ? sel.value : "";
   };
 
-  // Cancel → back to read-only (no nav step).
+  // ── Photo + cover editing (camera buttons over the hero) ────────────────
+  // Picked files are held until Save; the hero shows an instant local preview.
+  const imgState = { photoFile: null, coverFile: null };
+  const cover = document.getElementById("fpCover");
+  const avatar = document.getElementById("fpAvatar");
+  // Inject a camera button + hidden file input onto a hero element once.
+  const addPicker = (host, kind) => {
+    if (!host || host.querySelector(".fp-cam")) return;
+    host.classList.add("fp-editable-img");
+    const inp = document.createElement("input");
+    inp.type = "file"; inp.accept = "image/*"; inp.className = "fp-cam-input"; inp.style.display = "none";
+    const btn = document.createElement("button");
+    btn.type = "button"; btn.className = "fp-cam"; btn.setAttribute("aria-label", `Change ${kind}`);
+    btn.innerHTML = "📷";
+    btn.addEventListener("click", (e) => { e.stopPropagation(); inp.click(); });
+    inp.addEventListener("change", () => {
+      const file = inp.files && inp.files[0];
+      if (!file || !file.type.startsWith("image/")) return;
+      if (file.size > 5 * 1024 * 1024) { alert("Image must be under 5 MB."); inp.value = ""; return; }
+      imgState[kind === "cover" ? "coverFile" : "photoFile"] = file;
+      const url = URL.createObjectURL(file);
+      if (kind === "cover") host.style.backgroundImage = `url("${url}")`;
+      else host.style.backgroundImage = `url("${url}")`;
+      host.classList.add("has-img");
+    });
+    host.appendChild(inp); host.appendChild(btn);
+  };
+  addPicker(cover, "cover");
+  addPicker(avatar, "avatar");
+
+  // Cancel → back to read-only (no nav step). Re-render restores the hero too.
   document.getElementById("fpeCancel").addEventListener("click", () => {
     _fpEditing = false;
     openFullProfile(student, { fromHistory: true });
@@ -1332,9 +1362,39 @@ function _renderProfileEditInline(student) {
       },
     };
     statusEl.style.display = ""; statusEl.className = "fp-edit-status"; statusEl.textContent = "Saving…";
+
+    // Upload any newly-picked images first, remembering the old keys so we can
+    // delete them after the profile save succeeds (so we never orphan the live
+    // image if the save fails).
+    const oldPhoto = student.photo || "";
+    const oldCover = student.cover || "";
+    try {
+      if (imgState.photoFile && typeof window.uploadProfileImage === "function") {
+        statusEl.textContent = "Uploading photo…";
+        const path = window.profileImagePath(fields.name || student.name, { cover: false });
+        await window.uploadProfileImage(imgState.photoFile, path, { cover: false });
+        fields.photo = path;
+      }
+      if (imgState.coverFile && typeof window.uploadProfileImage === "function") {
+        statusEl.textContent = "Uploading cover…";
+        const path = window.profileImagePath(fields.name || student.name, { cover: true });
+        await window.uploadProfileImage(imgState.coverFile, path, { cover: true });
+        fields.cover = path;
+      }
+    } catch (e) {
+      return fail("Image upload failed: " + (e.message || e));
+    }
+
+    statusEl.textContent = "Saving…";
     const res = await window.saveProfileInline(fields);
     if (!res.ok) return fail(res.error || "Save failed.");
     statusEl.textContent = res.live ? "Saved ✓" : "Submitted for approval ✓";
+
+    // Save succeeded — clean up replaced images from Cloudflare (best-effort).
+    if (typeof window.deleteProfileImage === "function") {
+      if (fields.photo && oldPhoto && oldPhoto !== fields.photo) window.deleteProfileImage(oldPhoto);
+      if (fields.cover && oldCover && oldCover !== fields.cover) window.deleteProfileImage(oldCover);
+    }
     // Re-render the read-only profile with the saved values (no nav jump).
     _fpEditing = false;
     const canonTracks = (res.profile && res.profile.tracks) || fields.tracks;
@@ -1343,6 +1403,8 @@ function _renderProfileEditInline(student) {
       university: (res.profile && res.profile.university) || fields.university,
       faculty: (res.profile && res.profile.faculty) || fields.faculty,
       department: (res.profile && res.profile.department) || fields.department,
+      photo: fields.photo != null ? fields.photo : student.photo,
+      cover: fields.cover != null ? fields.cover : student.cover,
     });
     setTimeout(() => {
       openFullProfile(updated, { fromHistory: true });
@@ -3008,6 +3070,10 @@ function pathToMode(pathname = location.pathname) {
   const seg = (pathname || "/").replace(/^\/+|\/+$/g, "");
   if (!seg) return "home";
   if (/^profile\//.test(seg)) return "profile";
+  // /student is a transient quick-card overlay with no live student object on a
+  // cold Back. It sits on top of the yearbook, so resolve it to the yearbook
+  // section (returning home would drop the user to the top of the site).
+  if (seg === "student") return "yearbook";
   return VALID_MODES.includes(seg) ? seg : "home";
 }
 

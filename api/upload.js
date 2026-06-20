@@ -1,7 +1,7 @@
 // Serverless function: upload a photo to Cloudflare R2.
 // CommonJS — the project's package.json has no "type": "module",
 // and the existing node scripts (sort_students.js, scripts/migrate.js) are CJS too.
-const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 
 // Cache the S3 client across warm invocations
 let s3Client = null;
@@ -35,10 +35,26 @@ const config = {
 
 async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  // DELETE — remove a now-unused object (e.g. the old photo after a replacement
+  // is uploaded), so stale images don't pile up in the bucket.
+  if (req.method === 'DELETE') {
+    try {
+      const key = (req.body && req.body.filename) || (req.query && req.query.filename);
+      if (!key) return res.status(400).json({ error: 'Missing filename' });
+      const bucketName = process.env.R2_BUCKET_NAME || 'eece-azhar-images';
+      await getS3Client().send(new DeleteObjectCommand({ Bucket: bucketName, Key: key }));
+      return res.status(200).json({ success: true, deleted: key });
+    } catch (error) {
+      console.error('R2 delete error:', error.message);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
