@@ -133,6 +133,30 @@ const DEPARTMENTS = [
   "Software Engineering",
 ];
 
+// Graduation-project categories. A broad, fixed menu so projects bucket
+// consistently; anything missing can still be added via the "Other…" option,
+// after which the typed value is remembered and offered to everyone.
+const PROJECT_CATEGORIES = [
+  "Digital IC Design",
+  "ASIC Verification",
+  "Embedded Systems",
+  "Embedded Linux",
+  "IoT",
+  "Artificial Intelligence",
+  "Machine Learning",
+  "Computer Vision",
+  "Robotics",
+  "Control Systems",
+  "Communications",
+  "Signal Processing",
+  "RF & Antennas",
+  "Networking",
+  "Power Electronics",
+  "Biomedical",
+  "Cybersecurity",
+  "Software / Web",
+];
+
 // Broad engineering skills, grouped into categories for an easy-to-scan menu.
 // Users can also add custom skills (they then appear under "Other" for everyone).
 const SKILL_CATEGORIES = {
@@ -510,7 +534,7 @@ onAuthStateChanged(auth, async (user) => {
   // openFullProfile for the SAME student so the owner's "Edit profile" button
   // appears and the project-edit controls unlock — without it the Edit button
   // would stay hidden until the next navigation. (script.js exposes the helper.)
-  if (document.body.classList.contains("fp-open") &&
+  if (document.body.dataset.mode === "profile" &&
       typeof window.refreshOpenProfileAuth === "function") {
     window.refreshOpenProfileAuth();
   }
@@ -995,6 +1019,20 @@ function initSubmissionForm() {
       validationErrors.classList.add("hidden");
     });
   });
+
+  /* — Category options (full list + anything already used, deduped) — */
+  if (inputCategory) {
+    const byKey = new Map();
+    const add = (v) => { const c = cleanText(v); if (c && !byKey.has(dedupeKey(c))) byKey.set(dedupeKey(c), c); };
+    PROJECT_CATEGORIES.forEach(add);
+    (Array.isArray(window.GRADUATION_PROJECTS) ? window.GRADUATION_PROJECTS : [])
+      .forEach((p) => { if (p && typeof p.category === "string") add(p.category); });
+    const opts = Array.from(byKey.values()).sort((a, b) => a.localeCompare(b));
+    inputCategory.innerHTML =
+      `<option value="" disabled selected>Select project category...</option>` +
+      opts.map((v) => `<option value="${v}">${v}</option>`).join("") +
+      `<option value="other">Other...</option>`;
+  }
 
   /* — Category "other" — */
   inputCategory.addEventListener("change", () => {
@@ -1636,6 +1674,55 @@ function initSubmissionForm() {
 
   // Expose for hydrateProfileForm() (defined outside this closure).
   window._buildProfileObject = buildProfileObject;
+
+  // Inline profile editor (script.js renders the editable profile page and calls
+  // this to persist). `fields` carries the edited values; we canonicalise +
+  // validate them, build a student-shaped record, and reuse saveStudentProfile so
+  // the security model (pending → /pending, live → /profiles) is identical to the
+  // form path. Returns { ok, live, error }.
+  window.saveProfileInline = async function (fields) {
+    if (!currentUser) return { ok: false, error: "Please sign in first." };
+    const f = fields || {};
+    const year = cleanText(f.classYear);
+    if (!cleanText(f.name)) return { ok: false, error: "Full name is required." };
+    if (!f.university) return { ok: false, error: "University is required." };
+    if (!f.faculty) return { ok: false, error: "Faculty is required." };
+    if (!f.department) return { ok: false, error: "Department is required." };
+    if (!isValidClassYear(year)) return { ok: false, error: "Class Year must be exactly 4 digits." };
+    if (!(Array.isArray(f.tracks) && f.tracks.length)) return { ok: false, error: "At least one track is required." };
+
+    const base = myProfile || {};
+    const data = {
+      type: "student",
+      name: cleanText(f.name),
+      email: base.email || currentUser.email || "",
+      gender: f.gender || base.gender || "",
+      // Keep existing photo/cover unless the inline editor provided new paths.
+      photo: f.photo != null ? f.photo : (base.photo || ""),
+      cover: f.cover != null ? f.cover : (base.cover || ""),
+      color: base.color || "",
+      tracks: canonTracks(f.tracks),
+      skills: Array.isArray(f.skills) ? f.skills : (base.skills || []),
+      university: canonValue(f.university, knownValues(UNIVERSITIES, "university")),
+      faculty: canonValue(f.faculty, knownValues(FACULTIES, "faculty")),
+      department: canonValue(f.department, knownValues(DEPARTMENTS, "department")),
+      classYear: year,
+      linkedin: (f.social && f.social.linkedin) || "",
+      github: (f.social && f.social.github) || "",
+      whatsapp: (f.social && f.social.whatsapp) || "",
+      facebook: (f.social && f.social.facebook) || "",
+    };
+    try {
+      const live = await saveStudentProfile(data);
+      // Refresh the in-memory profile + the public site so the page re-renders
+      // with the saved values immediately.
+      myProfile = { ...(myProfile || {}), ...buildProfileObject(data), status: live ? "live" : "pending" };
+      if (typeof window.fetchFirebaseData === "function") window.fetchFirebaseData();
+      return { ok: true, live, profile: myProfile };
+    } catch (err) {
+      return { ok: false, error: err.message || "Save failed." };
+    }
+  };
 
   /* — Main submit handler — */
   form.addEventListener("submit", async (e) => {
@@ -2376,7 +2463,8 @@ function openProjectEditor(project, opts = {}) {
         <input type="text" class="field-input pe-name" value="${esc(project.name || project.title || "")}" placeholder="e.g. Autonomous Delivery Robot" />
 
         <label class="field-label">Category</label>
-        <input type="text" class="field-input pe-category" value="${esc(project.category || "")}" placeholder="e.g. Embedded" />
+        <select id="peCategorySel" class="field-input pe-category" data-other="peCategoryOther"></select>
+        <input type="text" id="peCategoryOther" class="field-input hidden" style="margin-top:0.5rem;" placeholder="Type the category" />
 
         <label class="field-label">Tracks <span class="required" aria-hidden="true">*</span></label>
         <div class="pe-tracks-selected"></div>
@@ -2391,19 +2479,23 @@ function openProjectEditor(project, opts = {}) {
         <div class="pe-grid">
           <div>
             <label class="field-label">University</label>
-            <input type="text" class="field-input pe-university" value="${esc(dUni)}" />
+            <select id="peUniversitySel" class="field-input pe-university" data-other="peUniversityOther"></select>
+            <input type="text" id="peUniversityOther" class="field-input hidden" style="margin-top:0.5rem;" placeholder="Type the university" />
           </div>
           <div>
             <label class="field-label">Faculty</label>
-            <input type="text" class="field-input pe-faculty" value="${esc(dFac)}" />
+            <select id="peFacultySel" class="field-input pe-faculty" data-other="peFacultyOther"></select>
+            <input type="text" id="peFacultyOther" class="field-input hidden" style="margin-top:0.5rem;" placeholder="Type the faculty" />
           </div>
           <div>
             <label class="field-label">Department</label>
-            <input type="text" class="field-input pe-department" value="${esc(dDep)}" />
+            <select id="peDepartmentSel" class="field-input pe-department" data-other="peDepartmentOther"></select>
+            <input type="text" id="peDepartmentOther" class="field-input hidden" style="margin-top:0.5rem;" placeholder="Type the department" />
           </div>
           <div>
             <label class="field-label">Class year</label>
-            <input type="text" class="field-input pe-classyear" value="${esc(dYear)}" inputmode="numeric" />
+            <select id="peClassYearSel" class="field-input pe-classyear" data-other="peClassYearOther"></select>
+            <input type="text" id="peClassYearOther" class="field-input hidden" style="margin-top:0.5rem;" placeholder="4-digit year" inputmode="numeric" maxlength="4" />
           </div>
         </div>
 
@@ -2435,7 +2527,25 @@ function openProjectEditor(project, opts = {}) {
   const trackSelEl = overlay.querySelector(".pe-tracks-selected");
   const trackSearchEl = overlay.querySelector(".pe-track-search");
   const trackSuggestEl = overlay.querySelector(".pe-track-suggest");
-  const close = () => overlay.remove();
+
+  // ── Back-button support ──────────────────────────────────────────────
+  // Push a history entry when the editor opens so the browser/phone Back
+  // button (and the Backspace key) closes the editor instead of navigating
+  // away from the page. close() tears down the overlay and, when the back
+  // wasn't triggered by popstate itself, steps the pushed entry off the stack.
+  let _closed = false;
+  history.pushState({ projectEditor: true }, "", location.href);
+  const onPop = () => { close(true); };
+  window.addEventListener("popstate", onPop);
+  const close = (fromPop = false) => {
+    if (_closed) return;
+    _closed = true;
+    window.removeEventListener("popstate", onPop);
+    overlay.remove();
+    // If we still own the pushed entry (button/ESC close, not a real back),
+    // pop it so history stays clean.
+    if (!fromPop && history.state && history.state.projectEditor) history.back();
+  };
 
   const students = Array.isArray(window.STUDENTS) ? window.STUDENTS : [];
   const studentByName = new Map(students.map((s) => [norm(s.name), s]));
@@ -2534,25 +2644,62 @@ function openProjectEditor(project, opts = {}) {
   });
   renderTracks();
 
+  // ── Fixed-choice dropdowns (no free typing → no near-duplicate values). Each
+  // gathers its options from the known pool (constants + everything already in
+  // the data, deduped case/space-insensitively) so prior "Other…" entries show
+  // up for everyone next time. Category draws from the project-category list +
+  // the track universe so any track can also be picked as a category.
+  const catOptions = (() => {
+    const byKey = new Map();
+    const add = (v) => { const c = cleanText(v); if (c && !byKey.has(dedupeKey(c))) byKey.set(dedupeKey(c), c); };
+    PROJECT_CATEGORIES.forEach(add);
+    trackUniverse.forEach(add);
+    (Array.isArray(window.GRADUATION_PROJECTS) ? window.GRADUATION_PROJECTS : [])
+      .forEach((p) => { if (p && typeof p.category === "string") add(p.category); });
+    return Array.from(byKey.values()).sort((a, b) => a.localeCompare(b));
+  })();
+  const yearOptions = (() => {
+    const byKey = new Map();
+    const add = (v) => { const c = cleanText(v); if (c && !byKey.has(dedupeKey(c))) byKey.set(dedupeKey(c), c); };
+    const now = new Date().getFullYear();
+    for (let y = now + 2; y >= now - 6; y--) add(String(y));
+    (Array.isArray(window.STUDENTS) ? window.STUDENTS : []).forEach((s) => s && add(s.classYear));
+    (Array.isArray(window.GRADUATION_PROJECTS) ? window.GRADUATION_PROJECTS : []).forEach((p) => p && add(p.classYear));
+    return Array.from(byKey.values()).sort((a, b) => b.localeCompare(a));
+  })();
+  fillSelectWithOther("peCategorySel", catOptions, { selected: cleanText(project.category || "") });
+  fillSelectWithOther("peUniversitySel", knownValues(UNIVERSITIES, "university"), { selected: cleanText(dUni) });
+  fillSelectWithOther("peFacultySel", knownValues(FACULTIES, "faculty"), { selected: cleanText(dFac) });
+  fillSelectWithOther("peDepartmentSel", knownValues(DEPARTMENTS, "department"), { selected: cleanText(dDep) });
+  fillSelectWithOther("peClassYearSel", yearOptions, { selected: cleanText(dYear) });
+
   renderTeam();
   searchEl.addEventListener("input", () => renderResults(searchEl.value));
-  overlay.querySelector(".admin-picker-close").addEventListener("click", close);
-  overlay.querySelector(".pe-cancel").addEventListener("click", close);
+  // Wrap close() in handlers so the event object isn't passed as `fromPop`.
+  overlay.querySelector(".admin-picker-close").addEventListener("click", () => close());
+  overlay.querySelector(".pe-cancel").addEventListener("click", () => close());
   overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+  // ESC closes too (same path as the Back button).
+  const onKey = (e) => { if (e.key === "Escape") close(); };
+  document.addEventListener("keydown", onKey);
+  const _origRemove = overlay.remove.bind(overlay);
+  overlay.remove = () => { document.removeEventListener("keydown", onKey); _origRemove(); };
 
   overlay.querySelector(".pe-save").addEventListener("click", async () => {
     const val = (sel) => { const el = overlay.querySelector(sel); return el ? el.value.trim() : ""; };
     const name = val(".pe-name");
-    const category = cleanText(val(".pe-category"));
+    // Fixed-choice fields read through the select+Other helper, then canonicalise
+    // against the known pool so case/whitespace variants collapse to one spelling.
+    const category = canonValue(readSelectWithOther("peCategorySel"), catOptions);
     // Project tracks (primary first), canonicalised against the known pool so
     // case/whitespace variants collapse to one spelling.
     const track = canonTracks(projTracks);
     const description = val(".pe-desc");
     const repo = val(".pe-repo");
-    const university = canonValue(val(".pe-university"), knownValues(UNIVERSITIES, "university"));
-    const faculty = canonValue(val(".pe-faculty"), knownValues(FACULTIES, "faculty"));
-    const department = canonValue(val(".pe-department"), knownValues(DEPARTMENTS, "department"));
-    const classYear = cleanText(val(".pe-classyear"));
+    const university = canonValue(readSelectWithOther("peUniversitySel"), knownValues(UNIVERSITIES, "university"));
+    const faculty = canonValue(readSelectWithOther("peFacultySel"), knownValues(FACULTIES, "faculty"));
+    const department = canonValue(readSelectWithOther("peDepartmentSel"), knownValues(DEPARTMENTS, "department"));
+    const classYear = cleanText(readSelectWithOther("peClassYearSel"));
     const supervisor = val(".pe-supervisor");
     const fail = (msg) => { statusEl.style.display = ""; statusEl.textContent = msg; };
     if (!category) return fail("Category is required.");
@@ -2560,6 +2707,7 @@ function openProjectEditor(project, opts = {}) {
     if (!university) return fail("University is required.");
     if (!department) return fail("Department is required.");
     if (!classYear) return fail("Class year is required.");
+    if (!/^\d{4}$/.test(classYear)) return fail("Class year must be exactly 4 digits.");
     if (!team.length) return fail("Add at least one team member.");
     if (!team.some((m) => m.leader)) team[0].leader = true; // ensure a leader
 

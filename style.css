@@ -2169,6 +2169,10 @@ body.nav-open .nav-toggle-bar:nth-child(3) { transform: translateY(-7.5px) rotat
     content-visibility: auto;
     contain-intrinsic-size: 0 320px;
 }
+/* Returning from a member card → render the grid with no entrance animation. */
+#projectsGrid.no-anim .project-card {
+    animation: none !important;
+}
 
 .project-card::before {
     content: '';
@@ -2898,7 +2902,25 @@ body.nav-open .nav-toggle-bar:nth-child(3) { transform: translateY(-7.5px) rotat
     /* Show hamburger; the section links collapse into a drawer */
     .nav-toggle { display: flex; }
     .nav-submit-btn { display: none; }      /* Join Us moves into the drawer */
-    .audio-wrapper { display: none; }       /* keep the navbar bar clean on mobile */
+
+    /* Audio control stays on the bar but shrinks to a round icon-only button
+       so it never crowds the navbar. The label words are hidden; an emoji
+       glyph (muted vs. playing) is rendered via ::before instead. */
+    .audio-wrapper { display: flex; }
+    .audio-btn {
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        border-radius: 50%;
+        gap: 0;
+        flex: 0 0 auto;
+    }
+    .audio-btn #audioBtnText { font-size: 0; }   /* hide words, keep a11y label */
+    .audio-btn #audioBtnText::before {
+        content: "🔇";
+        font-size: 16px;
+    }
+    .audio-btn.playing #audioBtnText::before { content: "🔊"; }
 
     .navbar-links {
         position: absolute;
@@ -4548,21 +4570,17 @@ textarea.field-input { resize: vertical; min-height: 90px; font-family: inherit;
 /* ════════════════════════════════════════════
    Full profile page (Facebook-style) — full width
 ════════════════════════════════════════════ */
-body.fp-open { overflow: hidden; }
-
+/* The profile is now a real in-page view (a section switchMode shows/hides),
+   not a fixed overlay. It flows in the normal document so the page scrolls
+   naturally and Back/Forward behave like any other section. */
 .full-profile {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 100vh;             /* fallback */
-    height: 100dvh;            /* scroll container tracks the dynamic viewport (no bottom gap on mobile) */
-    z-index: 1200;
-    overflow-y: auto;
+    position: relative;
+    width: 100%;
+    min-height: 100vh;
+    min-height: 100dvh;
     background:
         radial-gradient(1100px 600px at 50% -10%, rgba(139, 92, 246, 0.18), transparent 60%),
         var(--bg-deep, #04050d);
-    -webkit-overflow-scrolling: touch;
 }
 
 .fp-inner {
@@ -4574,6 +4592,25 @@ body.fp-open { overflow: hidden; }
 .fp-back {
     margin: 1.1rem 0 0.4rem;
 }
+
+/* ── Inline profile editor (same layout, editable in place) ── */
+.fp-edit { display: flex; flex-direction: column; gap: 1.1rem; }
+.fp-edit-field label,
+.fp-edit .fp-info-label { display: block; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.4rem; }
+.fp-edit .fp-info-card { display: flex; flex-direction: column; }
+.fp-edit .fp-info-card select,
+.fp-edit .fp-info-card input { margin-top: 0.1rem; }
+.fp-edit .field-input.hidden { display: none; }
+.fpe-track-add { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
+.fpe-track-add .field-input { flex: 1; }
+.chip.is-editable { display: inline-flex; align-items: center; gap: 0.35rem; }
+.chip.is-editable .chip-x { background: none; border: none; color: inherit; cursor: pointer; font-size: 0.8rem; opacity: 0.7; padding: 0; }
+.chip.is-editable .chip-x:hover { opacity: 1; }
+.fp-edit-socials { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+@media (max-width: 560px) { .fp-edit-socials { grid-template-columns: 1fr; } }
+.fp-edit-actions { display: flex; justify-content: flex-end; gap: 0.7rem; margin-top: 0.4rem; }
+.fp-edit-status { font-size: 0.85rem; color: var(--text-secondary); text-align: right; }
+.fp-edit-status.is-error { color: var(--error, #ef4444); }
 
 /* Cover banner + overlapping avatar */
 .fp-cover {
@@ -5032,11 +5069,41 @@ body.fp-open { overflow: hidden; }
 .admin-picker-dept { font-size: 0.78rem; color: var(--text-muted); }
 .admin-picker-empty { color: var(--text-muted); text-align: center; padding: 1rem; }
 
-/* ── Collaborative project editor ── */
-.proj-editor { max-width: 520px; }
-.proj-editor-body { overflow-y: auto; display: flex; flex-direction: column; gap: 0.35rem; }
-.proj-editor-body .field-label { margin-top: 0.4rem; }
+/* ── Collaborative project editor — styled to read like the profile page:
+   a wider panel with a gradient header banner + roomy, card-like fields. ── */
+.proj-editor {
+    max-width: 720px;
+    max-height: 88vh;
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
+    border-radius: var(--radius-lg, 20px);
+}
+.proj-editor .admin-picker-head {
+    position: relative;
+    padding: 1.1rem 1.3rem;
+    background:
+        radial-gradient(900px 300px at 0% -40%, rgba(139, 92, 246, 0.35), transparent 70%),
+        var(--gradient-2);
+    border-radius: 0;
+}
+.proj-editor .admin-picker-head h3 { color: #fff; font-size: 1.2rem; font-weight: 800; }
+.proj-editor .admin-picker-close { color: rgba(255,255,255,0.85); }
+.proj-editor .admin-picker-close:hover { color: #fff; }
+.proj-editor-body {
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 1.2rem 1.3rem 0.4rem;
+}
+.proj-editor-body .field-label { margin-top: 0.6rem; font-weight: 600; }
 .proj-editor-body textarea.field-input { resize: vertical; }
+.proj-editor-actions { padding: 0.9rem 1.3rem 1.2rem; }
+@media (max-width: 560px) {
+    .proj-editor-body { padding: 1rem 1rem 0.3rem; }
+    .proj-editor-actions { padding: 0.8rem 1rem 1rem; }
+}
 /* Two-column grid for the project editor's hierarchy fields (collapses on
    narrow screens so labels/inputs never get crushed). */
 .pe-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem 0.7rem; }

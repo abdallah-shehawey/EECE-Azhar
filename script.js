@@ -851,19 +851,27 @@ function findStudentById(id) {
 function profilePath(student) { return `/profile/${profileId(student)}`; }
 function profileEditPath(student) { return `/profile/${profileId(student)}/edit`; }
 
-// The student record currently rendered in the full-profile overlay. Kept so we
+// The student record currently rendered in the full-profile page. Kept so we
 // can re-render it in place when auth resolves (owner's Edit button) without
 // touching the history stack.
 let _openProfileStudent = null;
+// Whether the open profile is in inline-edit mode (drives /profile/<id>/edit).
+let _fpEditing = false;
 
 // Re-render the open profile after the auth state changes (called by portal.js
 // from onAuthStateChanged). Re-running openFullProfile with fromHistory keeps
 // the URL/history untouched but recomputes owner-only controls.
 window.refreshOpenProfileAuth = function () {
-  if (_openProfileStudent && document.body.classList.contains("fp-open")) {
+  if (_openProfileStudent && currentMode === "profile") {
     openFullProfile(_openProfileStudent, { fromHistory: true });
   }
 };
+
+// Pristine markup of the read-only About panel, captured once. The inline editor
+// overwrites #fpAbout's innerHTML, so we restore this template before every
+// read-only render — otherwise the static fields (fpUniversity, fpTracks, …)
+// would stay destroyed and setEl() would silently no-op.
+let _fpAboutTemplate = null;
 
 function openFullProfile(student, opts = {}) {
   const page = document.getElementById("fullProfile");
@@ -873,6 +881,16 @@ function openFullProfile(student, opts = {}) {
   // blank behind the overlay) — return them to home on Back/close instead of a
   // dead-end submit page. Everyone else returns to the section they came from.
   _fpReturnMode = opts.returnMode || currentMode || "yearbook";
+
+  const aboutEl = document.getElementById("fpAbout");
+  if (aboutEl) {
+    // Capture the pristine read-only template once, then ALWAYS restore it before
+    // rendering. Read-only uses it directly; the inline editor rebuilds on top of
+    // a clean panel. This guarantees exactly one editor and no orphaned nodes even
+    // if openFullProfile runs twice (e.g. auth resolving mid-edit).
+    if (_fpAboutTemplate == null) _fpAboutTemplate = aboutEl.innerHTML;
+    else aboutEl.innerHTML = _fpAboutTemplate;
+  }
 
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const initials = (student.name || "?").split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
@@ -1071,41 +1089,44 @@ function openFullProfile(student, opts = {}) {
   const editBtn = document.getElementById("fpEditBtn");
   if (editBtn) {
     const isOwner = window.__myUid && student.ownerUid && window.__myUid === student.ownerUid;
-    editBtn.style.display = isOwner ? "" : "none";
-    editBtn.onclick = () => { closeFullProfile(); if (typeof window.openMyProfileEdit === "function") window.openMyProfileEdit(); };
+    editBtn.style.display = (isOwner && !_fpEditing) ? "" : "none";
+    // Enter INLINE edit on this same page (no jump to a separate form). Pushes a
+    // /profile/<id>/edit history entry so Back cancels the edit cleanly.
+    editBtn.onclick = () => {
+      _fpEditing = true;
+      openFullProfile(student); // re-renders in edit mode + pushes /edit entry
+    };
   }
 
   fpShowTab("about");
-  page.style.display = "block";
-  document.body.classList.add("fp-open");
   // Remember the grid scroll position before the profile takes over the screen,
   // so closing the profile lands back on the same card. (When we arrived via the
   // quick card, openPhotoModal already captured it — don't clobber that.)
-  if (!_isOverlayPath("student") && !_isOverlayPath("profile")) {
+  if (currentMode !== "profile" && !_isOverlayPath("student") && !_isOverlayPath("profile")) {
     _overlayReturnScroll = window.scrollY;
   }
-  window.scrollTo(0, 0);
-  // The profile is addressed directly in the URL (/profile/<id>). On refresh or
-  // a shared link we reconstruct it from that id + Firebase — the canonical
-  // source of truth. sessionStorage only remembers the *section underneath* so
-  // closing returns there; it's no longer needed to identify the profile.
+  // Remember the section underneath so popstate/back can return there. The
+  // profile is addressed directly in the URL (/profile/<id>); on refresh or a
+  // shared link we reconstruct it from that id + Firebase.
   const id = profileId(student);
-  const profileState = { mode: "profile-view", from: _fpReturnMode, student: studentKey(student), id };
-  try { sessionStorage.setItem("eece-open-profile", JSON.stringify(profileState)); } catch (_) {}
-  // When reopened by Back/Forward (popstate), the history entry already exists —
-  // don't push/replace another or we'd corrupt the stack.
-  if (opts.fromHistory) return;
-  // History: if we came from the quick modal it left a /student entry behind —
-  // replace it (so Back lands on the section, not a closed modal). Otherwise
-  // push a fresh entry on top of the current section.
-  if (_isOverlayPath("student")) {
-    history.replaceState(profileState, "", profilePath(student));
-  } else if (_isOverlayPath("profile")) {
-    // Already on a /profile/<id> entry (e.g. switching from one member's card to
-    // another). Replace in place so we don't stack endless profile entries.
-    history.replaceState(profileState, "", profilePath(student));
+  try {
+    sessionStorage.setItem("eece-open-profile",
+      JSON.stringify({ from: _fpReturnMode, student: studentKey(student), id }));
+  } catch (_) {}
+  // Render the inline editor only if we're in edit mode AND the viewer owns this
+  // profile. (A non-owner can't reach edit; a deep-linked /edit by a non-owner
+  // silently falls back to the read-only view.)
+  const _isOwner = !!(window.__myUid && student.ownerUid && window.__myUid === student.ownerUid);
+  if (_fpEditing && _isOwner) { _renderProfileEditInline(student); }
+  else if (_fpEditing && !_isOwner && window.__myUid) { _fpEditing = false; }
+  // The profile is now a real SPA view: let switchMode show the section and own
+  // the single history entry. A history replay (Back/Forward) passes fromHistory
+  // so switchMode won't push again. A profile→profile change (different member)
+  // pushes a fresh /profile/<id> entry.
+  if (opts.fromHistory) {
+    if (typeof switchMode === "function") switchMode("profile", true);
   } else {
-    history.pushState(profileState, "", profilePath(student));
+    if (typeof switchMode === "function") switchMode("profile");
   }
 }
 function closeFullProfile() {
@@ -1113,7 +1134,203 @@ function closeFullProfile() {
   if (page) page.style.display = "none";
   document.body.classList.remove("fp-open");
   _openProfileStudent = null;
+  _fpEditing = false;
   try { sessionStorage.removeItem("eece-open-profile"); } catch (_) {}
+}
+
+// Distinct values used by approved students for a hierarchy field, plus a small
+// curated seed, de-duplicated case/space-insensitively. Powers the inline-edit
+// dropdowns the same way the form does — dynamic, no hardcoded master list.
+const _INST_SEED = {
+  university: ["Al-Azhar University"],
+  faculty: ["Faculty of Engineering", "Faculty of Computers & Artificial Intelligence", "Faculty of Computers & Information", "Faculty of Engineering & Technology"],
+  department: ["Electronics and Communication Engineering", "Computer Engineering", "Computer Science"],
+};
+function _knownInst(field) {
+  const byKey = new Map();
+  const add = (v) => { const c = String(v || "").replace(/\s+/g, " ").trim(); if (c && !byKey.has(c.toLowerCase())) byKey.set(c.toLowerCase(), c); };
+  (_INST_SEED[field] || []).forEach(add);
+  (STUDENTS || []).forEach((s) => add(s[field]));
+  (GRADUATION_PROJECTS || []).forEach((p) => add(p[field]));
+  return Array.from(byKey.values()).sort((a, b) => a.localeCompare(b));
+}
+function _knownTrackPoolJS() {
+  const byKey = new Map();
+  const add = (v) => { const c = String(v || "").replace(/\s+/g, " ").trim(); if (c && !byKey.has(c.toLowerCase())) byKey.set(c.toLowerCase(), c); };
+  (STUDENTS || []).forEach((s) => (Array.isArray(s.track) ? s.track : s.track ? [s.track] : []).forEach(add));
+  (GRADUATION_PROJECTS || []).forEach((p) => (projectTracks(p) || []).forEach(add));
+  return Array.from(byKey.values()).sort((a, b) => a.localeCompare(b));
+}
+
+// Render the profile's About panel as an INLINE editor (same page, same layout,
+// fields editable in place). Reuses window.saveProfileInline (portal.js) so all
+// canonicalisation / validation / security live in one place.
+function _renderProfileEditInline(student) {
+  const about = document.getElementById("fpAbout");
+  if (!about) return;
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  // Working copy of the editable fields.
+  const tracks0 = Array.isArray(student.track) ? [...student.track] : (student.track ? [student.track] : []);
+  const st = {
+    name: student.name || "",
+    university: student.university || "",
+    faculty: student.faculty || "",
+    department: student.department || "",
+    classYear: student.classYear || "",
+    tracks: tracks0,
+    social: Object.assign({ linkedin: "", github: "", whatsapp: "", facebook: "" }, student.social || {}),
+  };
+
+  const selOpts = (field, val) => {
+    const opts = _knownInst(field);
+    const has = opts.some((o) => o.toLowerCase() === String(val || "").toLowerCase());
+    return [
+      `<option value="" ${val ? "" : "selected"} disabled>Select…</option>`,
+      ...opts.map((o) => `<option value="${esc(o)}" ${o.toLowerCase() === String(val || "").toLowerCase() ? "selected" : ""}>${esc(o)}</option>`),
+      `<option value="__other" ${val && !has ? "selected" : ""}>Other…</option>`,
+    ].join("");
+  };
+  const yearOpts = (val) => {
+    const years = ["2030", "2029", "2028", "2027", "2026", "2025", "2024", "2023", "2022", "2021", "2020"];
+    const has = years.includes(String(val));
+    return [
+      ...years.map((y) => `<option value="${y}" ${String(val) === y ? "selected" : ""}>${y}</option>`),
+      `<option value="__other" ${val && !has ? "selected" : ""}>Other…</option>`,
+    ].join("");
+  };
+  const otherVis = (field, val) => (val && !_knownInst(field).some((o) => o.toLowerCase() === String(val).toLowerCase())) ? "" : "hidden";
+
+  about.innerHTML = `
+    <div class="fp-edit">
+      <div class="fp-edit-field fp-edit-name">
+        <label>Full name</label>
+        <input type="text" class="field-input" id="fpeName" value="${esc(st.name)}" />
+      </div>
+      <div class="fp-grid">
+        <div class="fp-info-card">
+          <span class="fp-info-label">University</span>
+          <select class="field-input" id="fpeUniversity">${selOpts("university", st.university)}</select>
+          <input type="text" class="field-input ${otherVis("university", st.university)}" id="fpeUniversityOther" placeholder="Type your university" value="${esc(otherVis("university", st.university) === "" ? st.university : "")}" />
+        </div>
+        <div class="fp-info-card">
+          <span class="fp-info-label">Faculty</span>
+          <select class="field-input" id="fpeFaculty">${selOpts("faculty", st.faculty)}</select>
+          <input type="text" class="field-input ${otherVis("faculty", st.faculty)}" id="fpeFacultyOther" placeholder="Type your faculty" value="${esc(otherVis("faculty", st.faculty) === "" ? st.faculty : "")}" />
+        </div>
+        <div class="fp-info-card">
+          <span class="fp-info-label">Department</span>
+          <select class="field-input" id="fpeDepartment">${selOpts("department", st.department)}</select>
+          <input type="text" class="field-input ${otherVis("department", st.department)}" id="fpeDepartmentOther" placeholder="Type your department" value="${esc(otherVis("department", st.department) === "" ? st.department : "")}" />
+        </div>
+        <div class="fp-info-card">
+          <span class="fp-info-label">Class Year</span>
+          <select class="field-input" id="fpeClassYear">${yearOpts(st.classYear)}</select>
+          <input type="text" class="field-input ${["2030","2029","2028","2027","2026","2025","2024","2023","2022","2021","2020"].includes(String(st.classYear))?"hidden":""}" id="fpeClassYearOther" inputmode="numeric" maxlength="4" placeholder="4-digit year" value="${esc(["2030","2029","2028","2027","2026","2025","2024","2023","2022","2021","2020"].includes(String(st.classYear))?"":st.classYear)}" />
+        </div>
+      </div>
+      <div class="fp-section">
+        <h3 class="fp-section-title">Tracks</h3>
+        <div class="chip-container" id="fpeTracks"></div>
+        <div class="fpe-track-add">
+          <input type="text" class="field-input" id="fpeTrackInput" list="fpeTrackList" placeholder="Add a track…" />
+          <datalist id="fpeTrackList">${_knownTrackPoolJS().map((t) => `<option value="${esc(t)}"></option>`).join("")}</datalist>
+          <button type="button" class="btn-secondary" id="fpeTrackAdd">Add</button>
+        </div>
+      </div>
+      <div class="fp-section">
+        <h3 class="fp-section-title">Connect</h3>
+        <div class="fp-edit-socials">
+          <input type="url" class="field-input" id="fpeLinkedin" placeholder="LinkedIn URL" value="${esc(st.social.linkedin || "")}" />
+          <input type="url" class="field-input" id="fpeGithub" placeholder="GitHub URL" value="${esc(st.social.github || "")}" />
+          <input type="tel" class="field-input" id="fpeWhatsapp" placeholder="WhatsApp (+20…)" value="${esc(st.social.whatsapp || "")}" />
+          <input type="url" class="field-input" id="fpeFacebook" placeholder="Facebook URL" value="${esc(st.social.facebook || "")}" />
+        </div>
+      </div>
+      <div class="fp-edit-actions">
+        <button type="button" class="btn-secondary" id="fpeCancel">Cancel</button>
+        <button type="button" class="btn-primary" id="fpeSave">💾 Save profile</button>
+      </div>
+      <p class="fp-edit-status" id="fpeStatus" style="display:none;"></p>
+    </div>`;
+
+  // Wire "Other…" reveal for the four selects.
+  [["fpeUniversity", "fpeUniversityOther"], ["fpeFaculty", "fpeFacultyOther"], ["fpeDepartment", "fpeDepartmentOther"], ["fpeClassYear", "fpeClassYearOther"]].forEach(([selId, otherId]) => {
+    const sel = document.getElementById(selId), oth = document.getElementById(otherId);
+    if (sel && oth) sel.addEventListener("change", () => { oth.classList.toggle("hidden", sel.value !== "__other"); if (sel.value === "__other") oth.focus(); });
+  });
+
+  // Tracks chip editor.
+  const tracksWrap = document.getElementById("fpeTracks");
+  const renderTrackChips = () => {
+    tracksWrap.innerHTML = st.tracks.length
+      ? st.tracks.map((t, i) => `<span class="chip is-editable">${esc(t)}<button type="button" class="chip-x" data-i="${i}" aria-label="Remove">✕</button></span>`).join("")
+      : `<span class="fp-muted">No tracks yet.</span>`;
+    tracksWrap.querySelectorAll(".chip-x").forEach((b) => b.addEventListener("click", () => { st.tracks.splice(+b.dataset.i, 1); renderTrackChips(); }));
+  };
+  renderTrackChips();
+  const trackInput = document.getElementById("fpeTrackInput");
+  const addTrack = () => {
+    const v = String(trackInput.value || "").replace(/\s+/g, " ").trim();
+    if (v && !st.tracks.some((t) => t.toLowerCase() === v.toLowerCase())) st.tracks.push(v);
+    trackInput.value = ""; renderTrackChips();
+  };
+  document.getElementById("fpeTrackAdd").addEventListener("click", addTrack);
+  trackInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addTrack(); } });
+
+  const readSel = (selId, otherId) => {
+    const sel = document.getElementById(selId);
+    if (sel && sel.value === "__other") { const o = document.getElementById(otherId); return o ? o.value.trim() : ""; }
+    return sel ? sel.value : "";
+  };
+
+  // Cancel → back to read-only (no nav step).
+  document.getElementById("fpeCancel").addEventListener("click", () => {
+    _fpEditing = false;
+    openFullProfile(student, { fromHistory: true });
+    try { history.replaceState({ mode: "profile" }, "", modeToPath("profile")); } catch (_) {}
+  });
+
+  // Save → persist via portal, then re-render the read-only page in place.
+  document.getElementById("fpeSave").addEventListener("click", async () => {
+    const statusEl = document.getElementById("fpeStatus");
+    const fail = (m) => { statusEl.style.display = ""; statusEl.textContent = m; statusEl.className = "fp-edit-status is-error"; };
+    if (typeof window.saveProfileInline !== "function") return fail("Editor unavailable — please reload.");
+    const fields = {
+      name: document.getElementById("fpeName").value.trim(),
+      university: readSel("fpeUniversity", "fpeUniversityOther"),
+      faculty: readSel("fpeFaculty", "fpeFacultyOther"),
+      department: readSel("fpeDepartment", "fpeDepartmentOther"),
+      classYear: readSel("fpeClassYear", "fpeClassYearOther"),
+      tracks: st.tracks,
+      social: {
+        linkedin: document.getElementById("fpeLinkedin").value.trim(),
+        github: document.getElementById("fpeGithub").value.trim(),
+        whatsapp: document.getElementById("fpeWhatsapp").value.trim(),
+        facebook: document.getElementById("fpeFacebook").value.trim(),
+      },
+    };
+    statusEl.style.display = ""; statusEl.className = "fp-edit-status"; statusEl.textContent = "Saving…";
+    const res = await window.saveProfileInline(fields);
+    if (!res.ok) return fail(res.error || "Save failed.");
+    statusEl.textContent = res.live ? "Saved ✓" : "Submitted for approval ✓";
+    // Re-render the read-only profile with the saved values (no nav jump).
+    _fpEditing = false;
+    const canonTracks = (res.profile && res.profile.tracks) || fields.tracks;
+    const updated = Object.assign({}, student, fields, {
+      track: canonTracks, tracks: canonTracks,
+      university: (res.profile && res.profile.university) || fields.university,
+      faculty: (res.profile && res.profile.faculty) || fields.faculty,
+      department: (res.profile && res.profile.department) || fields.department,
+    });
+    setTimeout(() => {
+      openFullProfile(updated, { fromHistory: true });
+      try { history.replaceState({ mode: "profile" }, "", modeToPath("profile")); } catch (_) {}
+    }, 500);
+  });
+
+  // Hide the read-only Tracks/Skills/Social sections + the project tab while editing.
+  ["fpTracksWrap", "fpSkillsWrap", "fpSocialWrap"].forEach((id) => { const el = document.getElementById(id); if (el) el.style.display = "none"; });
 }
 function fpShowTab(tab) {
   document.querySelectorAll(".fp-tab").forEach((b) => b.classList.toggle("active", b.dataset.fptab === tab));
@@ -1124,7 +1341,19 @@ function fpShowTab(tab) {
 }
 function initFullProfile() {
   const back = document.getElementById("fpBack");
-  if (back) back.addEventListener("click", () => { closeFullProfile(); history.back(); });
+  // Step ONE entry back through history; popstate replays whatever's underneath
+  // (a section, or another profile). Symmetric, like a normal page.
+  if (back) back.addEventListener("click", () => {
+    if (_fpEditing) {
+      // Cancel inline edit → back to the read-only profile (no nav step).
+      _fpEditing = false;
+      if (_openProfileStudent) openFullProfile(_openProfileStudent, { fromHistory: true });
+      try { history.replaceState({ mode: "profile" }, "", modeToPath("profile")); } catch (_) {}
+      return;
+    }
+    if (window.history.length > 1) history.back();
+    else if (typeof switchMode === "function") switchMode(_fpReturnMode || "yearbook");
+  });
   document.querySelectorAll(".fp-tab").forEach((b) => {
     b.addEventListener("click", () => fpShowTab(b.dataset.fptab));
   });
@@ -1857,9 +2086,12 @@ function switchProjectCat(cat) {
   renderProjects();
 }
 
-function renderProjects() {
+function renderProjects(animate = true) {
   const grid = document.getElementById("projectsGrid");
   if (!grid) return;
+  // Returning from a member's card/profile (history replay) must NOT replay the
+  // entrance animation — the grid should stay put, like the yearbook.
+  grid.classList.toggle("no-anim", !animate);
 
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -2549,43 +2781,36 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Browser Back/Forward (and backspace) navigate between views in-page.
   window.addEventListener("popstate", (e) => {
-    const mode = (e.state && e.state.mode) || "home";
+    // Resolve the target mode from the URL first (survives state loss on refresh),
+    // falling back to the history state, then home.
+    const urlMode = pathToMode();
+    const mode = urlMode || (e.state && e.state.mode) || "home";
 
-    // Returning to the edit page (Forward into /profile/edit): reopen the form.
-    if (mode === "profile-edit") {
-      if (typeof closeFullProfile === "function") closeFullProfile();
-      if (typeof window.openMyProfileEdit === "function") {
-        window.openMyProfileEdit({ fromHistory: true });
-      }
-      return;
-    }
-
-    // The full-profile overlay sits on top of a section. If we're leaving it
-    // (path no longer /profile), tear it down first so the section underneath
-    // shows through — without refetching the yearbook.
-    if (mode !== "profile-view" && typeof closeFullProfile === "function") {
-      closeFullProfile();
-    }
-
-    // Back/Forward landing on a /profile entry (e.g. Back out of /profile/edit):
-    // reopen the full profile so it isn't a blank page. The student to reopen is
-    // remembered in the state or in sessionStorage.
-    if (mode === "profile-view") {
-      // Leaving the edit form (which lives in submit mode) — hide it.
+    // Landing on a /profile/<id>[/edit] entry (e.g. Back from another section, or
+    // Forward into the inline editor). Rebuild the same full-page profile.
+    if (mode === "profile") {
+      // Leaving any open edit form that lived in submit mode.
       if (typeof window.__hideEditForm === "function") window.__hideEditForm();
-      // Resolve the student from the URL id first (survives any state loss),
-      // then the state key, then sessionStorage.
-      let s = null;
       const urlId = profileIdFromPath();
-      if (urlId) s = findStudentById(urlId);
+      _fpEditing = /\/edit\/?$/.test(location.pathname);
+      let s = (urlId && findStudentById(urlId)) || null;
       if (!s) {
         let key = (e.state && e.state.student) || null;
         if (!key) { try { key = (JSON.parse(sessionStorage.getItem("eece-open-profile") || "null") || {}).student; } catch (_) {} }
         s = key && typeof findStudentByKey === "function" ? findStudentByKey(key) : null;
       }
-      if (s && typeof openFullProfile === "function") openFullProfile(s, { fromHistory: true });
+      if (s && typeof openFullProfile === "function") {
+        openFullProfile(s, { fromHistory: true });
+      } else if (urlId) {
+        // Data not loaded yet (cold Back) → stash so applyDbPayload reopens it.
+        _pendingProfileId = urlId;
+        _pendingEditAfterOpen = _fpEditing;
+      }
       return;
     }
+
+    // Any other mode: tear down the profile page if it was open, then replay.
+    if (typeof closeFullProfile === "function") closeFullProfile();
 
     // Closing an overlay (quick card / full profile) → we have a saved scroll
     // position to restore so the user lands back on the same card. switchMode
@@ -2644,20 +2869,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   // fetchFirebaseData reopens it the moment fresh data arrives.
   if (isProfilePath) {
     _pendingEditAfterOpen = isEditPath;
+    // Cold-load on /profile/<id>[/edit]: push the profile entry on top of the
+    // seeded section, and open in edit mode if the URL ends in /edit AND the
+    // viewer owns it (owner check happens after auth resolves; until then we
+    // render read-only and refreshOpenProfileAuth re-renders with edit if owned).
     const reopen = () => {
       const s = findStudentById(urlProfileId) ||
                 (savedProfile && savedProfile.student ? findStudentByKey(savedProfile.student) : null);
       if (s && typeof openFullProfile === "function") {
+        _fpEditing = isEditPath; // editor shows once auth confirms ownership
         openFullProfile(s);
-        // Deep-linked straight to the edit page → open the editor on top.
-        if (_pendingEditAfterOpen && window.__myUid && s.ownerUid === window.__myUid &&
-            typeof window.openMyProfileEdit === "function") {
-          // We're already ON /profile/<id>/edit (refresh/deep link). openFullProfile
-          // pushed /profile/<id>; let the editor push /profile/<id>/edit on top so
-          // the Back chain is base → profile → edit (Back lands on the profile).
-          window.openMyProfileEdit();
-          _pendingEditAfterOpen = false;
-        }
         _pendingProfileKey = null;
         _pendingProfileId = null;
         return true;
@@ -2726,10 +2947,20 @@ const PORTAL_MODES = ["submit", "admin"];
 // and refreshing lands on the same view. The server rewrites unknown paths
 // back to index.html (see vercel.json), and we resolve the path → mode here.
 // Home is the root "/", never "/home", so the canonical URL stays clean.
-const VALID_MODES = ["home", "countdown", "yearbook", "projects", "submit", "admin"];
+const VALID_MODES = ["home", "countdown", "yearbook", "projects", "submit", "admin", "profile"];
 
+// `profile` is a full-page view (like yearbook/projects), not an overlay. Its URL
+// carries the student id and an optional /edit suffix, both derived from the
+// currently-open profile + edit state so Back/Forward and refresh stay correct.
 function modeToPath(mode) {
-  return mode === "home" ? "/" : `/${mode}`;
+  if (mode === "home") return "/";
+  if (mode === "profile") {
+    const id = (typeof _openProfileStudent !== "undefined" && _openProfileStudent)
+      ? profileId(_openProfileStudent) : "";
+    if (!id) return "/yearbook";
+    return _fpEditing ? `/profile/${id}/edit` : `/profile/${id}`;
+  }
+  return `/${mode}`;
 }
 
 // Back button for the portal pages (submit / edit / admin). Steps ONE entry back
@@ -2755,6 +2986,7 @@ window.goBackFromPortal = goBackFromPortal;
 function pathToMode(pathname = location.pathname) {
   const seg = (pathname || "/").replace(/^\/+|\/+$/g, "");
   if (!seg) return "home";
+  if (/^profile\//.test(seg)) return "profile";
   return VALID_MODES.includes(seg) ? seg : "home";
 }
 
@@ -2764,26 +2996,28 @@ function switchMode(mode, fromHistory = false) {
   // Expose active mode so the portal module can react (e.g. refresh approvals).
   document.body.dataset.mode = mode;
 
-  // The full-profile overlay (also used as the owner's "My profile") sits on top
-  // of a section. A fresh navigation to another section must tear it down so it
-  // doesn't linger over the new page. (History replays manage it via popstate.)
-  if (!fromHistory && document.body.classList.contains("fp-open") &&
-      typeof closeFullProfile === "function") {
-    closeFullProfile();
+  // Leaving the profile page for a different section → drop edit state + the
+  // remembered student so we don't re-open it. (Navigating profile→profile, e.g.
+  // one member to another, keeps going through openFullProfile which manages it.)
+  if (mode !== "profile" && prevMode === "profile") {
+    _fpEditing = false;
+    _openProfileStudent = null;
   }
 
   // Push a history entry so the browser Back button / backspace returns to the
   // previous view instead of leaving the site. popstate replays without pushing.
-  // Clean path-based URLs (e.g. /yearbook); Home lives at the root "/".
-  if (!fromHistory && prevMode !== mode) {
+  // Clean path-based URLs (e.g. /yearbook); Home lives at the root "/". The
+  // profile carries its id in the path; an edit↔view toggle is a same-mode URL
+  // change, so push when the PATH changes too (not just when the mode changes).
+  if (!fromHistory && (prevMode !== mode || (mode === "profile" && location.pathname !== modeToPath(mode)))) {
     try { history.pushState({ mode }, "", modeToPath(mode)); } catch (_) {}
   }
 
   // Always close the mobile nav drawer when navigating.
   closeNavMenu();
 
-  // Portal pages take over the screen: hide the top nav + header chrome.
-  const isPortal = PORTAL_MODES.includes(mode);
+  // Portal pages + the profile page take over the screen: hide the top nav chrome.
+  const isPortal = PORTAL_MODES.includes(mode) || mode === "profile";
   document.body.classList.toggle("portal-active", isPortal);
 
   // Highlight the active section link (only the 3 section modes have a link).
@@ -2801,6 +3035,7 @@ function switchMode(mode, fromHistory = false) {
     projects: document.getElementById("mode-projects"),
     submit: document.getElementById("mode-submit"),
     admin: document.getElementById("mode-admin"),
+    profile: document.getElementById("fullProfile"),
   };
   Object.values(sections).forEach((el) => {
     if (el) el.style.display = "none";
@@ -2843,11 +3078,16 @@ function switchMode(mode, fromHistory = false) {
         FILTER_DIMENSIONS.forEach((dim) => projectFilter[dim.key].clear());
       }
       buildProjectFilterPanel();
-      renderProjects();
+      // Fresh entry → animate the grid in; Back/Forward (returning from a card)
+      // → no animation, so it doesn't look like you're "entering" again.
+      renderProjects(!fromHistory);
     } else if (mode === "submit" && sections.submit) {
       sections.submit.style.display = "block";
     } else if (mode === "admin" && sections.admin) {
       sections.admin.style.display = "block";
+    } else if (mode === "profile" && sections.profile) {
+      // The DOM is populated by openFullProfile() before it calls switchMode().
+      sections.profile.style.display = "block";
     }
   }
 }

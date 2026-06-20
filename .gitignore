@@ -15,3 +15,6 @@ node_modules/
 
 # Throwaway local preview/screenshot scaffolds (generated from index.html)
 _*.html
+
+# Local admin tooling — student name→email mapping, never publish.
+scripts/assign-emails.js
