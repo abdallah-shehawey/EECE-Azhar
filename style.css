@@ -2922,6 +2922,13 @@ body.nav-open .nav-toggle-bar:nth-child(3) { transform: translateY(-7.5px) rotat
     }
     .audio-btn.playing #audioBtnText::before { content: "🔊"; }
 
+    /* Signed-in chip collapses to just the avatar on phones (name + chevron
+       hidden) so the navbar doesn't get crowded next to the audio + hamburger. */
+    .user-name { display: none; }
+    .user-chip .chevron { display: none; }
+    .user-chip { padding: 3px; gap: 0; border-radius: 50%; }
+    .user-avatar { margin: 0; }
+
     .navbar-links {
         position: absolute;
         top: 100%;

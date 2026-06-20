@@ -1141,10 +1141,31 @@ function closeFullProfile() {
 // Distinct values used by approved students for a hierarchy field, plus a small
 // curated seed, de-duplicated case/space-insensitively. Powers the inline-edit
 // dropdowns the same way the form does — dynamic, no hardcoded master list.
+// Full pick-lists so a student can choose their own university/faculty/department
+// from a complete menu (not just whatever already exists in the data). Kept in
+// sync with the UNIVERSITIES / FACULTIES / DEPARTMENTS constants in portal.js.
 const _INST_SEED = {
-  university: ["Al-Azhar University"],
-  faculty: ["Faculty of Engineering", "Faculty of Computers & Artificial Intelligence", "Faculty of Computers & Information", "Faculty of Engineering & Technology"],
-  department: ["Electronics and Communication Engineering", "Computer Engineering", "Computer Science"],
+  university: [
+    "Al-Azhar University", "Cairo University", "Ain Shams University", "Alexandria University",
+    "Mansoura University", "Helwan University", "Zagazig University", "Assiut University",
+    "Tanta University", "Benha University", "Menoufia University", "Suez Canal University",
+    "South Valley University", "Fayoum University", "Beni-Suef University", "Kafr El-Sheikh University",
+    "Damietta University", "Aswan University", "Minia University", "Sohag University",
+    "Port Said University", "The British University in Egypt (BUE)", "German University in Cairo (GUC)",
+    "American University in Cairo (AUC)", "Nile University", "Misr University for Science & Technology (MUST)",
+    "Future University in Egypt (FUE)", "October 6 University", "Egyptian Russian University",
+  ],
+  faculty: [
+    "Faculty of Engineering", "Faculty of Engineering & Technology",
+    "Faculty of Computers & Artificial Intelligence", "Faculty of Computers & Information",
+    "Faculty of Computer Engineering", "Higher Institute of Engineering",
+  ],
+  department: [
+    "Electronics and Communication Engineering", "Computer Engineering", "Electrical Power & Machines",
+    "Mechanical Engineering", "Civil Engineering", "Architecture Engineering", "Mechatronics Engineering",
+    "Biomedical Engineering", "Chemical Engineering", "Computer Science", "Information Systems",
+    "Artificial Intelligence", "Software Engineering",
+  ],
 };
 function _knownInst(field) {
   const byKey = new Map();

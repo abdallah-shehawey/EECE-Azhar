@@ -2658,8 +2658,10 @@ function openProjectEditor(project, opts = {}) {
   const catOptions = (() => {
     const byKey = new Map();
     const add = (v) => { const c = cleanText(v); if (c && !byKey.has(dedupeKey(c))) byKey.set(dedupeKey(c), c); };
+    // The fixed category menu + any category already saved on a project (so prior
+    // "Other…" entries persist). NOT the whole track universe — that bloated the
+    // list with near-duplicate buckets (e.g. "Network" vs "Networking").
     PROJECT_CATEGORIES.forEach(add);
-    trackUniverse.forEach(add);
     (Array.isArray(window.GRADUATION_PROJECTS) ? window.GRADUATION_PROJECTS : [])
       .forEach((p) => { if (p && typeof p.category === "string") add(p.category); });
     return Array.from(byKey.values()).sort((a, b) => a.localeCompare(b));
