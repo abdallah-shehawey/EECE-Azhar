@@ -251,21 +251,84 @@ function setSelectWithOther(selectId, value) {
   }
 }
 
+// Collapse a free-text value to a stable form: trim, collapse internal runs of
+// whitespace to a single space, and strip stray surrounding punctuation. Used as
+// the FIRST step before saving any institution/track value so trivial typing
+// differences don't create near-duplicates.
+function cleanText(v) {
+  return String(v == null ? "" : v).replace(/\s+/g, " ").trim();
+}
+
+// A case/space-insensitive key for de-duplication.
+function dedupeKey(v) {
+  return cleanText(v).toLowerCase();
+}
+
+// Canonicalise a value against the values ALREADY present in approved data: if a
+// case/whitespace-insensitive match exists, reuse that exact spelling so
+// "cairo university", "Cairo  University " and "Cairo University" all collapse to
+// the one canonical label. Otherwise keep the user's cleaned text as the new
+// canonical spelling. `pool` is the list of known values for this field.
+function canonValue(v, pool) {
+  const cleaned = cleanText(v);
+  if (!cleaned) return "";
+  const key = cleaned.toLowerCase();
+  const hit = (pool || []).find((p) => dedupeKey(p) === key);
+  return hit || cleaned;
+}
+
+// Every distinct track already used anywhere on the site (students + projects).
+function knownTrackPool() {
+  const byKey = new Map();
+  const add = (v) => {
+    const c = cleanText(v);
+    if (c && !byKey.has(dedupeKey(c))) byKey.set(dedupeKey(c), c);
+  };
+  const eat = (coll, fields) => (Array.isArray(coll) ? coll : []).forEach((r) => {
+    if (!r) return;
+    fields.forEach((f) => {
+      const v = r[f];
+      (Array.isArray(v) ? v : v ? [v] : []).forEach(add);
+    });
+  });
+  eat(window.STUDENTS, ["tracks", "track"]);
+  eat(window.GRADUATION_PROJECTS, ["tracks", "track"]);
+  return Array.from(byKey.values());
+}
+
+// Clean + canonicalise a tracks array, dropping case/whitespace duplicates and
+// matching each entry to its canonical spelling from the known pool.
+function canonTracks(arr) {
+  const pool = knownTrackPool();
+  const seen = new Set();
+  const out = [];
+  (Array.isArray(arr) ? arr : []).forEach((t) => {
+    const c = canonValue(t, pool);
+    if (c && !seen.has(c.toLowerCase())) { seen.add(c.toLowerCase()); out.push(c); }
+  });
+  return out;
+}
+
 // Merge a curated built-in list with every distinct value already used by live
 // students/projects on the site, so a university/faculty/department that someone
 // registered (via "Other…") is offered to everyone else afterwards — i.e. the
 // dropdowns grow dynamically from approved data, not just the hardcoded seed.
+// De-duplicates case/whitespace-insensitively so spelling variants collapse.
 function knownValues(builtin, field) {
-  const set = new Set(builtin);
+  const byKey = new Map(); // dedupeKey → canonical display value
+  const add = (v) => {
+    const cleaned = cleanText(v);
+    if (cleaned && !byKey.has(dedupeKey(cleaned))) byKey.set(dedupeKey(cleaned), cleaned);
+  };
+  (builtin || []).forEach(add);
   const eat = (coll) => {
     (Array.isArray(coll) ? coll : []).forEach((r) => {
-      const v = r && r[field];
-      if (typeof v === "string" && v.trim()) set.add(v.trim());
+      if (r && typeof r[field] === "string") add(r[field]);
     });
   };
   eat(window.STUDENTS);
   eat(window.GRADUATION_PROJECTS);
-  return Array.from(set).sort((a, b) => a.localeCompare(b));
+  return Array.from(byKey.values()).sort((a, b) => a.localeCompare(b));
 }
 
 /** Fill every hierarchy select in both the student and project forms. */
@@ -394,6 +457,18 @@ onAuthStateChanged(auth, async (user) => {
       myProfile = snap.exists() ? snap.val() : null;
     } catch (e) {
       console.warn("Could not load profile:", e.message);
+    }
+    // No live profile? Maybe they have a PENDING submission (stored only under
+    // /pending for privacy). Load it so the owner still sees their own pending
+    // data (form prefilled, "pending" badge) instead of a blank create form.
+    if (!myProfile) {
+      try {
+        const psnap = await get(ref(db, `pending/profile_${user.uid}`));
+        if (psnap.exists()) {
+          const p = psnap.val();
+          if (p && p.payload) myProfile = { ...p.payload, status: "pending", uid: user.uid, createdAt: p.createdAt };
+        }
+      } catch (_) { /* pending read is owner/admin only; ignore otherwise */ }
     }
     // No /profiles entry yet? If an existing yearbook card carries this user's
     // Gmail (assigned by the admin in Firebase), adopt it SILENTLY as their
@@ -1534,23 +1609,26 @@ function initSubmissionForm() {
       return true;
     }
 
-    // New or pending: store the profile as pending + queue it for approval.
-    await set(ref(db, `profiles/${uid}`), {
-      ...base,
-      status: "pending",
-      createdAt: (myProfile && myProfile.createdAt) || now,
-      updatedAt: now,
-    });
-    // Upsert a single pending entry keyed by uid so repeated edits don't pile up.
+    // New or pending: queue it for approval in /pending ONLY.
+    //
+    // SECURITY: /profiles is public-readable (so logged-out visitors can see the
+    // yearbook), so we must NOT write an un-approved profile there — that would
+    // expose pending users publicly. The full payload lives in /pending (which
+    // is readable only by the admin and the submitter), and the profile is
+    // written to /profiles only once the admin approves it (flipping to "live").
     await set(ref(db, `pending/profile_${uid}`), {
       type: "student",
       status: "pending",
       submittedByUid: uid,
       submittedByEmail: currentUser.email || "",
       submittedByName: currentUser.displayName || "",
-      createdAt: now,
+      createdAt: (myProfile && myProfile.createdAt) || now,
+      updatedAt: now,
       payload: { ...data, ownerUid: uid },
     });
+    // Keep an in-memory copy so the form/profile reflects the pending submission
+    // immediately, even though nothing public was written.
+    myProfile = { ...base, status: "pending", uid, createdAt: (myProfile && myProfile.createdAt) || now, updatedAt: now };
     // Tell the admin a new profile is waiting (best-effort email).
     notifyAdmin({ type: "submission", name: data.name, kind: "student profile" });
     return false;
@@ -1598,18 +1676,19 @@ function initSubmissionForm() {
       }
       data = {
         type: "student",
-        name: inputName.value.trim(),
+        name: cleanText(inputName.value),
         email: ($("inputEmail") && (adminAddMode || adminEditTarget)) ? $("inputEmail").value.trim() : (existing && existing.email) || "",
         gender: $("inputGender").value,
         photo: formState.photoPath,
         cover: formState.coverPath || "",
-        tracks: getSelectedTracks(),
+        // Canonicalise tracks against the known pool so case/space variants merge.
+        tracks: canonTracks(getSelectedTracks()),
         skills: getSelectedSkills(),
         color: formState.selectedColor,
-        university: readSelectWithOther("inputUniversity"),
-        faculty: readSelectWithOther("inputFaculty"),
-        department: readSelectWithOther("inputDepartment"),
-        classYear: readSelectWithOther("inputClassYear"),
+        university: canonValue(readSelectWithOther("inputUniversity"), knownValues(UNIVERSITIES, "university")),
+        faculty: canonValue(readSelectWithOther("inputFaculty"), knownValues(FACULTIES, "faculty")),
+        department: canonValue(readSelectWithOther("inputDepartment"), knownValues(DEPARTMENTS, "department")),
+        classYear: cleanText(readSelectWithOther("inputClassYear")),
         linkedin: $("inputLinkedin").value.trim(),
         github: $("inputGithub").value.trim(),
         whatsapp: $("inputWhatsapp").value.trim(),
@@ -1633,13 +1712,13 @@ function initSubmissionForm() {
         inputCategory.value === "other" ? inputCategoryOther.value.trim() : inputCategory.value;
       data = {
         type: "project",
-        category: finalCategory,
+        category: cleanText(finalCategory),
         icon: $("inputIcon").value.trim(),
         team,
-        university: readSelectWithOther("pjUniversity"),
-        faculty: readSelectWithOther("pjFaculty"),
-        department: readSelectWithOther("pjDepartment"),
-        classYear: readSelectWithOther("pjClassYear"),
+        university: canonValue(readSelectWithOther("pjUniversity"), knownValues(UNIVERSITIES, "university")),
+        faculty: canonValue(readSelectWithOther("pjFaculty"), knownValues(FACULTIES, "faculty")),
+        department: canonValue(readSelectWithOther("pjDepartment"), knownValues(DEPARTMENTS, "department")),
+        classYear: cleanText(readSelectWithOther("pjClassYear")),
       };
     }
 
@@ -2072,14 +2151,36 @@ async function approve(id, btn) {
   try {
     const rec = buildLiveRecord(entry.payload);
     await set(ref(db, `${rec.node}/${rec.key}`), rec.payload);
-    // If this came from a Google-linked student profile, flip it to "live"
-    // so future self-edits show instantly without re-approval.
+    // A Google-linked student profile (ownerUid set) becomes a LIVE /profiles
+    // record now. Pending profiles are no longer pre-written to /profiles (they'd
+    // be public), so approval is what publishes them — as "live" — and future
+    // self-edits then write straight through without re-approval.
     const ownerUid = entry.payload.ownerUid || entry.submittedByUid;
     if (entry.payload.type === "student" && ownerUid) {
-      const snap = await get(ref(db, `profiles/${ownerUid}`));
-      if (snap.exists()) {
-        await set(ref(db, `profiles/${ownerUid}/status`), "live");
-      }
+      const now = Date.now();
+      const d = entry.payload;
+      await set(ref(db, `profiles/${ownerUid}`), {
+        uid: ownerUid,
+        email: d.email || entry.submittedByEmail || "",
+        name: d.name || "",
+        gender: d.gender || "",
+        photo: d.photo || "",
+        cover: d.cover || "",
+        tracks: d.tracks || d.track || [],
+        skills: d.skills || [],
+        color: d.color || "",
+        university: d.university || "",
+        faculty: d.faculty || "",
+        department: d.department || "",
+        classYear: d.classYear || "",
+        social: {
+          linkedin: d.linkedin || "", github: d.github || "",
+          whatsapp: d.whatsapp || "", facebook: d.facebook || "",
+        },
+        status: "live",
+        createdAt: entry.createdAt || now,
+        updatedAt: now,
+      });
     }
     await remove(ref(db, `pending/${id}`));
     delete pendingCache[id];
@@ -2118,12 +2219,18 @@ async function adminDeleteStudent(student) {
   if (!confirm(`Permanently delete "${student.name}" from the yearbook?`)) return;
   try {
     const ops = [];
+    // The live /profiles record (if this person signed in) is keyed by ownerUid.
     if (student.ownerUid) {
       ops.push(remove(ref(db, `profiles/${student.ownerUid}`)));
-      ops.push(remove(ref(db, `students/${student.ownerUid}`)));
+      // A pending submission, if any, is keyed profile_<uid> under /pending.
+      ops.push(remove(ref(db, `pending/profile_${student.ownerUid}`)));
     }
-    // Also clear any name-keyed legacy record.
-    ops.push(remove(ref(db, `students/${sanitizeKey(student.name)}`)));
+    // The /students record is keyed by its REAL Firebase key (e.g. 0001_Name),
+    // captured as `_key` during the merge — NOT the name or the uid. Using the
+    // real key is what actually removes the record (the old name/uid keys never
+    // matched, so deletes silently no-op'd and the student came back on refresh).
+    const realKey = student._key || sanitizeKey(student.name);
+    ops.push(remove(ref(db, `students/${realKey}`)));
     await Promise.all(ops);
     if (typeof window.fetchFirebaseData === "function") window.fetchFirebaseData();
   } catch (err) {
@@ -2436,17 +2543,16 @@ function openProjectEditor(project, opts = {}) {
   overlay.querySelector(".pe-save").addEventListener("click", async () => {
     const val = (sel) => { const el = overlay.querySelector(sel); return el ? el.value.trim() : ""; };
     const name = val(".pe-name");
-    const category = val(".pe-category");
-    // Project tracks (primary first). Trim/de-dup defensively.
-    const track = (() => { const s = new Set(); return projTracks
-      .map((t) => String(t || "").trim()).filter(Boolean)
-      .filter((t) => (s.has(t.toLowerCase()) ? false : (s.add(t.toLowerCase()), true))); })();
+    const category = cleanText(val(".pe-category"));
+    // Project tracks (primary first), canonicalised against the known pool so
+    // case/whitespace variants collapse to one spelling.
+    const track = canonTracks(projTracks);
     const description = val(".pe-desc");
     const repo = val(".pe-repo");
-    const university = val(".pe-university");
-    const faculty = val(".pe-faculty");
-    const department = val(".pe-department");
-    const classYear = val(".pe-classyear");
+    const university = canonValue(val(".pe-university"), knownValues(UNIVERSITIES, "university"));
+    const faculty = canonValue(val(".pe-faculty"), knownValues(FACULTIES, "faculty"));
+    const department = canonValue(val(".pe-department"), knownValues(DEPARTMENTS, "department"));
+    const classYear = cleanText(val(".pe-classyear"));
     const supervisor = val(".pe-supervisor");
     const fail = (msg) => { statusEl.style.display = ""; statusEl.textContent = msg; };
     if (!category) return fail("Category is required.");

@@ -1,0 +1,27 @@
+{
+  "rules": {
+    "students": {
+      ".read": true,
+      ".write": "auth != null && auth.token.email === 'shehawey9@gmail.com'"
+    },
+    "projects": {
+      ".read": true,
+      ".write": "auth != null && auth.token.email === 'shehawey9@gmail.com'"
+    },
+    "profiles": {
+      ".read": true,
+      "$uid": {
+        ".write": "auth != null && (auth.uid === $uid || auth.token.email === 'shehawey9@gmail.com')",
+        ".validate": "newData.hasChildren(['uid','name'])"
+      }
+    },
+    "pending": {
+      ".read": "auth != null && auth.token.email === 'shehawey9@gmail.com'",
+      "$id": {
+        ".read": "auth != null && (auth.token.email === 'shehawey9@gmail.com' || data.child('submittedByUid').val() === auth.uid)",
+        ".write": "auth != null && (auth.token.email === 'shehawey9@gmail.com' || (!data.exists() && newData.child('submittedByUid').val() === auth.uid))",
+        ".validate": "newData.hasChildren(['type','status','submittedByUid','payload'])"
+      }
+    }
+  }
+}

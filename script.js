@@ -254,8 +254,19 @@ function mergeStudentSources(studentsData, profilesData) {
   if (profilesData) {
     Object.entries(profilesData).forEach(([uid, p]) => {
       if (!p || p.status !== "live" || !p.name) return;
+      // Find the legacy /students record this profile supersedes so we can carry
+      // its real Firebase key forward (needed for admin delete to remove BOTH the
+      // profile and the legacy mirror). Match by name, then by email.
+      let legacyKey = null;
+      const nameKey = `name:${nrm(p.name)}`;
+      if (byKey.has(nameKey)) legacyKey = byKey.get(nameKey)._key || null;
+      if (p.email) {
+        for (const [k, v] of byKey) {
+          if (!v.ownerUid && nrm(v.email) === nrm(p.email)) { legacyKey = legacyKey || v._key || null; }
+        }
+      }
       // Drop the legacy duplicates this profile supersedes.
-      byKey.delete(`name:${nrm(p.name)}`);
+      byKey.delete(nameKey);
       if (p.email) {
         for (const [k, v] of byKey) {
           if (!v.ownerUid && nrm(v.email) === nrm(p.email)) byKey.delete(k);
@@ -276,6 +287,8 @@ function mergeStudentSources(studentsData, profilesData) {
         classYear: p.classYear,
         email: p.email || "",
         ownerUid: uid,
+        // Carry the legacy mirror's key so a delete can remove it too.
+        _key: legacyKey || undefined,
       }));
     });
   }
@@ -1637,6 +1650,7 @@ function renderHomeStats() {
   set("statYears", years.size);
 
   renderHomeTrackBreakdown();
+  renderHomeProjectTrackBreakdown();
 }
 
 // Normalise a track name so trivial variants merge into one bucket:
@@ -1681,11 +1695,13 @@ function canonicalTrack(raw) {
   if (last.length > 3 && /[a-z]s$/i.test(last) && !/ss$/i.test(last) && !_NO_SINGULAR.has(last.toLowerCase())) {
     words[words.length - 1] = last.replace(/s$/i, "");
   }
-  const ACR = new Set(["ai", "ic", "asic", "iot", "rf", "dsp", "os", "ui", "ux", "qa"]);
+  const ACR = new Set(["ai", "ic", "asic", "rf", "dsp", "os", "ui", "ux", "qa"]);
+  // Tokens with a fixed mixed-case spelling that must be preserved verbatim.
+  const MIXED = { iot: "IoT", devops: "DevOps", ios: "iOS" };
   return words
     .map((w) => {
       const lw = w.toLowerCase();
-      if (lw === "devops") return "DevOps";
+      if (MIXED[lw]) return MIXED[lw];
       if (ACR.has(lw) || w.length <= 3) return w.toUpperCase();
       return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
     })
@@ -1751,6 +1767,49 @@ function renderHomeTrackBreakdown() {
       </div>`).join("");
   }
   entries.forEach(([track, n], i) => {
+    const numEl = grid.children[i]?.querySelector(".home-track-count");
+    if (numEl) animateCount(numEl, n);
+  });
+}
+
+// Count GRADUATION PROJECTS per track (a project's OWN tracks, not its members')
+// and render on Home, mirroring the students breakdown. A multi-track project is
+// counted under each of its tracks. Hidden until projects load.
+function renderHomeProjectTrackBreakdown() {
+  const section = document.getElementById("homeProjectTracksSection");
+  const grid = document.getElementById("homeProjectTrackGrid");
+  if (!grid || !section) return;
+
+  if (!GRADUATION_PROJECTS || GRADUATION_PROJECTS.length === 0) {
+    section.style.display = "none";
+    return;
+  }
+
+  const counts = {};
+  GRADUATION_PROJECTS.forEach((p) => {
+    const seen = new Set();
+    projectTracks(p).forEach((t) => {
+      const key = canonicalTrack(t);
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      counts[key] = (counts[key] || 0) + 1;
+    });
+  });
+
+  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  if (!entries.length) { section.style.display = "none"; return; }
+  section.style.display = "";
+
+  const sameSet = grid.childElementCount === entries.length &&
+    entries.every(([t], i) => grid.children[i]?.dataset.track === t);
+  if (!sameSet) {
+    grid.innerHTML = entries.map(([track]) => `
+      <div class="home-track-item" data-track="${track}">
+        <span class="home-track-count">0</span>
+        <span class="home-track-name">${track}</span>
+      </div>`).join("");
+  }
+  entries.forEach(([, n], i) => {
     const numEl = grid.children[i]?.querySelector(".home-track-count");
     if (numEl) animateCount(numEl, n);
   });
