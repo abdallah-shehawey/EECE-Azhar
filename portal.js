@@ -207,6 +207,34 @@ const SKILL_CATEGORIES = {
 ════════════════════════════════════════════ */
 const $ = (id) => document.getElementById(id);
 
+/*
+ * Optimistic auth paint. Firebase restoring the session is async, so on a refresh
+ * the header would briefly show a skeleton before the avatar reappears. We cached
+ * the last-known sign-in state (eece-auth-hint); paint it immediately so a
+ * returning user sees their avatar instantly. onAuthStateChanged still runs and
+ * corrects this if the cached guess is wrong (rare — only after a real sign-out
+ * elsewhere). We do NOT mark body.auth-ready here, so a wrong guess still gets
+ * reconciled the moment Firebase resolves.
+ */
+(function paintAuthHint() {
+  let hint = null;
+  try { hint = JSON.parse(localStorage.getItem("eece-auth-hint") || "null"); } catch (_) {}
+  if (!hint || !hint.signedIn) return;
+  const apply = () => {
+    const loginBtn = $("loginBtn");
+    const userMenu = $("userMenu");
+    if (!userMenu) return;
+    if (loginBtn) loginBtn.style.display = "none";
+    userMenu.style.display = "flex";
+    const av = $("userAvatar"), nm = $("userName");
+    if (av && hint.photo) { av.src = hint.photo; av.style.display = ""; }
+    if (nm && hint.name) nm.textContent = hint.name;
+    document.body.classList.add("auth-ready", "is-authed");
+  };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", apply, { once: true });
+  else apply();
+})();
+
 /**
  * Populate a <select> with options + an "Other…" entry that reveals a free-text
  * input (the element id is read from the select's data-other attribute).
@@ -860,6 +888,21 @@ function updateAuthUI() {
   const loginBtn = $("loginBtn");
   const userMenu = $("userMenu");
   const adminItem = $("menuAdminBtn");
+
+  // Cache the resolved sign-in state so the NEXT page load can paint the right
+  // header instantly (optimistic UI) instead of flashing a skeleton while
+  // Firebase restores the session. Cleared on sign-out below.
+  try {
+    if (currentUser) {
+      localStorage.setItem("eece-auth-hint", JSON.stringify({
+        signedIn: true,
+        photo: currentUser.photoURL || "",
+        name: currentUser.displayName || currentUser.email || "Account",
+      }));
+    } else {
+      localStorage.removeItem("eece-auth-hint");
+    }
+  } catch (_) {}
 
   if (currentUser) {
     if (loginBtn) loginBtn.style.display = "none";
