@@ -2860,11 +2860,24 @@ function init() {
     editMode = false;
     if (myProfile) {
       openMyProfileView();
+    } else if (currentUser && typeof window.openCreateProfileInline === "function") {
+      // Unified design: create uses the SAME inline editor as edit (not the old form).
+      window.openCreateProfileInline();
     } else {
       if (typeof window.switchMode === "function") window.switchMode("submit");
       hydrateProfileForm();
     }
   }
+  // Expose the signed-in Google identity so the inline create-editor can prefill.
+  window.__googleProfile = () => ({
+    name: (currentUser && currentUser.displayName) || "",
+    photo: (currentUser && currentUser.photoURL) || "",
+    email: (currentUser && currentUser.email) || "",
+  });
+  // Inline create-editor needs sign-in; route to the submit page's sign-in gate.
+  window.requireSignInForProfile = () => {
+    if (typeof window.switchMode === "function") window.switchMode("submit");
+  };
   const menuSubmit = $("menuSubmitBtn");
   if (menuSubmit) menuSubmit.addEventListener("click", openProfileEntry);
   const homeCtaBtn = $("homeProfileCta");

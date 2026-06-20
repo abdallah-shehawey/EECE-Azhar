@@ -1138,6 +1138,38 @@ function closeFullProfile() {
   try { sessionStorage.removeItem("eece-open-profile"); } catch (_) {}
 }
 
+// Create a profile using the SAME inline editor as "edit" (unified design),
+// instead of the old form. Seeds an empty student owned by the current user,
+// pre-filled with their Google name/photo, and opens straight into edit mode.
+function openCreateProfileInline() {
+  if (!window.__myUid) {  // not signed in yet — let portal handle the sign-in CTA
+    if (typeof window.requireSignInForProfile === "function") window.requireSignInForProfile();
+    return;
+  }
+  const g = (typeof window.__googleProfile === "function") ? window.__googleProfile() : {};
+  const seed = {
+    name: g.name || "",
+    photo: "", cover: "",
+    university: "Al-Azhar University",
+    faculty: "Faculty of Engineering",
+    department: "",
+    classYear: "",
+    track: [], tracks: [],
+    skills: [],
+    social: { linkedin: "", github: "", whatsapp: "", facebook: "" },
+    ownerUid: window.__myUid,
+    _isNewProfile: true,
+    _key: "__new__",
+  };
+  _fpEditing = true;
+  const m = document.body.dataset.mode;
+  // After save/cancel of a brand-new profile, the yearbook is the most useful
+  // landing spot (home/submit/admin aren't where they'll want to be).
+  _fpReturnMode = (m && m !== "submit" && m !== "admin" && m !== "home") ? m : "yearbook";
+  openFullProfile(seed);
+}
+window.openCreateProfileInline = openCreateProfileInline;
+
 // Distinct values used by approved students for a hierarchy field, plus a small
 // curated seed, de-duplicated case/space-insensitively. Powers the inline-edit
 // dropdowns the same way the form does — dynamic, no hardcoded master list.
@@ -1216,6 +1248,7 @@ function _renderProfileEditInline(student) {
     const years = ["2030", "2029", "2028", "2027", "2026", "2025", "2024", "2023", "2022", "2021", "2020"];
     const has = years.includes(String(val));
     return [
+      `<option value="" ${val ? "" : "selected"} disabled>Select…</option>`,
       ...years.map((y) => `<option value="${y}" ${String(val) === y ? "selected" : ""}>${y}</option>`),
       `<option value="__other" ${val && !has ? "selected" : ""}>Other…</option>`,
     ].join("");
@@ -1247,7 +1280,7 @@ function _renderProfileEditInline(student) {
         <div class="fp-info-card">
           <span class="fp-info-label">Class Year</span>
           <select class="field-input" id="fpeClassYear">${yearOpts(st.classYear)}</select>
-          <input type="text" class="field-input ${["2030","2029","2028","2027","2026","2025","2024","2023","2022","2021","2020"].includes(String(st.classYear))?"hidden":""}" id="fpeClassYearOther" inputmode="numeric" maxlength="4" placeholder="4-digit year" value="${esc(["2030","2029","2028","2027","2026","2025","2024","2023","2022","2021","2020"].includes(String(st.classYear))?"":st.classYear)}" />
+          <input type="text" class="field-input ${(st.classYear && !["2030","2029","2028","2027","2026","2025","2024","2023","2022","2021","2020"].includes(String(st.classYear)))?"":"hidden"}" id="fpeClassYearOther" inputmode="numeric" maxlength="4" placeholder="4-digit year" value="${esc((st.classYear && !["2030","2029","2028","2027","2026","2025","2024","2023","2022","2021","2020"].includes(String(st.classYear)))?st.classYear:"")}" />
         </div>
       </div>
       <div class="fp-section">
@@ -1335,9 +1368,15 @@ function _renderProfileEditInline(student) {
   addPicker(cover, "cover");
   addPicker(avatar, "avatar");
 
-  // Cancel → back to read-only (no nav step). Re-render restores the hero too.
+  // Cancel → for an existing profile, back to its read-only view; for a brand-new
+  // profile (nothing to show yet) leave to the yearbook instead.
   document.getElementById("fpeCancel").addEventListener("click", () => {
     _fpEditing = false;
+    if (student._isNewProfile) {
+      closeFullProfile();
+      switchMode(_fpReturnMode || "yearbook");
+      return;
+    }
     openFullProfile(student, { fromHistory: true });
     try { history.replaceState({ mode: "profile" }, "", modeToPath("profile")); } catch (_) {}
   });
