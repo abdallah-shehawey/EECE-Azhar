@@ -528,6 +528,12 @@ onAuthStateChanged(auth, async (user) => {
   if (document.body.dataset.mode === "submit") hydrateProfileForm();
   // If admin is already viewing the Approvals panel, refresh it.
   if (isAdmin && document.body.dataset.mode === "admin") loadPending();
+  // Now that auth is known, bounce a non-admin off the /admin route if they
+  // cold-loaded straight onto it (the guard couldn't decide before this fired).
+  if (!isAdmin && document.body.dataset.mode === "admin" &&
+      typeof window.enforceAdminRoute === "function") {
+    window.enforceAdminRoute();
+  }
 
   // The full profile may already be open (e.g. a refresh on /profile/<id>
   // reopened it before auth resolved). Now that we know who's signed in, re-run
