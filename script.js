@@ -100,12 +100,12 @@ function applyDbPayload({ studentsData, projectsData, profilesData }) {
     const s = (_pendingProfileId && findStudentById(_pendingProfileId)) ||
               (_pendingProfileKey && (STUDENTS || []).find((st) => studentKey(st) === _pendingProfileKey)) || null;
     if (s) {
+      // Deep link to /profile/<id>/edit → open the INLINE editor (only if the
+      // viewer owns the profile; openFullProfile enforces that and falls back to
+      // read-only otherwise).
+      _fpEditing = !!(_pendingEditAfterOpen && window.__myUid && s.ownerUid === window.__myUid);
+      _pendingEditAfterOpen = false;
       openFullProfile(s);
-      if (_pendingEditAfterOpen && window.__myUid && s.ownerUid === window.__myUid &&
-          typeof window.openMyProfileEdit === "function") {
-        window.openMyProfileEdit();
-        _pendingEditAfterOpen = false;
-      }
       _pendingProfileKey = null;
       _pendingProfileId = null;
     } else if (_pendingProfileId) {
@@ -2990,7 +2990,34 @@ function pathToMode(pathname = location.pathname) {
   return VALID_MODES.includes(seg) ? seg : "home";
 }
 
+// The approvals page (/admin) is admin-only. Non-admins must not even reach it
+// by typing the URL. We can only decide once auth has resolved (body.auth-ready);
+// before that we let it through and re-check when onAuthStateChanged settles
+// (portal.js calls enforceAdminRoute() after it resolves). Returns true if the
+// route was blocked (caller should stop).
+function isAdminRouteBlocked(mode) {
+  if (mode !== "admin") return false;
+  const resolved = document.body.classList.contains("auth-ready");
+  return resolved && !window.__isAdmin;
+}
+function enforceAdminRoute() {
+  if (currentMode === "admin" && isAdminRouteBlocked("admin")) {
+    switchMode("home");
+  }
+}
+window.enforceAdminRoute = enforceAdminRoute;
+
 function switchMode(mode, fromHistory = false) {
+  // Guard the admin/approvals route: a signed-out or non-admin visitor who types
+  // /admin (or hits Back into it) is bounced home instead of seeing the page.
+  if (isAdminRouteBlocked(mode)) {
+    if (location.pathname.replace(/^\/+|\/+$/g, "") === "admin") {
+      try { history.replaceState({ mode: "home" }, "", "/"); } catch (_) {}
+    }
+    mode = "home";
+    fromHistory = true; // we've already fixed the URL; don't push another entry
+  }
+
   const prevMode = currentMode;
   currentMode = mode;
   // Expose active mode so the portal module can react (e.g. refresh approvals).
