@@ -1356,7 +1356,10 @@ function _renderProfileEditInline(student) {
     inp.addEventListener("change", () => {
       const file = inp.files && inp.files[0];
       if (!file || !file.type.startsWith("image/")) return;
-      if (file.size > 5 * 1024 * 1024) { alert("Image must be under 5 MB."); inp.value = ""; return; }
+      // The upload pipeline (window.uploadProfileImage) compresses to WebP before
+      // sending, so big phone photos are fine — they shrink dramatically. Only
+      // reject files so large that decoding them into a canvas could hang/OOM.
+      if (file.size > 25 * 1024 * 1024) { alert("Image is too large (over 25 MB). Please pick a smaller one."); inp.value = ""; return; }
       imgState[kind === "cover" ? "coverFile" : "photoFile"] = file;
       const url = URL.createObjectURL(file);
       if (kind === "cover") host.style.backgroundImage = `url("${url}")`;

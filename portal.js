@@ -247,7 +247,7 @@ function fillSelectWithOther(selectId, values, { selected = "" } = {}) {
   const known = values.includes(selected);
   sel.innerHTML =
     `<option value="" disabled${selected ? "" : " selected"}>Select…</option>` +
-    values.map((v) => `<option value="${v}"${v === selected ? " selected" : ""}>${v}</option>`).join("") +
+    values.map((v) => `<option value="${esc(v)}"${v === selected ? " selected" : ""}>${esc(v)}</option>`).join("") +
     `<option value="__other"${selected && !known ? " selected" : ""}>Other…</option>`;
   if (otherId) {
     const other = $(otherId);
