@@ -3331,7 +3331,8 @@ body.nav-open .nav-toggle-bar:nth-child(3) { transform: translateY(-7.5px) rotat
 
 /* Utility — scoped so it can't disturb existing .audio-hint.hidden */
 #mode-submit .hidden,
-#mode-admin .hidden { display: none !important; }
+#mode-admin .hidden,
+#projectEditor .hidden { display: none !important; }   /* editor is appended to <body>, outside #mode-admin */
 .hidden-file { display: none; }
 
 /* ── Header auth area ── */
