@@ -2142,6 +2142,17 @@ body.nav-open .nav-toggle-bar:nth-child(3) { transform: translateY(-7.5px) rotat
 .project-card-icon.cat-digital svg    { stroke: #fcd34d; }
 .project-card-icon.cat-embedded svg   { stroke: #6ee7b7; }
 .project-card-icon.cat-network svg    { stroke: #67e8f9; }
+/* Families added when project categories were broadened. */
+.project-card-icon.cat-ai svg         { stroke: #c4b5fd; }
+.project-card-icon.cat-robotics svg   { stroke: #fca5a5; }
+.project-card-icon.cat-control svg    { stroke: #93c5fd; }
+.project-card-icon.cat-comms svg      { stroke: #5eead4; }
+.project-card-icon.cat-signal svg     { stroke: #f9a8d4; }
+.project-card-icon.cat-rf svg         { stroke: #7dd3fc; }
+.project-card-icon.cat-power svg      { stroke: #fdba74; }
+.project-card-icon.cat-biomedical svg { stroke: #6ee7b7; }
+.project-card-icon.cat-security svg   { stroke: #fca5a5; }
+.project-card-icon.cat-software svg   { stroke: #a5b4fc; }
 
 /* ===== Projects Grid ===== */
 .projects-grid {
@@ -2314,6 +2325,17 @@ body.nav-open .nav-toggle-bar:nth-child(3) { transform: translateY(-7.5px) rotat
     background: rgba(245, 158, 11, 0.15);
     border: 1px solid rgba(245, 158, 11, 0.3);
 }
+/* Families added when project categories were broadened. */
+.project-cat-badge.cat-ai         { color: #c4b5fd; background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); }
+.project-cat-badge.cat-robotics   { color: #fca5a5; background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); }
+.project-cat-badge.cat-control    { color: #93c5fd; background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3); }
+.project-cat-badge.cat-comms      { color: #5eead4; background: rgba(20,184,166,0.15); border: 1px solid rgba(20,184,166,0.3); }
+.project-cat-badge.cat-signal     { color: #f9a8d4; background: rgba(236,72,153,0.15); border: 1px solid rgba(236,72,153,0.3); }
+.project-cat-badge.cat-rf         { color: #7dd3fc; background: rgba(14,165,233,0.15); border: 1px solid rgba(14,165,233,0.3); }
+.project-cat-badge.cat-power      { color: #fdba74; background: rgba(249,115,22,0.15); border: 1px solid rgba(249,115,22,0.3); }
+.project-cat-badge.cat-biomedical { color: #6ee7b7; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); }
+.project-cat-badge.cat-security   { color: #fca5a5; background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); }
+.project-cat-badge.cat-software   { color: #a5b4fc; background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.3); }
 
 .project-card-icon {
     width: 46px;
@@ -2340,6 +2362,17 @@ body.nav-open .nav-toggle-bar:nth-child(3) { transform: translateY(-7.5px) rotat
     background: linear-gradient(135deg, rgba(245,158,11,0.2), rgba(236,72,153,0.2));
     border: 1px solid rgba(245, 158, 11, 0.25);
 }
+/* Families added when project categories were broadened. */
+.project-card-icon.cat-ai         { background: linear-gradient(135deg, rgba(139,92,246,0.22), rgba(99,102,241,0.18)); border: 1px solid rgba(139,92,246,0.25); }
+.project-card-icon.cat-robotics   { background: linear-gradient(135deg, rgba(239,68,68,0.18), rgba(245,158,11,0.18)); border: 1px solid rgba(239,68,68,0.22); }
+.project-card-icon.cat-control    { background: linear-gradient(135deg, rgba(59,130,246,0.2), rgba(14,165,233,0.18)); border: 1px solid rgba(59,130,246,0.25); }
+.project-card-icon.cat-comms      { background: linear-gradient(135deg, rgba(20,184,166,0.2), rgba(6,182,212,0.18)); border: 1px solid rgba(20,184,166,0.25); }
+.project-card-icon.cat-signal     { background: linear-gradient(135deg, rgba(236,72,153,0.2), rgba(139,92,246,0.18)); border: 1px solid rgba(236,72,153,0.25); }
+.project-card-icon.cat-rf         { background: linear-gradient(135deg, rgba(14,165,233,0.2), rgba(59,130,246,0.18)); border: 1px solid rgba(14,165,233,0.25); }
+.project-card-icon.cat-power      { background: linear-gradient(135deg, rgba(249,115,22,0.2), rgba(245,158,11,0.18)); border: 1px solid rgba(249,115,22,0.25); }
+.project-card-icon.cat-biomedical { background: linear-gradient(135deg, rgba(16,185,129,0.2), rgba(20,184,166,0.18)); border: 1px solid rgba(16,185,129,0.25); }
+.project-card-icon.cat-security   { background: linear-gradient(135deg, rgba(239,68,68,0.18), rgba(139,92,246,0.18)); border: 1px solid rgba(239,68,68,0.22); }
+.project-card-icon.cat-software   { background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.18)); border: 1px solid rgba(99,102,241,0.25); }
 
 /* Card title */
 .project-title {

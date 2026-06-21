@@ -2561,10 +2561,23 @@ function openProjectEditor(project, opts = {}) {
         <input type="text" id="peCategoryOther" class="field-input hidden" style="margin-top:0.5rem;" placeholder="Type the category" />
 
         <label class="field-label">Tracks <span class="required" aria-hidden="true">*</span></label>
+        <!-- Same dropdown multi-select as Create Profile: a button opens a menu of
+             checkable tracks (the project's existing tracks pre-checked), plus a
+             custom-add row. Chosen tracks render below as chips where the first is
+             the primary (★) and the others can be promoted (⤴) or removed (✕). -->
+        <div class="track-select pe-track-select">
+          <button type="button" class="track-select-btn pe-track-btn" aria-haspopup="true" aria-expanded="false">
+            <span class="track-select-placeholder">Select the project's track(s)…</span>
+            <svg class="track-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="track-menu pe-track-menu" role="listbox" aria-multiselectable="true">
+            <div class="track-menu-other">
+              <input type="text" class="track-other-input pe-track-other" placeholder="Add another track…" />
+              <button type="button" class="track-other-add pe-track-other-add">Add</button>
+            </div>
+          </div>
+        </div>
         <div class="pe-tracks-selected"></div>
-        <input type="search" class="field-input pe-track-search" placeholder="Add a track (e.g. Embedded Systems)…" autocomplete="off" list="peTrackList" />
-        <datalist id="peTrackList">${trackUniverse.map((t) => `<option value="${esc(t)}"></option>`).join("")}</datalist>
-        <div class="pe-track-suggest"></div>
         <p class="field-hint">The track(s) this graduation project belongs to (not the members' tracks). The first one is the primary track.</p>
 
         <label class="field-label">Description</label>
@@ -2619,8 +2632,10 @@ function openProjectEditor(project, opts = {}) {
   const resultsEl = overlay.querySelector(".pe-results");
   const statusEl = overlay.querySelector(".pe-status");
   const trackSelEl = overlay.querySelector(".pe-tracks-selected");
-  const trackSearchEl = overlay.querySelector(".pe-track-search");
-  const trackSuggestEl = overlay.querySelector(".pe-track-suggest");
+  const trackBtnEl = overlay.querySelector(".pe-track-btn");
+  const trackMenuEl = overlay.querySelector(".pe-track-menu");
+  const trackOtherEl = overlay.querySelector(".pe-track-other");
+  const trackOtherAddEl = overlay.querySelector(".pe-track-other-add");
 
   // ── Back-button support ──────────────────────────────────────────────
   // Push a history entry when the editor opens so the browser/phone Back
@@ -2692,8 +2707,13 @@ function openProjectEditor(project, opts = {}) {
     }));
   };
 
-  // ── Track picker (multi-select, primary = first chip) ──
+  // ── Track picker: dropdown multi-select (same UX as the Create Profile/Project
+  // pickers) where the project's existing tracks come in pre-checked. The chosen
+  // tracks render below as chips; the FIRST chip is the primary track (★) and the
+  // rest can be promoted (⤴) or removed (✕), so the primary concept is preserved.
   const normT = (s) => String(s || "").trim().toLowerCase();
+  const hasT = (t) => projTracks.some((x) => normT(x) === normT(t));
+
   const renderTracks = () => {
     trackSelEl.innerHTML = projTracks.length
       ? projTracks.map((t, i) =>
@@ -2706,37 +2726,69 @@ function openProjectEditor(project, opts = {}) {
         ).join("")
       : `<span class="admin-picker-empty">No tracks yet — add at least one.</span>`;
     trackSelEl.querySelectorAll(".pe-track-remove").forEach((b) =>
-      b.addEventListener("click", () => { projTracks.splice(+b.dataset.i, 1); renderTracks(); }));
+      b.addEventListener("click", () => { projTracks.splice(+b.dataset.i, 1); renderTracks(); renderTrackMenu(); updateTrackBtn(); }));
     trackSelEl.querySelectorAll(".pe-track-makeprimary").forEach((b) =>
       b.addEventListener("click", () => {
         const i = +b.dataset.i; const [t] = projTracks.splice(i, 1); projTracks.unshift(t); renderTracks();
       }));
   };
-  const addTrack = (raw) => {
-    const t = String(raw || "").trim();
-    if (!t) return;
-    if (projTracks.some((x) => normT(x) === normT(t))) return; // no dups
-    projTracks.push(t);
-    trackSearchEl.value = ""; renderTrackSuggest(""); renderTracks();
+
+  const updateTrackBtn = () => {
+    const ph = trackBtnEl.querySelector(".track-select-placeholder");
+    if (!ph) return;
+    const n = projTracks.length;
+    ph.textContent = n === 0 ? "Select the project's track(s)…" : `${n} track${n > 1 ? "s" : ""} selected`;
+    ph.classList.toggle("has-value", n > 0);
   };
-  const renderTrackSuggest = (q = "") => {
-    const nq = normT(q);
-    if (!nq) { trackSuggestEl.innerHTML = ""; return; }
-    const chosen = new Set(projTracks.map(normT));
-    const rows = trackUniverse.filter((t) => !chosen.has(normT(t)) && normT(t).includes(nq)).slice(0, 8);
-    const exact = trackUniverse.some((t) => normT(t) === nq);
-    let html = rows.map((t) => `<button type="button" class="pe-track-opt" data-t="${esc(t)}">${esc(t)}</button>`).join("");
-    // Offer to create a brand-new track when the typed value isn't already known.
-    if (!exact && q.trim()) html += `<button type="button" class="pe-track-opt is-new" data-t="${esc(q.trim())}">+ Add “${esc(q.trim())}”</button>`;
-    trackSuggestEl.innerHTML = html;
-    trackSuggestEl.querySelectorAll(".pe-track-opt").forEach((b) =>
-      b.addEventListener("click", () => addTrack(b.dataset.t)));
+
+  // Pool = every known track + whatever's already on the project, deduped.
+  const trackPool = () => {
+    const byKey = new Map();
+    const add = (v) => { const c = String(v || "").trim(); if (c && !byKey.has(normT(c))) byKey.set(normT(c), c); };
+    trackUniverse.forEach(add);
+    projTracks.forEach(add);
+    return Array.from(byKey.values()).sort((a, b) => a.localeCompare(b));
   };
-  trackSearchEl.addEventListener("input", () => renderTrackSuggest(trackSearchEl.value));
-  trackSearchEl.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") { e.preventDefault(); addTrack(trackSearchEl.value); }
+
+  const renderTrackMenu = () => {
+    const otherRow = trackMenuEl.querySelector(".track-menu-other");
+    trackMenuEl.querySelectorAll(".track-option").forEach((el) => el.remove());
+    const frag = document.createDocumentFragment();
+    trackPool().forEach((t) => {
+      const row = document.createElement("label");
+      row.className = "track-option";
+      row.innerHTML = `<input type="checkbox" value="${esc(t)}" ${hasT(t) ? "checked" : ""}> <span>${esc(t)}</span>`;
+      row.querySelector("input").addEventListener("change", (e) => {
+        if (e.target.checked) { if (!hasT(t)) projTracks.push(t); }
+        else { const i = projTracks.findIndex((x) => normT(x) === normT(t)); if (i >= 0) projTracks.splice(i, 1); }
+        renderTracks(); updateTrackBtn();
+      });
+      frag.appendChild(row);
+    });
+    trackMenuEl.insertBefore(frag, otherRow);
+  };
+
+  const addCustomTrack = () => {
+    const raw = String(trackOtherEl.value || "");
+    raw.split(",").map((s) => s.trim()).filter(Boolean).forEach((t) => { if (!hasT(t)) projTracks.push(t); });
+    trackOtherEl.value = "";
+    renderTrackMenu(); renderTracks(); updateTrackBtn();
+  };
+  trackOtherAddEl.addEventListener("click", addCustomTrack);
+  trackOtherEl.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addCustomTrack(); } });
+
+  trackBtnEl.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const open = trackMenuEl.classList.toggle("open");
+    trackBtnEl.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) renderTrackMenu();
   });
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".pe-track-select")) { trackMenuEl.classList.remove("open"); trackBtnEl.setAttribute("aria-expanded", "false"); }
+  });
+
   renderTracks();
+  updateTrackBtn();
 
   // ── Fixed-choice dropdowns (no free typing → no near-duplicate values). Each
   // gathers its options from the known pool (constants + everything already in

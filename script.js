@@ -117,6 +117,16 @@ function applyDbPayload({ studentsData, projectsData, profilesData }) {
       _pendingProfileId = null;
       _pendingProfileKey = null;
     }
+  } else if (_openProfileStudent && currentMode === "profile" && typeof openFullProfile === "function") {
+    // A profile is already open (e.g. refresh landed on /profile/<id> and we
+    // opened it from cache). Fresh data just arrived, so re-open it with the
+    // up-to-date record from STUDENTS — otherwise a newly-set cover/photo that
+    // wasn't in the cached object never appears until you leave and come back.
+    const fresh = findStudentById(profileId(_openProfileStudent)) ||
+                  (STUDENTS || []).find((st) => studentKey(st) === studentKey(_openProfileStudent));
+    if (fresh && fresh !== _openProfileStudent && !_fpEditing) {
+      openFullProfile(fresh, { fromHistory: true });
+    }
   }
 
   // A refresh / deep link landed on /project/<id> before the data was ready.
@@ -880,7 +890,11 @@ function openFullProfile(student, opts = {}) {
   // The owner's "My profile" is hosted on the submit page (which is otherwise
   // blank behind the overlay) — return them to home on Back/close instead of a
   // dead-end submit page. Everyone else returns to the section they came from.
-  _fpReturnMode = opts.returnMode || currentMode || "yearbook";
+  // When navigating profile→profile (currentMode is already "profile"), keep the
+  // EXISTING return section rather than recording "profile" — otherwise the
+  // remembered base becomes the profile itself and Back/refresh has nothing to
+  // land on underneath, dropping the user out of the site.
+  _fpReturnMode = opts.returnMode || (currentMode && currentMode !== "profile" ? currentMode : _fpReturnMode) || "yearbook";
 
   const aboutEl = document.getElementById("fpAbout");
   if (aboutEl) {
@@ -1012,12 +1026,10 @@ function openFullProfile(student, opts = {}) {
       const members = team.map(memberTile).join("");
       const repo = p.repo ? `<a class="fp-repo" href="${esc(p.repo)}" target="_blank" rel="noopener noreferrer">🔗 GitHub Repository</a>` : "";
       const desc = p.description ? `<p class="fp-proj-desc">${esc(p.description)}</p>` : `<p class="fp-proj-desc fp-muted">No description yet.</p>`;
-      // Use the same SVG category icon as the Projects tab (falls back to any
-      // emoji icon stored on the record, then a default rocket).
-      const catKey = (p.category || "").toLowerCase();
-      const icon = PROJ_ICONS[p.category]
-        ? `<span class="fp-proj-icon cat-${catKey}">${PROJ_ICONS[p.category]}</span>`
-        : esc(p.icon || "🚀");
+      // Use the SAME family-based category icon as the Projects tab so the
+      // profile's Graduation Project card matches the grid card exactly.
+      const catKey = categoryFamily(p.category);
+      const icon = `<span class="fp-proj-icon cat-${catKey}">${categoryIcon(p.category).html}</span>`;
       const catLabel = CAT_LABELS[p.category] || p.category || "Project";
       // Any team member (or admin) may edit the project — shared ownership.
       const viewerIsMember = team.some((m) => norm(m.name) === norm(student.name));
@@ -1285,12 +1297,22 @@ function _renderProfileEditInline(student) {
       </div>
       <div class="fp-section">
         <h3 class="fp-section-title">Tracks</h3>
-        <div class="chip-container" id="fpeTracks"></div>
-        <div class="fpe-track-add">
-          <input type="text" class="field-input" id="fpeTrackInput" list="fpeTrackList" placeholder="Add a track…" />
-          <datalist id="fpeTrackList">${_knownTrackPoolJS().map((t) => `<option value="${esc(t)}"></option>`).join("")}</datalist>
-          <button type="button" class="btn-secondary" id="fpeTrackAdd">Add</button>
+        <!-- Same dropdown multi-select as Create Profile: a button opens a menu of
+             checkable tracks (existing ones pre-checked), chosen tracks show as
+             removable chips, and a free-text row adds custom tracks. -->
+        <div class="track-select" id="fpeTrackSelect">
+          <button type="button" class="track-select-btn" id="fpeTrackBtn" aria-haspopup="true" aria-expanded="false">
+            <span class="track-select-placeholder">Select your track(s)…</span>
+            <svg class="track-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="track-menu" id="fpeTrackMenu" role="listbox" aria-multiselectable="true">
+            <div class="track-menu-other">
+              <input type="text" id="fpeTrackOther" class="track-other-input" placeholder="Add another track…" />
+              <button type="button" class="track-other-add" id="fpeTrackOtherAdd">Add</button>
+            </div>
+          </div>
         </div>
+        <div class="chip-container" id="fpeTracks" aria-label="Selected tracks"></div>
       </div>
       <div class="fp-section">
         <h3 class="fp-section-title">Connect</h3>
@@ -1314,23 +1336,83 @@ function _renderProfileEditInline(student) {
     if (sel && oth) sel.addEventListener("change", () => { oth.classList.toggle("hidden", sel.value !== "__other"); if (sel.value === "__other") oth.focus(); });
   });
 
-  // Tracks chip editor.
+  // ── Tracks: dropdown multi-select (mirrors the Create Profile picker) ──────
+  // The user's existing tracks come in pre-selected (st.tracks); the menu lists
+  // every known track with the chosen ones checked, plus a row to add a custom
+  // one. Selected tracks render as removable chips beneath the button.
   const tracksWrap = document.getElementById("fpeTracks");
+  const trackBtn = document.getElementById("fpeTrackBtn");
+  const trackMenu = document.getElementById("fpeTrackMenu");
+  const trackOtherInput = document.getElementById("fpeTrackOther");
+  const trackOtherAdd = document.getElementById("fpeTrackOtherAdd");
+  const hasTrack = (t) => st.tracks.some((x) => x.toLowerCase() === t.toLowerCase());
+
+  // Known pool = every track on the site + whatever the user already has.
+  const trackPool = () => {
+    const byKey = new Map();
+    const add = (v) => { const c = String(v || "").replace(/\s+/g, " ").trim(); if (c && !byKey.has(c.toLowerCase())) byKey.set(c.toLowerCase(), c); };
+    _knownTrackPoolJS().forEach(add);
+    st.tracks.forEach(add);
+    return Array.from(byKey.values()).sort((a, b) => a.localeCompare(b));
+  };
+
+  const updateTrackBtnLabel = () => {
+    const ph = trackBtn.querySelector(".track-select-placeholder");
+    if (!ph) return;
+    const n = st.tracks.length;
+    ph.textContent = n === 0 ? "Select your track(s)…" : `${n} track${n > 1 ? "s" : ""} selected`;
+    ph.classList.toggle("has-value", n > 0);
+  };
+
   const renderTrackChips = () => {
     tracksWrap.innerHTML = st.tracks.length
       ? st.tracks.map((t, i) => `<span class="chip is-editable">${esc(t)}<button type="button" class="chip-x" data-i="${i}" aria-label="Remove">✕</button></span>`).join("")
       : `<span class="fp-muted">No tracks yet.</span>`;
-    tracksWrap.querySelectorAll(".chip-x").forEach((b) => b.addEventListener("click", () => { st.tracks.splice(+b.dataset.i, 1); renderTrackChips(); }));
+    tracksWrap.querySelectorAll(".chip-x").forEach((b) => b.addEventListener("click", () => {
+      st.tracks.splice(+b.dataset.i, 1); renderTrackChips(); renderTrackMenu(); updateTrackBtnLabel();
+    }));
   };
+
+  const renderTrackMenu = () => {
+    const otherRow = trackMenu.querySelector(".track-menu-other");
+    trackMenu.querySelectorAll(".track-option").forEach((el) => el.remove());
+    const frag = document.createDocumentFragment();
+    trackPool().forEach((t) => {
+      const row = document.createElement("label");
+      row.className = "track-option";
+      row.innerHTML = `<input type="checkbox" value="${esc(t)}" ${hasTrack(t) ? "checked" : ""}> <span>${esc(t)}</span>`;
+      row.querySelector("input").addEventListener("change", (e) => {
+        if (e.target.checked) { if (!hasTrack(t)) st.tracks.push(t); }
+        else st.tracks = st.tracks.filter((x) => x.toLowerCase() !== t.toLowerCase());
+        renderTrackChips(); updateTrackBtnLabel();
+      });
+      frag.appendChild(row);
+    });
+    trackMenu.insertBefore(frag, otherRow);
+  };
+
+  const addCustomTrack = () => {
+    const raw = String(trackOtherInput.value || "");
+    raw.split(",").map((s) => s.replace(/\s+/g, " ").trim()).filter(Boolean).forEach((t) => { if (!hasTrack(t)) st.tracks.push(t); });
+    trackOtherInput.value = "";
+    renderTrackMenu(); renderTrackChips(); updateTrackBtnLabel();
+  };
+  trackOtherAdd.addEventListener("click", addCustomTrack);
+  trackOtherInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addCustomTrack(); } });
+
+  // Open/close the dropdown (click outside closes).
+  trackBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const open = trackMenu.classList.toggle("open");
+    trackBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) renderTrackMenu();
+  });
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("#fpeTrackSelect")) { trackMenu.classList.remove("open"); trackBtn.setAttribute("aria-expanded", "false"); }
+  });
+
   renderTrackChips();
-  const trackInput = document.getElementById("fpeTrackInput");
-  const addTrack = () => {
-    const v = String(trackInput.value || "").replace(/\s+/g, " ").trim();
-    if (v && !st.tracks.some((t) => t.toLowerCase() === v.toLowerCase())) st.tracks.push(v);
-    trackInput.value = ""; renderTrackChips();
-  };
-  document.getElementById("fpeTrackAdd").addEventListener("click", addTrack);
-  trackInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addTrack(); } });
+  updateTrackBtnLabel();
 
   const readSel = (selId, otherId) => {
     const sel = document.getElementById(selId);
@@ -2188,12 +2270,53 @@ function animateCount(el, target) {
 
 let currentProjectCat = "All";
 
-// SVG icons per project category
+// SVG icons per project *family*. Categories were broadened (e.g. "Digital IC
+// Design", "Embedded Systems", "Networking"…), so we key the icons by a small
+// set of families and resolve any category to one of them via categoryFamily().
+// This way every project gets an icon + colour, not just the original three.
 const PROJ_ICONS = {
-  Digital: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/></svg>`,
-  Embedded: `<img src="icons/embedded_icon.png" alt="Embedded" class="proj-card-img-icon" />`,
-  Network: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`,
+  digital: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/></svg>`,
+  embedded: `<img src="icons/embedded_icon.png" alt="Embedded" class="proj-card-img-icon" />`,
+  network: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`,
+  ai: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="6" height="6" rx="1"/><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></svg>`,
+  robotics: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="8" width="14" height="11" rx="2"/><path d="M12 8V5M12 5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM2 13v2M22 13v2"/><circle cx="9" cy="13" r="1"/><circle cx="15" cy="13" r="1"/></svg>`,
+  control: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>`,
+  comms: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.93 19.07A10 10 0 0 1 4.93 4.93M19.07 4.93a10 10 0 0 1 0 14.14M7.76 16.24a6 6 0 0 1 0-8.49M16.24 7.76a6 6 0 0 1 0 8.49"/><circle cx="12" cy="12" r="2"/></svg>`,
+  signal: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12c1.5 0 1.5-7 3-7s1.5 14 3 14 1.5-9 3-9 1.5 5 3 5 1.5-3 3-3 1.5 2 3 2"/></svg>`,
+  rf: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="11"/><path d="M5 11l7-8 7 8"/><circle cx="12" cy="20" r="1"/><path d="M8 11h8"/></svg>`,
+  power: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
+  biomedical: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2 5 4-10 2 5h6"/></svg>`,
+  security: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+  software: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>`,
 };
+
+// Map a free-text category (new or legacy) onto one of the icon families above.
+// Keyword-based so "Digital IC Design", "ASIC Verification" → digital, etc.
+function categoryFamily(category) {
+  const c = String(category || "").toLowerCase();
+  if (/embedded|firmware|iot|microcontroller|rtos/.test(c)) return "embedded";
+  if (/digital|asic|fpga|verilog|vlsi|ic design/.test(c)) return "digital";
+  if (/network|cloud|web|backend|frontend|full.?stack|software|devops|mobile|app/.test(c)) {
+    return /network/.test(c) ? "network" : "software";
+  }
+  if (/security|cyber|crypto/.test(c)) return "security";
+  if (/\bai\b|artificial|machine learning|deep learning|\bml\b|computer vision|\bnlp\b|neural/.test(c)) return "ai";
+  if (/robot|automation|mechatron/.test(c)) return "robotics";
+  if (/control|plc|scada/.test(c)) return "control";
+  if (/communication|comms|wireless|5g|telecom/.test(c)) return "comms";
+  if (/signal|dsp|audio|image proc/.test(c)) return "signal";
+  if (/\brf\b|antenna|microwave|radar/.test(c)) return "rf";
+  if (/power|energy|electronics|grid|battery|renewable/.test(c)) return "power";
+  if (/bio|medical|health|ecg|eeg/.test(c)) return "biomedical";
+  return "digital"; // sensible default so a card never renders without an icon
+}
+
+// The icon HTML + the family class for a given category (used by both the
+// Projects grid and the profile's Graduation Project tab so they always match).
+function categoryIcon(category) {
+  const fam = categoryFamily(category);
+  return { html: PROJ_ICONS[fam] || PROJ_ICONS.digital, family: fam };
+}
 
 // Display labels for category badges
 const CAT_LABELS = {
@@ -2243,8 +2366,10 @@ function renderProjects(animate = true) {
   grid.innerHTML = "";
 
   filtered.forEach((project, idx) => {
-    // Per-project key so "All" view colours each card by its own category.
-    const catKey = (project.category || "").toLowerCase();
+    // Per-project key so "All" view colours each card by its own category. The
+    // family (digital/embedded/…) drives both the colour and the icon, so any
+    // category — old or newly added — still gets a styled icon top-right.
+    const catKey = categoryFamily(project.category);
     const card = document.createElement("div");
     card.className = `project-card cat-${catKey}`;
     card.style.animationDelay = `${idx * 0.1}s`;
@@ -2253,7 +2378,7 @@ function renderProjects(animate = true) {
     // ── Card Top: badge + icon ──
     const cardTop = document.createElement("div");
     cardTop.className = "project-card-top";
-    const iconSvg = PROJ_ICONS[project.category] || "";
+    const iconSvg = categoryIcon(project.category).html;
     const catLabel = CAT_LABELS[project.category] || project.category;
     cardTop.innerHTML = `
             <span class="project-cat-badge cat-${catKey}">${iconSvg} ${catLabel}</span>
@@ -2974,9 +3099,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     try { savedProfile = JSON.parse(sessionStorage.getItem("eece-open-profile") || "null"); } catch (_) {}
   }
 
+  // A profile sits ON TOP of a real section. The base must be a section the user
+  // can land on via Back — never "profile" itself (that would make the profile
+  // its own base, leaving nothing underneath, so Back exits the site) and never
+  // a transient overlay ("student") or portal page. Anything else falls back to
+  // the yearbook so there is always a section beneath the profile entry.
+  const BASE_SECTIONS = ["home", "countdown", "yearbook", "projects"];
   let startMode;
   if (isProfilePath) {
-    startMode = (savedProfile && VALID_MODES.includes(savedProfile.from)) ? savedProfile.from : "yearbook";
+    startMode = (savedProfile && BASE_SECTIONS.includes(savedProfile.from)) ? savedProfile.from : "yearbook";
   } else if (urlProjectId) {
     startMode = "projects";
   } else if (rawPath === "student") {
