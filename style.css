@@ -72,6 +72,10 @@
 html {
     scroll-behavior: smooth;
     background: #04050d;
+    /* Tell the browser the UI is dark so native form controls — most importantly
+       the <select> dropdown popup (University / Faculty / Department / Year) and
+       its <option> list — render dark instead of the default white OS menu. */
+    color-scheme: dark;
     overscroll-behavior-x: none;
     font-size: 16px;                  /* lock 1rem = 16px across ALL browsers */
     -webkit-text-size-adjust: 100%;   /* prevent Chrome/Safari auto font scaling */
@@ -3996,7 +4000,12 @@ select.field-input {
     background-repeat: no-repeat;
     background-position: right 1rem center;
 }
+/* Match the dropdown popup to the site theme. color-scheme:dark on <html> makes
+   the native menu dark; these explicit colours keep it consistent everywhere and
+   dim the disabled placeholder row. */
 select.field-input option { background: var(--bg-deep); color: var(--text-primary); }
+select.field-input option:disabled { color: var(--text-muted); }
+select.field-input option:checked { background: rgba(139, 92, 246, 0.25); color: #fff; }
 
 /* Team list */
 .team-list { display: flex; flex-direction: column; gap: 0.8rem; margin-bottom: 1rem; }
